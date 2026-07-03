@@ -1,0 +1,80 @@
+########################################
+# Node / React Native / Expo (frontend)
+########################################
+node_modules/
+.expo/
+.expo-shared/
+dist/
+web-build/
+*.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.pnpm-debug.*
+
+# Metro
+.metro-health-check*
+
+# Native build outputs (managed workflow에서 prebuild 시)
+ios/
+android/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Environment
+.env
+.env.*
+!.env.example
+
+########################################
+# Java / Gradle / Spring Boot (backend)
+########################################
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Java
+*.class
+*.jar
+!gradle-wrapper.jar
+!**/gradlew
+*.war
+*.ear
+*.logs
+hs_err_pid*
+
+# Spring Boot
+out/
+
+########################################
+# IDE / Editor
+########################################
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.swp
+.settings/
+.project
+.classpath
+bin/
+
+########################################
+# OS
+########################################
+.DS_Store
+Thumbs.db
+
+# macOS AppleDouble files (non-APFS/exFAT 볼륨에서 생성됨, 예: USB)
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd

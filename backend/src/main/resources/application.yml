@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: eunggeubi
+  profiles:
+    active: local
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  datasource:
+    url: jdbc:h2:mem:eunggeubi
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    open-in-view: false
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  # TODO: 운영 환경에서는 MySQL 등으로 교체. 아래 값은 환경변수로 주입한다.
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/eunggeubi}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USERNAME:eunggeubi}
+    password: ${DB_PASSWORD:}
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
