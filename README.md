@@ -40,5 +40,4 @@ frontend/src/
 
 - `main` : 배포 브랜치 (직접 push 금지)
 - `develop` : 통합 개발 브랜치
-- `feature/be-도메인명` : 백엔드 기능 개발 (예: `feature/be-login`)
-- `feature/fe-도메인명` : 프론트엔드 기능 개발 (예: `feature/fe-login`)
+- `feature/도메인명` : 도메인 단위 기능 개발, 프론트/백엔드 변경 함께 포함 (예: `feature/login`)
