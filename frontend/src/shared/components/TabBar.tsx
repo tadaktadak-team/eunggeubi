@@ -2,7 +2,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
+import EmergencyButton from '../../domain/emergency/components/EmergencyButton';
 // 탭 아이콘. lib = 어느 아이콘 세트인지(ion=Ionicons, mci=MaterialCommunityIcons)
 const ICONS: Record<string, { lib: 'ion' | 'mci'; active: string; inactive: string }> = {
   AiChat: { lib: 'ion', active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline' },
@@ -68,13 +68,10 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
         </View>
       </View>
 
-      {/* 중앙 119 버튼 */}
-      <Pressable
-        style={styles.fab}
-        onPress={() => console.log('119 버튼 눌림 (2단계에서 길게누르기 구현 예정)')}
-      >
-        <Text style={styles.fabText}>119</Text>
-      </Pressable>
+    {/* 중앙 119 버튼 (길게 누르면 발동) */}
+      <View style={styles.fabWrapper}>
+        <EmergencyButton onFire={() => console.log('🚨 발동! (3단계에서 전화+알림 연결)')} />
+      </View>
     </View>
   );
 }
@@ -87,22 +84,10 @@ const styles = StyleSheet.create({
   centerSlot: { width: 80 },
   label: { fontSize: 12, color: '#999', marginTop: 2 },
   labelFocused: { color: '#d64533', fontWeight: 'bold' },
-  fab: {
+  fabWrapper: {
     position: 'absolute',
     top: -10,
     left: '50%',
-    marginLeft: -32,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#d64533',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 5,
+    marginLeft: -32, // 버튼 너비(64) 절반
   },
-  fabText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 });
