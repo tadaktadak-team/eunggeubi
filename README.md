@@ -7,7 +7,7 @@
 | 폴더 | 설명 | 기술스택 |
 |------|------|------|
 | `backend/` | REST API 서버 | Spring Boot 3.5.0, Java 17 |
-| `frontend/` | 모바일 앱 | React Native (Expo 57), TypeScript |
+| `frontend/` | 모바일 앱 | React Native (Expo 54), TypeScript |
 
 ## 브랜치 전략
 
