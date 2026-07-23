@@ -2,8 +2,10 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import EmergencyButton from '../../domain/emergency/components/EmergencyButton';
-// 탭 아이콘. lib = 어느 아이콘 세트인지(ion=Ionicons, mci=MaterialCommunityIcons)
+import { useEmergency } from '../../domain/emergency/hooks/useEmergency';
+
 const ICONS: Record<string, { lib: 'ion' | 'mci'; active: string; inactive: string }> = {
   AiChat: { lib: 'ion', active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline' },
   Hospital: { lib: 'ion', active: 'location', inactive: 'location-outline' },
@@ -11,7 +13,6 @@ const ICONS: Record<string, { lib: 'ion' | 'mci'; active: string; inactive: stri
   My: { lib: 'ion', active: 'person', inactive: 'person-outline' },
 };
 
-// 아이콘 하나 그려주는 작은 컴포넌트 (Ionicons / MaterialCommunityIcons 둘 다 처리)
 function TabIcon({ routeName, focused, color }: { routeName: string; focused: boolean; color: string }) {
   const icon = ICONS[routeName];
   if (!icon) return null;
@@ -25,6 +26,7 @@ function TabIcon({ routeName, focused, color }: { routeName: string; focused: bo
 
 export default function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { trigger } = useEmergency();
 
   const renderTab = (route: (typeof state.routes)[number], index: number) => {
     const { options } = descriptors[route.key];
@@ -54,23 +56,19 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
   return (
     <View style={[styles.wrapper, { paddingBottom: insets.bottom }]}>
       <View style={styles.bar}>
-        {/* 왼쪽 2개 */}
         <View style={styles.group}>
           {state.routes.slice(0, 2).map((route, i) => renderTab(route, i))}
         </View>
 
-        {/* 가운데 119 자리 */}
         <View style={styles.centerSlot} />
 
-        {/* 오른쪽 2개 */}
         <View style={styles.group}>
           {state.routes.slice(2, 4).map((route, i) => renderTab(route, i + 2))}
         </View>
       </View>
 
-    {/* 중앙 119 버튼 (길게 누르면 발동) */}
       <View style={styles.fabWrapper}>
-        <EmergencyButton onFire={() => console.log('🚨 발동! (3단계에서 전화+알림 연결)')} />
+        <EmergencyButton onFire={trigger} />
       </View>
     </View>
   );
@@ -88,6 +86,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -10,
     left: '50%',
-    marginLeft: -32, // 버튼 너비(64) 절반
+    marginLeft: -32,
   },
 });
