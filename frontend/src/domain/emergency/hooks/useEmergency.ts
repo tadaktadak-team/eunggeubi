@@ -1,11 +1,15 @@
 import * as Location from 'expo-location';
 import { useState } from 'react';
 import { Alert, Linking } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../../navigation/types';
 
 import { sendEmergencyAlert } from '../api/emergency';
 
 export function useEmergency() {
   const [loading, setLoading] = useState(false);
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const trigger = async () => {
     if (loading) return;
@@ -34,11 +38,11 @@ export function useEmergency() {
 
       const result = await sendEmergencyAlert(latitude, longitude);
 
-      // TODO: 4단계에서 결과 화면 이동으로 교체
-      Alert.alert(
-        '보호자에게 알림 발송됨',
-        `현재 위치: ${address}\n발송 대상: ${result.guardians.map((x) => x.name).join(', ')}`,
-      );
+      navigation.navigate('EmergencyResult', {
+        address,
+        sentAt: result.sentAt,
+        guardians: result.guardians,
+      });
     } catch (e) {
       Alert.alert('오류', '긴급 발동 중 문제가 발생했어요.');
       console.error(e);
