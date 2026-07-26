@@ -63,4 +63,9 @@ public class User extends BaseTimeEntity {
         this.address = address;
         this.status = status;
     }
+
+    // 비밀번호 변경 (재설정 시 사용)
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
 }
