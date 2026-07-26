@@ -42,6 +42,7 @@ public class JwtProvider {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + validityMs);
         return Jwts.builder()
+                .id(java.util.UUID.randomUUID().toString()) // 매번 고유(jti) → 같은 초에 만들어도 토큰이 달라짐
                 .subject(String.valueOf(userId)) // 토큰 주인 = 회원 id
                 .issuedAt(now)
                 .expiration(expiry)

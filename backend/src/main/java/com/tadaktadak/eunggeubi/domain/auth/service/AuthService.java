@@ -1,5 +1,5 @@
 package com.tadaktadak.eunggeubi.domain.auth.service;
-
+import com.tadaktadak.eunggeubi.domain.auth.entity.Purpose;
 import com.tadaktadak.eunggeubi.domain.auth.dto.LoginRequest;
 import com.tadaktadak.eunggeubi.domain.auth.dto.LoginResponse;
 import com.tadaktadak.eunggeubi.domain.auth.dto.SignupRequest;
@@ -36,6 +36,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
+    private final PhoneVerificationService phoneVerificationService;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -43,6 +44,8 @@ public class AuthService {
         if (userRepository.existsByEmail(request.email())) {
             throw new IllegalArgumentException("이미 가입된 이메일입니다.");
         }
+        // 1-2. 휴대폰 인증 완료된 번호인지 확인 (인증 안 된 번호는 가입 불가)
+        phoneVerificationService.ensureVerified(request.phone(), Purpose.SIGNUP);
 
         // 2. 만 14세 미만 판별 → 보호자 동의 필요 여부 & 회원 상태 결정
         boolean guardianConsentRequired =
@@ -93,6 +96,40 @@ public class AuthService {
         saveRefreshToken(user.getId(), refreshToken);
 
         return new LoginResponse(user.getId(), accessToken, refreshToken, "Bearer");
+    }
+    @Transactional
+    public LoginResponse reissue(String refreshToken) {
+        // 1. 토큰 자체 유효성 (서명·만료)
+        if (!jwtProvider.validateToken(refreshToken)) {
+            throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다.");
+        }
+
+        // 2. DB에 저장된 토큰인지 확인 (해시로 조회)
+        RefreshToken saved = refreshTokenRepository.findByTokenHash(hashToken(refreshToken))
+                .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다."));
+
+        // 3. 이미 폐기(로그아웃/재사용)된 토큰이면 거부
+        if (saved.getRevokedAt() != null) {
+            throw new IllegalArgumentException("이미 로그아웃되었거나 만료된 토큰입니다.");
+        }
+
+        // 4. 기존 토큰 폐기 (재발급 시 회전 — 한 번 쓴 refresh는 무효화)
+        saved.revoke(LocalDateTime.now());
+
+        // 5. 새 access + refresh 발급
+        Long userId = jwtProvider.getUserId(refreshToken);
+        String newAccessToken = jwtProvider.createAccessToken(userId);
+        String newRefreshToken = jwtProvider.createRefreshToken(userId);
+        saveRefreshToken(userId, newRefreshToken);
+
+        return new LoginResponse(userId, newAccessToken, newRefreshToken, "Bearer");
+    }
+
+    @Transactional
+    public void logout(String refreshToken) {
+        // 해당 refresh 토큰 폐기 (없거나 이미 폐기여도 조용히 성공 — 멱등)
+        refreshTokenRepository.findByTokenHash(hashToken(refreshToken))
+                .ifPresent(token -> token.revoke(LocalDateTime.now()));
     }
 
     private void saveRefreshToken(Long userId, String refreshToken) {

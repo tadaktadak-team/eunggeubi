@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.tadaktadak.eunggeubi.domain.auth.dto.LoginRequest;
 import com.tadaktadak.eunggeubi.domain.auth.dto.LoginResponse;
+import com.tadaktadak.eunggeubi.domain.auth.dto.ReissueRequest;
+import com.tadaktadak.eunggeubi.domain.auth.dto.LogoutRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -30,5 +32,15 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request)); // 200
+    }
+    @PostMapping("/reissue")
+    public ResponseEntity<LoginResponse> reissue(@Valid @RequestBody ReissueRequest request) {
+        return ResponseEntity.ok(authService.reissue(request.refreshToken())); // 200
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
+        authService.logout(request.refreshToken());
+        return ResponseEntity.noContent().build(); // 204
     }
 }

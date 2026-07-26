@@ -50,4 +50,8 @@ public class RefreshToken {
         this.expiresAt = expiresAt;
         this.revokedAt = revokedAt;
     }
+    // 리프레시 토큰 폐기 (로그아웃/재발급 시 기존 토큰 무효화)
+    public void revoke(LocalDateTime revokedAt) {
+        this.revokedAt = revokedAt;
+    }
 }

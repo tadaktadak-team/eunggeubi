@@ -73,4 +73,14 @@ public class PhoneVerification {
         this.verifiedAt = verifiedAt;
         this.createdAt = createdAt;
     }
+    // 인증 실패 시 시도 횟수 증가
+    public void increaseAttempt() {
+        this.attemptCount++;
+    }
+
+    // 인증 성공 처리
+    public void markVerified(LocalDateTime verifiedAt) {
+        this.status = VerificationStatus.VERIFIED;
+        this.verifiedAt = verifiedAt;
+    }
 }

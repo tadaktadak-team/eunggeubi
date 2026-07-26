@@ -33,7 +33,7 @@ public class SecurityConfig {
                 // 경로별 접근 권한
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**").permitAll()   // 회원가입·로그인·소셜·인증
-                        .requestMatchers("/health").permitAll()        // 서버 상태체크
+                        .requestMatchers("/health", "/error" ).permitAll()        // 서버 상태체크
                         .anyRequest().authenticated()                  // 나머지는 토큰 필수
                 )
 
