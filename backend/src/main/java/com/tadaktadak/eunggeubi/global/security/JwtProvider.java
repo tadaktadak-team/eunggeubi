@@ -6,6 +6,8 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -50,6 +52,12 @@ public class JwtProvider {
     // 토큰에서 회원 id 추출 (서명·만료 검증 포함)
     public Long getUserId(String token) {
         return Long.valueOf(parseClaims(token).getSubject());
+    }
+
+    // 토큰의 만료 시각을 LocalDateTime으로 반환 (refresh 토큰 DB 저장용)
+    public LocalDateTime getExpiration(String token) {
+        Date expiration = parseClaims(token).getExpiration();
+        return expiration.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
     }
 
     // 토큰이 유효한지 검사 (위조·만료면 false)

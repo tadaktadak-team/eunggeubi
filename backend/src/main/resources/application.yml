@@ -8,7 +8,6 @@ jwt:
   access-token-validity-ms: 3600000       # access 토큰 1시간
   refresh-token-validity-ms: 1209600000   # refresh 토큰 14일
 
-
 ---
 spring:
   config:
@@ -16,15 +15,9 @@ spring:
       on-profile: local
 
   datasource:
-    url: jdbc:h2:mem:eunggeubi
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: jdbc:mysql://localhost:3306/eunggeubi?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
 
   jpa:
     hibernate:
@@ -38,7 +31,7 @@ spring:
     activate:
       on-profile: prod
 
-
+  # 운영 환경에서는 환경변수로 주입한다.
   datasource:
     url: ${DB_URL:jdbc:mysql://localhost:3306/eunggeubi}
     driver-class-name: com.mysql.cj.jdbc.Driver
