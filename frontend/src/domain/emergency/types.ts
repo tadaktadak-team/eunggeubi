@@ -1,9 +1,0 @@
-export type Relationship = 'PARENT' | 'GRANDPARENT' | 'SIBLING' | 'OTHER';
-export type SendStatus = 'SENT' | 'FAILED';
-
-export interface GuardianResult {
-  name: string;
-  phone: string;
-  relationship: Relationship;
-  status: SendStatus;
-}
