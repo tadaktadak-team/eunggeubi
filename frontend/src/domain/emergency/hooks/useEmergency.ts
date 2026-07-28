@@ -3,21 +3,29 @@ import { useState } from 'react';
 import { Alert, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../../navigation/types';
 
+import { useAuth } from '../../auth/hooks/useAuth';
+import { RootStackParamList } from '../../../navigation/types';
 import { sendEmergencyAlert } from '../api/emergency';
 
 export function useEmergency() {
   const [loading, setLoading] = useState(false);
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { isLoggedIn } = useAuth();
 
   const trigger = async () => {
     if (loading) return;
     setLoading(true);
     try {
+      // 119 전화는 로그인 여부와 상관없이 항상 연결
       Linking.openURL('tel:119').catch(() => {
         Alert.alert('전화 연결 실패', '이 기기에서는 전화를 걸 수 없어요.');
       });
+
+      // 비회원은 전화만 연결하고 종료 (보호자 알림 안내는 앱 진입 시 처리)
+      if (!isLoggedIn) {
+        return;
+      }
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -28,7 +36,6 @@ export function useEmergency() {
       const pos = await Location.getCurrentPositionAsync({});
       const { latitude, longitude } = pos.coords;
 
-      // 좌표 → 사람이 읽는 주소 (실패 시 좌표 그대로 사용)
       let address = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
       const geo = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (geo.length > 0) {
