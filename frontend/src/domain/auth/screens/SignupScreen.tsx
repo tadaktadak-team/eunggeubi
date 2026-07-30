@@ -88,7 +88,8 @@ export default function SignupScreen() {
         agreeSensitiveInfo: agreePrivacy,
       });
       if (res.guardianConsentRequired) {
-        Alert.alert('보호자 동의 필요', '만 14세 미만은 보호자 동의가 필요해요.\n(보호자 동의 기능은 곧 추가돼요)');
+        navigation.navigate('GuardianConsent', { userId: res.userId, email: email.trim() });
+        return;
       }
       navigation.navigate('SignupComplete', { email: email.trim() });
     } catch (e: any) {

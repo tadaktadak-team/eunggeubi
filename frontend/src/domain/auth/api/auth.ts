@@ -5,6 +5,9 @@ import {
   Purpose,
   SignupRequest,
   SignupResponse,
+  GuardianRequest,
+  GuardianConsentResponse,
+  ConsentStatusResponse,
 } from '../types';
 
 export function signup(payload: SignupRequest) {
@@ -37,4 +40,12 @@ export function reissue(refreshToken: string) {
 
 export function logout(refreshToken: string) {
   return api.post<void>('/api/auth/logout', { refreshToken });
+}
+
+export function requestGuardianConsent(payload: GuardianRequest) {
+  return api.post<GuardianConsentResponse>('/api/auth/guardian/request', payload);
+}
+
+export function getGuardianConsentStatus(userId: number) {
+  return api.get<ConsentStatusResponse>(`/api/auth/guardian/status?userId=${userId}`);
 }
