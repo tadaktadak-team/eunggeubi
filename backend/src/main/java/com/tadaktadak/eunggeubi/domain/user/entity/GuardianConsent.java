@@ -64,4 +64,14 @@ public class GuardianConsent {
         this.confirmedAt = confirmedAt;
         this.expiresAt = expiresAt;
     }
+    // 보호자 동의 완료 처리
+    public void confirm(LocalDateTime confirmedAt) {
+        this.status = ConsentStatus.CONFIRMED;
+        this.confirmedAt = confirmedAt;
+    }
+
+    // 만료 처리
+    public void expire() {
+        this.status = ConsentStatus.EXPIRED;
+    }
 }

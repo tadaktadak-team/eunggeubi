@@ -88,11 +88,17 @@ public class AuthService {
             throw new IllegalArgumentException("탈퇴한 계정입니다.");
         }
 
-        // 4. 토큰 발급 (access + refresh)
+        // 4. 미성년자 보호자 동의 대기 회원 차단 (동의 완료 전엔 로그인 불가)
+        if (user.getStatus() == UserStatus.PENDING) {
+            throw new IllegalArgumentException("보호자 동의가 완료되지 않은 계정입니다.");
+        }
+
+
+        // 5. 토큰 발급 (access + refresh)
         String accessToken = jwtProvider.createAccessToken(user.getId());
         String refreshToken = jwtProvider.createRefreshToken(user.getId());
 
-        // 5. refresh 토큰은 해시로 DB 저장 (재발급/로그아웃 관리용)
+        // 6. refresh 토큰은 해시로 DB 저장 (재발급/로그아웃 관리용)
         saveRefreshToken(user.getId(), refreshToken);
 
         return new LoginResponse(user.getId(), accessToken, refreshToken, "Bearer");
