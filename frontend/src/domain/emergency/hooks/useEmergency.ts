@@ -48,6 +48,7 @@ export function useEmergency() {
       navigation.navigate('EmergencyResult', {
         address,
         sentAt: result.sentAt,
+        message: result.message,
         guardians: result.guardians,
       });
     } catch (e) {
