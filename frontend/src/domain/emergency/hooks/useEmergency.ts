@@ -18,9 +18,14 @@ export function useEmergency() {
     setLoading(true);
     try {
       // 119 전화는 로그인 여부와 상관없이 항상 연결
-      Linking.openURL('tel:119').catch(() => {
-        Alert.alert('전화 연결 실패', '이 기기에서는 전화를 걸 수 없어요.');
-      });
+      if (__DEV__) {
+        // 개발/테스트 중엔 실제 전화 대신 안내만
+        Alert.alert('개발 모드', '실제 배포 앱에서는 119로 전화가 연결됩니다.');
+      } else {
+        Linking.openURL('tel:119').catch(() => {
+          Alert.alert('전화 연결 실패', '이 기기에서는 전화를 걸 수 없어요.');
+        });
+      }
 
       // 비회원은 전화만 연결하고 종료 (보호자 알림 안내는 앱 진입 시 처리)
       if (!isLoggedIn) {
