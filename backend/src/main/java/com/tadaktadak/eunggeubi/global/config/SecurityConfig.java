@@ -32,9 +32,9 @@ public class SecurityConfig {
 
                 // 경로별 접근 권한
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()   // 회원가입·로그인·소셜·인증
-                        .requestMatchers("/health", "/error" ).permitAll()        // 서버 상태체크
-                        .anyRequest().authenticated()                  // 나머지는 토큰 필수
+                        .requestMatchers("/api/auth/**", "/api/drugs/**").permitAll()   // 회원가입·로그인·약품검색
+                        .requestMatchers("/health", "/error").permitAll()                // 서버 상태체크
+                        .anyRequest().authenticated()                                   // 나머지는 토큰 필수
                 )
 
                 // 시큐리티 기본 필터 앞에 우리 JWT 필터 끼워넣기

@@ -23,4 +23,9 @@ public class DrugController {
         List<DrugInfoResponse> results = drugService.searchDrugsByName(keyword);
         return ResponseEntity.ok(results);
     }
+    @GetMapping("/{itemSeq}")
+    public ResponseEntity<DrugInfoResponse> getDrugDetail(@PathVariable("itemSeq") String itemSeq) {
+        DrugInfoResponse response = drugService.getDrugDetail(itemSeq);
+        return ResponseEntity.ok(response);
+    }
 }
