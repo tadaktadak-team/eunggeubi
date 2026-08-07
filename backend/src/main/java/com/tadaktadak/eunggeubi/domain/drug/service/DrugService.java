@@ -1,80 +1,112 @@
 package com.tadaktadak.eunggeubi.domain.drug.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tadaktadak.eunggeubi.domain.drug.dto.DrugInfoResponse;
-import com.tadaktadak.eunggeubi.domain.drug.repository.DrugInfoRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class DrugService {
 
-    private final DrugInfoRepository drugInfoRepository;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
-    // 약품명 검색 (프론트엔드 개발용 Mock 데이터)
+    @Value("${openapi.e-drug.url}")
+    private String apiUrl;
+
+    @Value("${openapi.e-drug.service-key}")
+    private String serviceKey;
+
+    /**
+     * 1. 약품명 키워드 검색 API 연동
+     */
     public List<DrugInfoResponse> searchDrugsByName(String keyword) {
-        List<DrugInfoResponse> mockList = new ArrayList<>();
+        List<DrugInfoResponse> resultList = new ArrayList<>();
 
-        // 키워드 기본값 처리
-        String searchKey = (keyword == null || keyword.isBlank()) ? "일반" : keyword;
+        try {
+            // ⭐ 한글 키워드를 직접 URL 인코딩 (UTF-8)
+            String encodedKeyword = URLEncoder.encode(keyword, StandardCharsets.UTF_8.toString());
 
-        // 1. 대표 Mock 약품 1: 타이레놀
-        mockList.add(DrugInfoResponse.builder()
-                .itemSeq("199300001")
-                .name("타이레놀정500밀리그램 (" + searchKey + " 연관)")
-                .shape("장원형")
-                .color("하얀색")
-                .imprint("TYLENOL 500")
-                .efficacy("감기로 인한 발열 및 통증, 두통, 신경통, 근육통 완화")
-                .useInfo("성인 1회 1~2정씩 1일 3~4회 (4~6시간 간격) 필요시 복용")
-                .caution("매일 세 잔 이상 정기적으로 술을 마시는 사람이 이 약을 복용할 경우 간 손상이 유발될 수 있습니다.")
-                .drugType("일반의약품")
-                .build());
+            // build(true)를 유지하면서, 직접 인코딩한 키워드 삽입
+            URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
+                    .queryParam("serviceKey", serviceKey)
+                    .queryParam("itemName", encodedKeyword)
+                    .queryParam("type", "json")
+                    .queryParam("numOfRows", 10)
+                    .build(true)
+                    .toUri();
 
-        // 2. 대표 Mock 약품 2: 게보린
-        mockList.add(DrugInfoResponse.builder()
-                .itemSeq("198000002")
-                .name("게보린정 (" + searchKey + " 연관)")
-                .shape("삼각형")
-                .color("분홍색")
-                .imprint("GBN")
-                .efficacy("두통, 치통, 생리통, 신경통 완화")
-                .useInfo("성인 1회 1정 1일 3회까지 복용 (복용 간격은 4시간 이상)")
-                .caution("만 15세 미만의 소아는 복용하지 않도록 합니다.")
-                .drugType("일반의약품")
-                .build());
+            String responseString = restTemplate.getForObject(uri, String.class);
+            JsonNode rootNode = objectMapper.readTree(responseString);
+            JsonNode itemsNode = rootNode.path("body").path("items");
 
-        // 3. 대표 Mock 약품 3: 아스피린
-        mockList.add(DrugInfoResponse.builder()
-                .itemSeq("199800003")
-                .name("바이엘아스피린정500밀리그램")
-                .shape("원형")
-                .color("하얀색")
-                .imprint("BAYER")
-                .efficacy("혈전 예방, 두통, 관절통, 고열 완화")
-                .useInfo("성인 1회 1~2정씩 1일 2~3회 복용")
-                .caution("위장관 출혈 환자나 수술을 앞둔 환자는 복용을 금합니다.")
-                .drugType("일반의약품")
-                .build());
+            if (itemsNode.isArray()) {
+                for (JsonNode item : itemsNode) {
+                    resultList.add(mapToDrugInfoResponse(item));
+                }
+            }
+        } catch (Exception e) {
+            log.error("e약은요 Open API 검색 실패: {}", e.getMessage(), e);
+        }
 
-        return mockList;
+        return resultList;
     }
+
+    /**
+     * 2. 품목기준코드(itemSeq) 단건 상세 조회 API 연동
+     */
     public DrugInfoResponse getDrugDetail(String itemSeq) {
+        try {
+            // itemSeq는 보통 숫자지만 혹시 몰라 동일하게 인코딩 처리
+            String encodedItemSeq = URLEncoder.encode(itemSeq, StandardCharsets.UTF_8.toString());
+
+            URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
+                    .queryParam("serviceKey", serviceKey)
+                    .queryParam("itemSeq", encodedItemSeq)
+                    .queryParam("type", "json")
+                    .build(true)
+                    .toUri();
+
+            String responseString = restTemplate.getForObject(uri, String.class);
+            JsonNode rootNode = objectMapper.readTree(responseString);
+            JsonNode itemsNode = rootNode.path("body").path("items");
+
+            if (itemsNode.isArray() && !itemsNode.isEmpty()) {
+                return mapToDrugInfoResponse(itemsNode.get(0));
+            }
+        } catch (Exception e) {
+            log.error("e약은요 Open API 상세조회 실패: {}", e.getMessage(), e);
+        }
+
+        return null;
+    }
+
+    private DrugInfoResponse mapToDrugInfoResponse(JsonNode item) {
         return DrugInfoResponse.builder()
-                .itemSeq(itemSeq)
-                .name("타이레놀정500밀리그램 (상세조회)")
-                .shape("장원형")
-                .color("하얀색")
-                .imprint("TYLENOL 500")
-                .efficacy("감기로 인한 발열 및 통증, 두통, 신경통, 근육통 완화")
-                .useInfo("성인 1회 1~2정씩 1일 3~4회 (4~6시간 간격) 필요시 복용")
-                .caution("매일 세 잔 이상 정기적으로 술을 마시는 사람이 이 약을 복용할 경우 간 손상이 유발될 수 있습니다.")
+                .itemSeq(getTextOrNull(item, "itemSeq"))
+                .name(getTextOrNull(item, "itemName"))
+                .efficacy(getTextOrNull(item, "efcyQesitm"))       // 효능/효과
+                .useInfo(getTextOrNull(item, "useMethodQesitm"))   // 용법/용량
+                .caution(getTextOrNull(item, "atpnQesitm"))        // 주의사항
+                .itemImage(getTextOrNull(item, "itemImage"))       // 알약 이미지 URL
                 .drugType("일반의약품")
                 .build();
+    }
+    private String getTextOrNull(JsonNode node, String fieldName) {
+        JsonNode target = node.path(fieldName);
+        return (target.isMissingNode() || target.isNull()) ? null : target.asText();
     }
 }

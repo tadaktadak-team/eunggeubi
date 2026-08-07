@@ -17,6 +17,7 @@ public class DrugInfoResponse {
     private String useInfo;   // 용법/용량
     private String caution;   // 주의사항
     private String drugType;  // 약품구분
+    private String itemImage; // 알약 이미지 URL
 
     //DB에서 꺼낸 Entity를 프론트엔드용 DTO 상자로 변환해주는 메서드
     public static DrugInfoResponse from(DrugInfo drugInfo) {
