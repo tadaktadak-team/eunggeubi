@@ -17,8 +17,7 @@ type ResultRoute = RouteProp<RootStackParamList, 'EmergencyResult'>;
 
 export default function EmergencyResultScreen() {
   const { params } = useRoute<ResultRoute>();
-  const { address, guardians } = params;
-  const userName = '홍길동'; // TODO: 로그인 정보로 교체
+  const { address, message, guardians } = params;
 
   return (
     <View style={styles.container}>
@@ -40,9 +39,7 @@ export default function EmergencyResultScreen() {
             <Ionicons name="notifications-outline" size={16} color="#666" />
             <Text style={styles.cardHeaderText}>발송 메시지</Text>
           </View>
-          <Text style={styles.message}>
-            “{userName} 님이 응급 상황으로 서비스 이용 중, 현재 위치: [링크]”
-          </Text>
+          <Text style={styles.message}>“{message}”</Text>
         </View>
 
         {guardians.map((g) => (
