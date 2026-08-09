@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AiConsultationNavigator from '../domain/ai_consultations/screens/AiConsultationNavigator';
 import MyScreen from '../domain/auth/screens/MyScreen';
 import FindAccountScreen from '../domain/auth/screens/FindAccountScreen';
 import { useAuth } from '../domain/auth/hooks/useAuth';
@@ -26,9 +27,7 @@ function TabsNavigator() {
   return (
     <>
       <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
-        <Tab.Screen name="AiChat" options={{ title: 'AI상담' }}>
-          {() => <PlaceholderScreen name="AI상담" />}
-        </Tab.Screen>
+        <Tab.Screen name="AiChat" component={AiConsultationNavigator} options={{ title: 'AI상담' }} />
         <Tab.Screen name="Hospital" options={{ title: '병원찾기' }}>
           {() => <PlaceholderScreen name="병원찾기" />}
         </Tab.Screen>
