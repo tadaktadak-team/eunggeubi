@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import EmergencyButton from '../../domain/emergency/components/EmergencyButton';
 import { useEmergency } from '../../domain/emergency/hooks/useEmergency';
+import { colors } from '../theme/theme';
 
 const ICONS: Record<string, { lib: 'ion' | 'mci'; active: string; inactive: string }> = {
   AiChat: { lib: 'ion', active: 'chatbubble-ellipses', inactive: 'chatbubble-ellipses-outline' },
@@ -32,7 +33,7 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
     const { options } = descriptors[route.key];
     const label = options.title ?? route.name;
     const isFocused = state.index === index;
-    const color = isFocused ? '#d64533' : '#999';
+    const color = isFocused ? colors.primary : colors.placeholder;
 
     const onPress = () => {
       const event = navigation.emit({
@@ -75,13 +76,13 @@ export default function TabBar({ state, descriptors, navigation }: BottomTabBarP
 }
 
 const styles = StyleSheet.create({
-  wrapper: { backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee' },
+  wrapper: { backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.border },
   bar: { flexDirection: 'row', height: 60, alignItems: 'center' },
   group: { flex: 1, flexDirection: 'row' },
   tab: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerSlot: { width: 80 },
-  label: { fontSize: 12, color: '#999', marginTop: 2 },
-  labelFocused: { color: '#d64533', fontWeight: 'bold' },
+  label: { fontSize: 12, color: colors.placeholder, marginTop: 2 },
+  labelFocused: { color: colors.primary, fontWeight: 'bold' },
   fabWrapper: {
     position: 'absolute',
     top: -10,
