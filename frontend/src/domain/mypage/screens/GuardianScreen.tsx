@@ -2,11 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
-import { deleteGuardian, getGuardians } from '../api/guardian';
+import { deleteGuardian, getGuardians, updateGuardian } from '../api/guardian';
 import { Guardian, MyPageStackParamList, RELATIONSHIP_LABEL } from '../types';
 
 type Nav = NativeStackNavigationProp<MyPageStackParamList>;
@@ -51,6 +51,23 @@ export default function GuardianScreen() {
       },
     ]);
 
+  // 알림 on/off 토글 (낙관적 업데이트: 즉시 반영, 실패 시 롤백)
+  const onToggleNotify = async (g: Guardian) => {
+    const next = !g.notifyEnabled;
+    setGuardians((prev) => prev.map((x) => (x.id === g.id ? { ...x, notifyEnabled: next } : x)));
+    try {
+      await updateGuardian(g.id, {
+        name: g.name,
+        phone: g.phone,
+        relationship: g.relationship,
+        notifyEnabled: next,
+      });
+    } catch (e: any) {
+      setGuardians((prev) => prev.map((x) => (x.id === g.id ? { ...x, notifyEnabled: g.notifyEnabled } : x)));
+      Alert.alert('변경 실패', e?.message ?? '다시 시도해주세요.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <AppHeader title="보호자 관리" />
@@ -67,21 +84,33 @@ export default function GuardianScreen() {
         ) : (
           guardians.map((g) => (
             <View key={g.id} style={styles.card}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{g.name.charAt(0)}</Text>
+              <View style={styles.cardTop}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{g.name.charAt(0)}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name}>
+                    {g.name} <Text style={styles.relation}>{RELATIONSHIP_LABEL[g.relationship]}</Text>
+                  </Text>
+                  <Text style={styles.phone}>{g.phone}</Text>
+                </View>
+                <Pressable onPress={() => navigation.navigate('GuardianForm', { guardian: g })} hitSlop={8}>
+                  <Text style={styles.editBtn}>수정</Text>
+                </Pressable>
+                <Pressable onPress={() => onDelete(g)} hitSlop={8} style={{ marginLeft: spacing.sm }}>
+                  <Ionicons name="close" size={20} color={colors.placeholder} />
+                </Pressable>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>
-                  {g.name} <Text style={styles.relation}>{RELATIONSHIP_LABEL[g.relationship]}</Text>
-                </Text>
-                <Text style={styles.phone}>{g.phone}</Text>
+
+              <View style={styles.notifyRow}>
+                <Text style={styles.notifyLabel}>긴급 알림 받기</Text>
+                <Switch
+                  value={g.notifyEnabled}
+                  onValueChange={() => onToggleNotify(g)}
+                  trackColor={{ true: colors.primary, false: colors.border }}
+                  thumbColor={colors.white}
+                />
               </View>
-              <Pressable onPress={() => navigation.navigate('GuardianForm', { guardian: g })} hitSlop={8}>
-                <Text style={styles.editBtn}>수정</Text>
-              </Pressable>
-              <Pressable onPress={() => onDelete(g)} hitSlop={8} style={{ marginLeft: spacing.sm }}>
-                <Ionicons name="close" size={20} color={colors.placeholder} />
-              </Pressable>
             </View>
           ))
         )}
@@ -109,21 +138,29 @@ const styles = StyleSheet.create({
   badge: { backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 2 },
   badgeText: { color: colors.white, fontSize: font.caption, fontWeight: '700' },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
     backgroundColor: colors.white,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
+    gap: spacing.md,
   },
+  cardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: colors.primary, fontWeight: '700', fontSize: font.body },
   name: { fontSize: font.body, fontWeight: '700', color: colors.text },
   relation: { fontSize: font.caption, fontWeight: '400', color: colors.textSub },
   phone: { fontSize: font.sub, color: colors.textSub, marginTop: 2 },
   editBtn: { fontSize: font.sub, color: colors.textSub },
+  notifyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
+  },
+  notifyLabel: { fontSize: font.sub, color: colors.textSub },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
