@@ -1,24 +1,38 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { deleteGuardian, getGuardians } from '../api/guardian';
 import { Guardian, MyPageStackParamList, RELATIONSHIP_LABEL } from '../types';
 
 type Nav = NativeStackNavigationProp<MyPageStackParamList>;
 
-// TODO: API 연동 시 교체 (GET /api/guardians)
-const MOCK_GUARDIANS: Guardian[] = [
-  { id: 1, name: '김보호', relationship: 'PARENT', phone: '010-1234-5678' },
-  { id: 2, name: '이가족', relationship: 'SIBLING', phone: '010-9876-5432' },
-];
-
 export default function GuardianScreen() {
   const navigation = useNavigation<Nav>();
-  const [guardians, setGuardians] = useState<Guardian[]>(MOCK_GUARDIANS);
+  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setGuardians(await getGuardians());
+    } catch (e: any) {
+      Alert.alert('오류', e?.message ?? '보호자 목록을 불러오지 못했어요.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 화면에 들어올 때마다 최신 목록 (등록/수정 후 복귀 시 반영)
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load]),
+  );
 
   const onDelete = (g: Guardian) =>
     Alert.alert('삭제', `${g.name} 보호자를 삭제할까요?`, [
@@ -26,7 +40,14 @@ export default function GuardianScreen() {
       {
         text: '삭제',
         style: 'destructive',
-        onPress: () => setGuardians((prev) => prev.filter((x) => x.id !== g.id)), // TODO: DELETE API
+        onPress: async () => {
+          try {
+            await deleteGuardian(g.id);
+            setGuardians((prev) => prev.filter((x) => x.id !== g.id));
+          } catch (e: any) {
+            Alert.alert('삭제 실패', e?.message ?? '다시 시도해주세요.');
+          }
+        },
       },
     ]);
 
@@ -41,25 +62,29 @@ export default function GuardianScreen() {
           </View>
         </View>
 
-        {guardians.map((g) => (
-          <View key={g.id} style={styles.card}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{g.name.charAt(0)}</Text>
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+        ) : (
+          guardians.map((g) => (
+            <View key={g.id} style={styles.card}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{g.name.charAt(0)}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.name}>
+                  {g.name} <Text style={styles.relation}>{RELATIONSHIP_LABEL[g.relationship]}</Text>
+                </Text>
+                <Text style={styles.phone}>{g.phone}</Text>
+              </View>
+              <Pressable onPress={() => navigation.navigate('GuardianForm', { guardian: g })} hitSlop={8}>
+                <Text style={styles.editBtn}>수정</Text>
+              </Pressable>
+              <Pressable onPress={() => onDelete(g)} hitSlop={8} style={{ marginLeft: spacing.sm }}>
+                <Ionicons name="close" size={20} color={colors.placeholder} />
+              </Pressable>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>
-                {g.name} <Text style={styles.relation}>{RELATIONSHIP_LABEL[g.relationship]}</Text>
-              </Text>
-              <Text style={styles.phone}>{g.phone}</Text>
-            </View>
-            <Pressable onPress={() => navigation.navigate('GuardianForm', { guardian: g })} hitSlop={8}>
-              <Text style={styles.editBtn}>수정</Text>
-            </Pressable>
-            <Pressable onPress={() => onDelete(g)} hitSlop={8} style={{ marginLeft: spacing.sm }}>
-              <Ionicons name="close" size={20} color={colors.placeholder} />
-            </Pressable>
-          </View>
-        ))}
+          ))
+        )}
 
         <Pressable style={styles.addBtn} onPress={() => navigation.navigate('GuardianForm')}>
           <Ionicons name="add" size={20} color={colors.textSub} />

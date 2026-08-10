@@ -5,6 +5,7 @@ export interface Guardian {
   name: string;
   relationship: Relationship;
   phone: string;
+  notifyEnabled: boolean;
 }
 
 export const RELATIONSHIP_LABEL: Record<Relationship, string> = {

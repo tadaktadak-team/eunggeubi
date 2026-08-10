@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { addGuardian, updateGuardian } from '../api/guardian';
 import { MyPageStackParamList, Relationship, RELATIONSHIP_LABEL, RELATIONSHIP_OPTIONS } from '../types';
 
 type Nav = NativeStackNavigationProp<MyPageStackParamList>;
@@ -18,14 +19,28 @@ export default function GuardianFormScreen() {
   const [name, setName] = useState(editing?.name ?? '');
   const [phone, setPhone] = useState(editing?.phone ?? '');
   const [relationship, setRelationship] = useState<Relationship>(editing?.relationship ?? 'PARENT');
+  const [saving, setSaving] = useState(false);
 
-  const onSave = () => {
+  const onSave = async () => {
     if (!name.trim() || !phone.trim()) {
       Alert.alert('입력 확인', '이름과 전화번호를 입력해주세요.');
       return;
     }
-    // TODO: API 연동 (등록: POST, 수정: PUT)
-    Alert.alert('저장', '준비 중입니다.', [{ text: '확인', onPress: () => navigation.goBack() }]);
+    try {
+      setSaving(true);
+      const body = { name: name.trim(), phone: phone.trim(), relationship };
+      if (editing) {
+        // 수정: 기존 알림 설정은 유지
+        await updateGuardian(editing.id, { ...body, notifyEnabled: editing.notifyEnabled });
+      } else {
+        await addGuardian(body);
+      }
+      navigation.goBack();
+    } catch (e: any) {
+      Alert.alert('저장 실패', e?.message ?? '다시 시도해주세요.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -69,8 +84,8 @@ export default function GuardianFormScreen() {
           })}
         </View>
 
-        <Pressable style={styles.saveBtn} onPress={onSave}>
-          <Text style={styles.saveText}>저장</Text>
+        <Pressable style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={onSave} disabled={saving}>
+          <Text style={styles.saveText}>{saving ? '저장 중...' : '저장'}</Text>
         </Pressable>
       </ScrollView>
     </View>
