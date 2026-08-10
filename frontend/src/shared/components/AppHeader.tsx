@@ -3,6 +3,8 @@ import { useNavigation } from '@react-navigation/native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { colors } from '../theme/theme';
+
 type Props = {
   title: string;
   onBack?: () => void; // 없으면 기본 뒤로가기
@@ -18,7 +20,7 @@ export default function AppHeader({ title, onBack }: Props) {
     <View style={[styles.header, { paddingTop: insets.top }]}>
       <View style={styles.row}>
         <Pressable onPress={handleBack} style={styles.side} hitSlop={8}>
-          <Ionicons name="chevron-back" size={26} color="#333" />
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
         </Pressable>
         <Text style={styles.title}>{title}</Text>
         <View style={styles.side} />
@@ -29,9 +31,9 @@ export default function AppHeader({ title, onBack }: Props) {
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
   },
   row: {
     height: 52,
@@ -48,6 +50,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: 'bold',
-    color: '#222',
+    color: colors.text,
   },
 });

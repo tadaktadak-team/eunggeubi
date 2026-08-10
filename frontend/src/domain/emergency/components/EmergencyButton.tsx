@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import { colors } from '../../../shared/theme/theme';
+
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const SIZE = 64;
@@ -59,7 +61,7 @@ export default function EmergencyButton({ onFire }: Props) {
           cx={SIZE / 2}
           cy={SIZE / 2}
           r={RADIUS}
-          stroke="#fff"
+          stroke={colors.white}
           strokeWidth={STROKE}
           fill="none"
           strokeDasharray={CIRCUMFERENCE}
@@ -85,7 +87,7 @@ const styles = StyleSheet.create({
     width: SIZE,
     height: SIZE,
     borderRadius: SIZE / 2,
-    backgroundColor: '#d64533',
+    backgroundColor: colors.primary,
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -97,7 +99,7 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '-90deg' }], // 시작점을 12시 방향으로
   },
   text: {
-    color: '#fff',
+    color: colors.white,
     fontWeight: 'bold',
     fontSize: 16,
   },
