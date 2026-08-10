@@ -2,6 +2,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AiConsultationNavigator from '../domain/ai_consultations/screens/AiConsultationNavigator';
 import MyScreen from '../domain/user/screens/MyScreen';
 import FindAccountScreen from '../domain/auth/screens/FindAccountScreen';
 import { useAuth } from '../domain/auth/hooks/useAuth';
@@ -16,24 +17,31 @@ import EmergencyResultScreen from '../domain/emergency/screens/EmergencyResultSc
 import PlaceholderScreen from '../shared/components/PlaceholderScreen';
 import TabBar from '../shared/components/TabBar';
 import { RootStackParamList } from './types';
+import { useState } from 'react';
+import LoginRequiredSheet from '../domain/auth/screens/../components/LoginRequiredSheet';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 function TabsNavigator() {
+  const { isLoggedIn } = useAuth();
+  const [guestSheetVisible, setGuestSheetVisible] = useState(!isLoggedIn);
+
   return (
-    <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="AiChat" options={{ title: 'AI상담' }}>
-        {() => <PlaceholderScreen name="AI상담" />}
-      </Tab.Screen>
-      <Tab.Screen name="Hospital" options={{ title: '병원찾기' }}>
-        {() => <PlaceholderScreen name="병원찾기" />}
-      </Tab.Screen>
-      <Tab.Screen name="Medicine" options={{ title: '약물정보' }}>
-        {() => <PlaceholderScreen name="약물정보" />}
-      </Tab.Screen>
-      <Tab.Screen name="My" component={MyScreen} options={{ title: '마이' }} />
-    </Tab.Navigator>
+    <>
+      <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
+        <Tab.Screen name="AiChat" component={AiConsultationNavigator} options={{ title: 'AI상담' }} />
+        <Tab.Screen name="Hospital" options={{ title: '병원찾기' }}>
+          {() => <PlaceholderScreen name="병원찾기" />}
+        </Tab.Screen>
+        <Tab.Screen name="Medicine" options={{ title: '약물정보' }}>
+          {() => <PlaceholderScreen name="약물정보" />}
+        </Tab.Screen>
+        <Tab.Screen name="My" component={MyScreen} options={{ title: '마이' }} />
+      </Tab.Navigator>
+
+      <LoginRequiredSheet visible={guestSheetVisible} onClose={() => setGuestSheetVisible(false)} />
+    </>
   );
 }
 

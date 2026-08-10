@@ -14,6 +14,7 @@ export type RootStackParamList = {
   EmergencyResult: {
     address: string;
     sentAt: string;
+    message: string;
     guardians: GuardianResult[];
   };
 };
