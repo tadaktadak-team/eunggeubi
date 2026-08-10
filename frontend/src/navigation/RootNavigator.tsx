@@ -3,7 +3,6 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AiConsultationNavigator from '../domain/ai_consultations/screens/AiConsultationNavigator';
-import MyPageHomeScreen from '../domain/mypage/screens/MyPageHomeScreen';
 import FindAccountScreen from '../domain/auth/screens/FindAccountScreen';
 import { useAuth } from '../domain/auth/hooks/useAuth';
 import LoginScreen from '../domain/auth/screens/LoginScreen';
@@ -16,6 +15,7 @@ import TabBar from '../shared/components/TabBar';
 import { RootStackParamList } from './types';
 import { useState } from 'react';
 import LoginRequiredSheet from '../domain/auth/screens/../components/LoginRequiredSheet';
+import MyPageNavigator from '../domain/mypage/screens/MyPageNavigator';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -34,7 +34,7 @@ function TabsNavigator() {
         <Tab.Screen name="Medicine" options={{ title: '약물정보' }}>
           {() => <PlaceholderScreen name="약물정보" />}
         </Tab.Screen>
-        <Tab.Screen name="My" component={MyPageHomeScreen} options={{ title: '마이' }} />
+        <Tab.Screen name="My" component={MyPageNavigator} options={{ title: '마이' }} />
       </Tab.Navigator>
 
       <LoginRequiredSheet visible={guestSheetVisible} onClose={() => setGuestSheetVisible(false)} />

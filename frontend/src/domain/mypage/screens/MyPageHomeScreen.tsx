@@ -1,14 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { MyPageStackParamList } from '../types';
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../../auth/hooks/useAuth';
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
+type Nav = CompositeNavigationProp<
+  NativeStackNavigationProp<MyPageStackParamList>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 type IconName = keyof typeof Ionicons.glyphMap;
 
 // TODO: API 연동 시 교체 (GET /users/me, 보호자 수, 상담 수, 건강 프로필)
@@ -47,6 +51,11 @@ export default function MyPageHomeScreen() {
       { text: '로그아웃', style: 'destructive', onPress: () => signOut() },
     ]);
 
+  const onQuick = (key: string, label: string) => {
+    if (key === 'guardian') navigation.navigate('Guardian');
+    else go(label); // 건강/상담은 아직
+  };
+
   if (!isLoggedIn) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
@@ -83,7 +92,7 @@ export default function MyPageHomeScreen() {
         {/* 퀵 액션 3개 */}
         <View style={styles.quickRow}>
           {QUICK.map((q) => (
-            <Pressable key={q.key} style={styles.quickItem} onPress={() => go(q.label)}>
+            <Pressable key={q.key} style={styles.quickItem} onPress={() => onQuick(q.key, q.label)}>
               <Ionicons name={q.icon} size={24} color={colors.primary} />
               <Text style={styles.quickLabel}>{q.label}</Text>
             </Pressable>
