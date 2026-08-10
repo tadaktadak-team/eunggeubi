@@ -2,6 +2,7 @@
 export const colors = {
   primary: '#d64533',      // 메인 크림슨 레드 (버튼·포인트)
   primaryDark: '#C42C38',
+  primaryLight: '#FCE9E7', 
   black: '#111111',        // 로그인 버튼 등
   white: '#FFFFFF',
   bg: '#FFFFFF',
