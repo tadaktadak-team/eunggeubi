@@ -53,4 +53,12 @@ public class Guardian {
         this.notifyEnabled = notifyEnabled;
         this.createdAt = createdAt;
     }
+
+    // 보호자 정보 수정 (변경 감지로 반영)
+    public void update(String name, String phone, Relationship relationship, boolean notifyEnabled) {
+        this.name = name;
+        this.phone = phone;
+        this.relationship = relationship;
+        this.notifyEnabled = notifyEnabled;
+    }
 }
