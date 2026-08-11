@@ -24,6 +24,12 @@ public class HospitalService {
     @Value("${openapi.hospital.url}")
     private String apiUrl;
 
+    @Value("${openapi.pharmacy.url}")
+    private String pharmacyApiUrl;
+
+    @Value("${openapi.pharmacy.service-key}")
+    private String pharmacyServiceKey;
+
     @Value("${openapi.hospital.service-key}")
     private String serviceKey;
 
@@ -58,6 +64,35 @@ public class HospitalService {
         }
     }
 
+    public List<HospitalResponse> findNearbyPharmacies(
+            double latitude,
+            double longitude
+    ) {
+
+        try {
+            String url = UriComponentsBuilder
+                    .fromHttpUrl(pharmacyApiUrl)
+                    .queryParam("ServiceKey", pharmacyServiceKey)
+                    .queryParam("pageNo", 1)
+                    .queryParam("numOfRows", 20)
+                    .queryParam("xPos", longitude)
+                    .queryParam("yPos", latitude)
+                    .queryParam("radius", 5000)
+                    .build()
+                    .toUriString();
+
+            log.info("약국 API 요청: {}", pharmacyApiUrl);
+
+            String response = restTemplate.getForObject(url, String.class);
+
+            return parseResponse(response);
+
+        } catch (Exception e) {
+            log.error("약국 API 호출 실패", e);
+            throw new RuntimeException("약국 정보를 불러오지 못했습니다.");
+        }
+    }
+
     private List<HospitalResponse> parseResponse(String response)
             throws Exception {
 
@@ -87,9 +122,10 @@ public class HospitalService {
                             .name(text(item, "yadmNm"))
                             .address(text(item, "addr"))
                             .phone(text(item, "telno"))
-                            .latitude(doubleValue(item, "YPos"))
-                            .longitude(doubleValue(item, "XPos"))
+                            .latitude(doubleValue(item, "yPos"))
+                            .longitude(doubleValue(item, "xPos"))
                             .type(text(item, "clCdNm"))
+                            .distance(doubleValue(item, "distance"))
                             .build()
             );
         }

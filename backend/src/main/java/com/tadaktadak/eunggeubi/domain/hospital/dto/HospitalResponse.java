@@ -17,5 +17,6 @@ public class HospitalResponse {
     private String phone;       // 전화번호
     private Double latitude;    // 위도
     private Double longitude;   // 경도
+    private Double distance;
     private String type;        // 병원 종류
 }

@@ -22,4 +22,11 @@ public class HospitalController {
     ) {
         return hospitalService.findNearbyHospitals(lat, lng);
     }
+    @GetMapping("/api/pharmacies")
+    public List<HospitalResponse> findNearbyPharmacies(
+            @RequestParam double lat,
+            @RequestParam double lng
+    ) {
+        return hospitalService.findNearbyPharmacies(lat, lng);
+    }
 }
