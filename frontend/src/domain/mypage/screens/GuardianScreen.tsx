@@ -27,31 +27,12 @@ export default function GuardianScreen() {
     }
   }, []);
 
-  // 화면에 들어올 때마다 최신 목록 (등록/수정 후 복귀 시 반영)
   useFocusEffect(
     useCallback(() => {
       load();
     }, [load]),
   );
 
-  const onDelete = (g: Guardian) =>
-    Alert.alert('삭제', `${g.name} 보호자를 삭제할까요?`, [
-      { text: '취소', style: 'cancel' },
-      {
-        text: '삭제',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteGuardian(g.id);
-            setGuardians((prev) => prev.filter((x) => x.id !== g.id));
-          } catch (e: any) {
-            Alert.alert('삭제 실패', e?.message ?? '다시 시도해주세요.');
-          }
-        },
-      },
-    ]);
-
-  // 알림 on/off 토글 (낙관적 업데이트: 즉시 반영, 실패 시 롤백)
   const onToggleNotify = async (g: Guardian) => {
     const next = !g.notifyEnabled;
     setGuardians((prev) => prev.map((x) => (x.id === g.id ? { ...x, notifyEnabled: next } : x)));
@@ -67,6 +48,22 @@ export default function GuardianScreen() {
       Alert.alert('변경 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
+
+  const runDelete = async (g: Guardian) => {
+    try {
+      await deleteGuardian(g.id);
+      setGuardians((prev) => prev.filter((x) => x.id !== g.id));
+    } catch (e: any) {
+      Alert.alert('삭제 실패', e?.message ?? '다시 시도해주세요.');
+    }
+  };
+
+  const openMenu = (g: Guardian) =>
+    Alert.alert(g.name, '작업을 선택하세요', [
+      { text: '수정', onPress: () => navigation.navigate('GuardianForm', { guardian: g }) },
+      { text: '삭제', style: 'destructive', onPress: () => runDelete(g) },
+      { text: '취소', style: 'cancel' },
+    ]);
 
   return (
     <View style={styles.container}>
@@ -84,33 +81,25 @@ export default function GuardianScreen() {
         ) : (
           guardians.map((g) => (
             <View key={g.id} style={styles.card}>
-              <View style={styles.cardTop}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{g.name.charAt(0)}</Text>
+              <View style={{ flex: 1 }}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.name}>{g.name}</Text>
+                  <View style={styles.relChip}>
+                    <Text style={styles.relChipText}>{RELATIONSHIP_LABEL[g.relationship]}</Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.name}>
-                    {g.name} <Text style={styles.relation}>{RELATIONSHIP_LABEL[g.relationship]}</Text>
-                  </Text>
-                  <Text style={styles.phone}>{g.phone}</Text>
-                </View>
-                <Pressable onPress={() => navigation.navigate('GuardianForm', { guardian: g })} hitSlop={8}>
-                  <Text style={styles.editBtn}>수정</Text>
-                </Pressable>
-                <Pressable onPress={() => onDelete(g)} hitSlop={8} style={{ marginLeft: spacing.sm }}>
-                  <Ionicons name="close" size={20} color={colors.placeholder} />
-                </Pressable>
+                <Text style={styles.phone}>{g.phone}</Text>
               </View>
-
-              <View style={styles.notifyRow}>
-                <Text style={styles.notifyLabel}>긴급 알림 받기</Text>
-                <Switch
-                  value={g.notifyEnabled}
-                  onValueChange={() => onToggleNotify(g)}
-                  trackColor={{ true: colors.primary, false: colors.border }}
-                  thumbColor={colors.white}
-                />
-              </View>
+              <Switch
+                value={g.notifyEnabled}
+                onValueChange={() => onToggleNotify(g)}
+                trackColor={{ true: colors.primary, false: colors.border }}
+                thumbColor={colors.white}
+                style={{ marginTop: 4 }}
+              />
+              <Pressable onPress={() => openMenu(g)} hitSlop={8} style={styles.menuBtn}>
+                <Ionicons name="ellipsis-vertical" size={20} color={colors.placeholder} />
+              </Pressable>
             </View>
           ))
         )}
@@ -138,29 +127,32 @@ const styles = StyleSheet.create({
   badge: { backgroundColor: colors.primary, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: 2 },
   badgeText: { color: colors.white, fontSize: font.caption, fontWeight: '700' },
   card: {
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: colors.primary, fontWeight: '700', fontSize: font.body },
-  name: { fontSize: font.body, fontWeight: '700', color: colors.text },
-  relation: { fontSize: font.caption, fontWeight: '400', color: colors.textSub },
-  phone: { fontSize: font.sub, color: colors.textSub, marginTop: 2 },
-  editBtn: { fontSize: font.sub, color: colors.textSub },
-  notifyRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.md,
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
-  notifyLabel: { fontSize: font.sub, color: colors.textSub },
+  name: { fontSize: font.h3, fontWeight: '700', color: colors.text },
+  phone: { fontSize: font.body, color: colors.textSub, marginTop: 2 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  relChip: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+  },
+  relChipText: { fontSize: font.caption, color: colors.primaryDark, fontWeight: '600' },
+  menuBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   addBtn: {
     flexDirection: 'row',
     alignItems: 'center',
