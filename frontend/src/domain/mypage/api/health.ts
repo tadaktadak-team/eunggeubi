@@ -1,12 +1,10 @@
+import { api } from '../../../shared/api/client';
 import { HealthProfile } from '../types';
 
-// TODO: 백엔드 연동 시 GET /api/health, PUT /api/health 로 교체
-export async function getHealthProfile(): Promise<HealthProfile> {
-  await new Promise((r) => setTimeout(r, 300));
-  return { bloodType: null, diseases: [], allergies: [], medications: [] };
+export function getHealthProfile() {
+  return api.get<HealthProfile>('/api/health', { auth: true });
 }
 
-export async function saveHealthProfile(body: HealthProfile): Promise<HealthProfile> {
-  await new Promise((r) => setTimeout(r, 300));
-  return body;
+export function saveHealthProfile(body: HealthProfile) {
+  return api.put<HealthProfile>('/api/health', body, { auth: true });
 }
