@@ -116,26 +116,10 @@ export default function HealthScreen() {
   return (
     <View style={styles.container}>
       <AppHeader title="건강 프로필" />
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* 요약 카드 */}
-        <View style={styles.summary}>
-          <Text style={styles.summaryLabel}>응급 시 참고·전달용</Text>
-          <View style={styles.chipWrap}>
-            {bloodType && (
-              <View style={styles.summaryChip}>
-                <Text style={styles.summaryChipText}>{bloodType}형</Text>
-              </View>
-            )}
-            {[...diseases, ...allergies].map((it) => (
-              <View key={it} style={styles.summaryChip}>
-                <Text style={styles.summaryChipText}>{it}</Text>
-              </View>
-            ))}
-            {!bloodType && diseases.length === 0 && allergies.length === 0 && (
-              <Text style={styles.empty}>아래에서 정보를 입력해주세요</Text>
-            )}
-          </View>
-        </View>
+      <ScrollView contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
 
         {/* 혈액형 (단일 선택) */}
         <View style={styles.section}>
