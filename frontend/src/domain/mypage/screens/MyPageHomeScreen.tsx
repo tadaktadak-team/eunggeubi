@@ -53,6 +53,7 @@ export default function MyPageHomeScreen() {
 
   const onQuick = (key: string, label: string) => {
     if (key === 'guardian') navigation.navigate('Guardian');
+    else if (key === 'health') navigation.navigate('Health');
     else go(label); // 건강/상담은 아직
   };
 
@@ -120,7 +121,7 @@ export default function MyPageHomeScreen() {
         </View>
 
         {/* 건강 프로필 하이라이트 */}
-        <Pressable style={styles.healthCard} onPress={() => go('건강 프로필')}>
+        <Pressable style={styles.healthCard} onPress={() => navigation.navigate('Health')}>
           <Ionicons name="medkit-outline" size={22} color={colors.primary} />
           <View style={{ flex: 1 }}>
             <Text style={styles.healthTitle}>내 건강 프로필 확인하기</Text>
