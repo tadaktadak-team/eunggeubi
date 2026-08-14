@@ -20,7 +20,6 @@ export const RELATIONSHIP_OPTIONS: Relationship[] = ['PARENT', 'GRANDPARENT', 'S
 export interface HealthProfile {
   bloodType: string | null;
   diseases: string[];
-  allergies: string[];
   medications: string[];
 }
 

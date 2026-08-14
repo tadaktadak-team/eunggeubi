@@ -5,7 +5,6 @@ import java.util.List;
 public record HealthProfileRequest(
         String bloodType, //혈액형
         List<String> diseases, //병명
-        List<String> allergies, //알레르기
         List<String> medications //약명
 ) {
 }

@@ -26,12 +26,11 @@ public class HealthProfileService {
     @Transactional
     public HealthProfileResponse saveProfile(Long userId, HealthProfileRequest req) {
         String diseases = toCsv(req.diseases());
-        String allergies = toCsv(req.allergies());
         String medications = toCsv(req.medications());
 
         HealthProfile profile = healthProfileRepository.findByUserId(userId)
                 .map(p -> {
-                    p.update(req.bloodType(), diseases, allergies, medications);
+                    p.update(req.bloodType(), diseases, medications);
                     return p; // 변경 감지로 UPDATE
                 })
                 .orElseGet(() -> healthProfileRepository.save(
@@ -39,7 +38,6 @@ public class HealthProfileService {
                                 .userId(userId)
                                 .bloodType(req.bloodType())
                                 .diseases(diseases)
-                                .allergies(allergies)
                                 .medications(medications)
                                 .build()
                 ));
