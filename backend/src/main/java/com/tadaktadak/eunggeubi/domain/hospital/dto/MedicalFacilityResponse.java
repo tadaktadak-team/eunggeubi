@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class HospitalResponse {
+public class MedicalFacilityResponse {
 
     private String ykiho;       // 암호화된 요양기호
     private String name;        // 병원명

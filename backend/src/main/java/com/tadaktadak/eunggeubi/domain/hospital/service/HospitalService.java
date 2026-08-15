@@ -2,7 +2,7 @@ package com.tadaktadak.eunggeubi.domain.hospital.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import com.tadaktadak.eunggeubi.domain.hospital.dto.HospitalResponse;
+import com.tadaktadak.eunggeubi.domain.hospital.dto.MedicalFacilityResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,25 +23,52 @@ public class HospitalService {
     private final RestTemplate restTemplate;
     private final XmlMapper xmlMapper;
 
+    // URL은 병원/약국 각각 사용
     @Value("${openapi.hospital.url}")
     private String apiUrl;
 
     @Value("${openapi.pharmacy.url}")
     private String pharmacyApiUrl;
 
-    @Value("${openapi.pharmacy.service-key}")
-    private String pharmacyServiceKey;
-
-    @Value("${openapi.hospital.service-key}")
+    // 서비스키는 하나만 사용
+    @Value("${medical_locator.secret}")
     private String serviceKey;
 
-    public List<HospitalResponse> findNearbyHospitals(
+    public List<MedicalFacilityResponse> findNearbyHospitals(
             double latitude,
             double longitude
     ) {
+        return findNearby(
+                apiUrl,
+                serviceKey,
+                latitude,
+                longitude,
+                "병원"
+        );
+    }
 
+    public List<MedicalFacilityResponse> findNearbyPharmacies(
+            double latitude,
+            double longitude
+    ) {
+        return findNearby(
+                pharmacyApiUrl,
+                serviceKey,
+                latitude,
+                longitude,
+                "약국"
+        );
+    }
+
+    private List<MedicalFacilityResponse> findNearby(
+            String apiUrl,
+            String serviceKey,
+            double latitude,
+            double longitude,
+            String type
+    ) {
         try {
-            String url = UriComponentsBuilder
+            URI uri = UriComponentsBuilder
                     .fromHttpUrl(apiUrl)
                     .queryParam("ServiceKey", serviceKey)
                     .queryParam("pageNo", 1)
@@ -47,61 +76,30 @@ public class HospitalService {
                     .queryParam("xPos", longitude)
                     .queryParam("yPos", latitude)
                     .queryParam("radius", 5000)
-                    .build()
-                    .toUriString();
+                    .build(true)
+                    .toUri();
 
-            log.info("병원 API 요청: {}", apiUrl);
+            byte[] responseBytes = restTemplate.getForObject(uri, byte[].class);
 
-            String response = restTemplate.getForObject(url, String.class);
-
-            System.out.println(response);
-
-            return parseResponse(response);
-
-        } catch (Exception e) {
-            log.error("병원 API 호출 실패", e);
-            throw new RuntimeException("병원 정보를 불러오지 못했습니다.");
-        }
-    }
-
-    public List<HospitalResponse> findNearbyPharmacies(
-            double latitude,
-            double longitude
-    ) {
-
-        try {
-            String url = UriComponentsBuilder
-                    .fromHttpUrl(pharmacyApiUrl)
-                    .queryParam("ServiceKey", pharmacyServiceKey)
-                    .queryParam("pageNo", 1)
-                    .queryParam("numOfRows", 20)
-                    .queryParam("xPos", longitude)
-                    .queryParam("yPos", latitude)
-                    .queryParam("radius", 5000)
-                    .build()
-                    .toUriString();
-
-            log.info("약국 API 요청: {}", pharmacyApiUrl);
-
-            String response = restTemplate.getForObject(url, String.class);
+            String response =
+                    new String(responseBytes, StandardCharsets.UTF_8);
 
             return parseResponse(response);
 
         } catch (Exception e) {
-            log.error("약국 API 호출 실패", e);
-            throw new RuntimeException("약국 정보를 불러오지 못했습니다.");
+            log.error("{} API 호출 실패", type, e);
+            throw new RuntimeException(type + " 정보를 불러오지 못했습니다.");
         }
     }
 
-    private List<HospitalResponse> parseResponse(String response)
+    private List<MedicalFacilityResponse> parseResponse(String response)
             throws Exception {
 
         JsonNode root = xmlMapper.readTree(response);
 
-        List<HospitalResponse> result = new ArrayList<>();
+        List<MedicalFacilityResponse> result = new ArrayList<>();
 
         JsonNode items = root
-                .path("response")
                 .path("body")
                 .path("items")
                 .path("item");
@@ -115,15 +113,14 @@ public class HospitalService {
         }
 
         for (JsonNode item : items) {
-
             result.add(
-                    HospitalResponse.builder()
+                    MedicalFacilityResponse.builder()
                             .ykiho(text(item, "ykiho"))
                             .name(text(item, "yadmNm"))
                             .address(text(item, "addr"))
                             .phone(text(item, "telno"))
-                            .latitude(doubleValue(item, "yPos"))
-                            .longitude(doubleValue(item, "xPos"))
+                            .latitude(doubleValue(item, "YPos"))
+                            .longitude(doubleValue(item, "XPos"))
                             .type(text(item, "clCdNm"))
                             .distance(doubleValue(item, "distance"))
                             .build()

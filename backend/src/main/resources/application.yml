@@ -46,3 +46,6 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET}
+
+medical_locator:
+  secret: ${MEDICAL_LOCATOR_SECRET}
