@@ -71,8 +71,11 @@ export default function SymptomHomeScreen() {
         <Text style={styles.sectionTitle}>바로가기</Text>
         <View style={styles.quickLinkRow}>
           <QuickLinkCard label="병원찾기" icon={{ lib: 'ion', name: 'location-outline' }} onPress={() => goToTab('Hospital')} />
-          {/* 목업에 동일 라벨("병원찾기")이 두 번 나와 있어 그대로 옮겼습니다. 실제로는 다른 목적지(예: 약국찾기)일 가능성이 있어요 */}
-          <QuickLinkCard label="병원찾기" icon={{ lib: 'ion', name: 'location-outline' }} onPress={() => goToTab('Hospital')} />
+          <QuickLinkCard
+            label="응급처치 안내"
+            icon={{ lib: 'ion', name: 'alert-circle-outline' }}
+            onPress={() => navigation.navigate('FirstAidGuide', {})}
+          />
           <QuickLinkCard label="약물정보" icon={{ lib: 'mci', name: 'pill' }} onPress={() => goToTab('Medicine')} />
         </View>
 
