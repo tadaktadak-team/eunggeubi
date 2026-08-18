@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+    <HEAD>
+        <CODE>E001</CODE>
+        <MESSAGE>잘못된 요청입니다.</MESSAGE>
+    </HEAD>
+</response>

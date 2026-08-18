@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+    <HEAD>
+        <CODE>S001</CODE>
+        <MESSAGE>OK</MESSAGE>
+    </HEAD>
+    <svc>
+        <CNTNTSSJ>딸꾹질</CNTNTSSJ>
+        <CNTNTS_SN>9999</CNTNTS_SN>
+        <cntntsClList>
+            <cntntsCl>
+                <CNTNTS_CL_NM>개요</CNTNTS_CL_NM>
+                <CNTNTS_CL_CN>딸꾹질은 횡격막이 불수의적으로 수축하면서 발생하는 흔한 증상이다.</CNTNTS_CL_CN>
+            </cntntsCl>
+        </cntntsClList>
+    </svc>
+</response>

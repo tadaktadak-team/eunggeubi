@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+    <HEAD>
+        <CODE>S001</CODE>
+        <MESSAGE>OK</MESSAGE>
+    </HEAD>
+    <svc>
+        <CNTNTSSJ>직장탈출증</CNTNTSSJ>
+        <CNTNTS_SN>5684</CNTNTS_SN>
+        <cntntsClList>
+            <cntntsCl>
+                <CNTNTS_CL_NM>개요</CNTNTS_CL_NM>
+                <CNTNTS_CL_CN>직장은 결장과 항문 사이를 연결하는 부위로, 이 부위가 항문 밖으로 빠져나오는 것을 직장탈출증이라고 한다.</CNTNTS_CL_CN>
+            </cntntsCl>
+            <cntntsCl>
+                <CNTNTS_CL_NM>증상</CNTNTS_CL_NM>
+                <CNTNTS_CL_CN>초기에는 배변 시에만 항문 밖으로 빠져나왔다가 저절로 들어가지만, 진행되면 기침이나 재채기만으로도 빠져나올 수 있다.</CNTNTS_CL_CN>
+            </cntntsCl>
+            <cntntsCl>
+                <CNTNTS_CL_NM>사진</CNTNTS_CL_NM>
+                <CNTNTS_CL_CN>http://health.kdca.go.kr/images/sample-image-01.jpg</CNTNTS_CL_CN>
+            </cntntsCl>
+            <cntntsCl>
+                <CNTNTS_CL_NM>참고사항</CNTNTS_CL_NM>
+                <CNTNTS_CL_CN></CNTNTS_CL_CN>
+            </cntntsCl>
+        </cntntsClList>
+    </svc>
+</response>
