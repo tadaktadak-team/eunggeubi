@@ -1,7 +1,5 @@
 package com.tadaktadak.eunggeubi.domain.hospital.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tadaktadak.eunggeubi.domain.hospital.dto.MedicalFacilityResponse;
 import com.tadaktadak.eunggeubi.domain.hospital.service.HospitalService;
 import lombok.RequiredArgsConstructor;
@@ -17,35 +15,26 @@ import java.util.List;
 public class HospitalController {
 
     private final HospitalService hospitalService;
-    private final ObjectMapper objectMapper;
 
     @GetMapping(
             value = "/api/hospitals",
             produces = MediaType.APPLICATION_JSON_VALUE
     )
-    public String findNearbyHospitals(
+    public List<MedicalFacilityResponse> findNearbyHospitals(
             @RequestParam double lat,
             @RequestParam double lng
-    ) throws JsonProcessingException {
-
-        List<MedicalFacilityResponse> hospitals =
-                hospitalService.findNearbyHospitals(lat, lng);
-
-        return objectMapper.writeValueAsString(hospitals);
+    ) {
+        return hospitalService.findNearbyHospitals(lat, lng);
     }
 
     @GetMapping(
             value = "/api/pharmacies",
             produces = MediaType.APPLICATION_JSON_VALUE
     )
-    public String findNearbyPharmacies(
+    public List<MedicalFacilityResponse> findNearbyPharmacies(
             @RequestParam double lat,
             @RequestParam double lng
-    ) throws JsonProcessingException {
-
-        List<MedicalFacilityResponse> pharmacies =
-                hospitalService.findNearbyPharmacies(lat, lng);
-
-        return objectMapper.writeValueAsString(pharmacies);
+    ) {
+        return hospitalService.findNearbyPharmacies(lat, lng);
     }
 }
