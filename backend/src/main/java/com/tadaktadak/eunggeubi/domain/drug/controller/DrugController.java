@@ -15,7 +15,7 @@ public class DrugController {
 
     private final DrugService drugService;
 
-    // 약품명 검색 API
+    // 약품명 검색 API(http://localhost:8080/api/drugs/search?keyword=타이레놀)
     @GetMapping("/search")
     public ResponseEntity<List<DrugInfoResponse>> searchDrugs(@RequestParam("keyword") String keyword) {
 
