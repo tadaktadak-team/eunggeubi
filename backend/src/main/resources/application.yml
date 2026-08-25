@@ -46,3 +46,8 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET}
+
+openapi:
+  e-drug:
+    url: https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList
+    service-key: ${E_DRUG_SECRET}
