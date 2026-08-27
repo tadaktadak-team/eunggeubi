@@ -51,3 +51,7 @@ openapi:
   e-drug:
     url: https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList
     service-key: ${E_DRUG_SECRET}
+
+  pill-ident:
+    url: https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03
+    service-key: ${PILL_IDENT_SECRET}
