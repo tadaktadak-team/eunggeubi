@@ -70,3 +70,11 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET}
+
+medical_locator:
+  secret: ${MEDICAL_LOCATOR_SECRET}
+  hospital:
+    url: "http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList"
+  pharmacy:
+    url: "http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList"
+
