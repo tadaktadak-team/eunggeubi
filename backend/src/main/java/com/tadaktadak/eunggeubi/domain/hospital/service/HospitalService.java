@@ -24,10 +24,10 @@ public class HospitalService {
     private final XmlMapper xmlMapper;
 
     // URL은 병원/약국 각각 사용
-    @Value("${openapi.hospital.url}")
+    @Value("${medical_locator.hospital.url}")
     private String apiUrl;
 
-    @Value("${openapi.pharmacy.url}")
+    @Value("${medical_locator.pharmacy.url}")
     private String pharmacyApiUrl;
 
     // 서비스키는 하나만 사용
