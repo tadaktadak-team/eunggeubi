@@ -18,6 +18,10 @@ repositories {
 	mavenCentral()
 }
 
+ext {
+	set('springAiVersion', '1.0.9') // Spring Boot 3.5.x와 맞는 최신 Spring AI 1.0.x
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-validation'
@@ -29,11 +33,26 @@ dependencies {
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
 	runtimeOnly 'com.mysql:mysql-connector-j'
+
+	// RAG 인덱싱 파이프라인: OpenAI 임베딩 + Qdrant 벡터 저장소
+	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+	implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
+	// KDCA 건강정보 API 응답(XML) 파싱용
+	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
+	// seed.csv 파싱용 (질병명에 콤마가 포함된 행이 있어 따옴표 인용 규칙을 제대로 지키는 파서가 필요함)
+	implementation 'org.apache.commons:commons-csv:1.14.1'
+
 	annotationProcessor 'org.projectlombok:lombok'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testCompileOnly 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+	}
 }
 
 tasks.named('test') {
