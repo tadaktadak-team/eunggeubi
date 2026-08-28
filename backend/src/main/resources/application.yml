@@ -45,6 +45,10 @@ medical_locator:
   pharmacy:
     url: "http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList"
 
+emergency_bed:
+  secret: ${EMERGENCY_BED_SECRET:}
+  url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire"
+
 ---
 spring:
   config:
@@ -63,34 +67,14 @@ spring:
     open-in-view: false
 
 ---
+# AI 인덱싱/리허설/검색점검 배치를 돌릴 때만 Qdrant 컬렉션 자동 생성을 켠다.
+# (일반 실행에서는 꺼둬야 Qdrant 없이도 서버가 기동된다)
 spring:
   config:
     activate:
-      on-profile: prod
-
-  # 운영 환경에서는 환경변수로 주입한다.
-  datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/eunggeubi}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${DB_USERNAME:eunggeubi}
-    password: ${DB_PASSWORD:}
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-    open-in-view: false
-
-jwt:
-  secret: ${JWT_SECRET}
-
-medical_locator:
-  secret: ${MEDICAL_LOCATOR_SECRET}
-  hospital:
-    url: "http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList"
-  pharmacy:
-    url: "http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList"
-
-emergency_bed:
-  url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire"
+      on-profile: "index | rehearsal | search-check"
+  ai:
+    vectorstore:
+      qdrant:
+        initialize-schema: true
 
