@@ -48,7 +48,7 @@ medical_locator:
 emergency_bed:
   secret: ${EMERGENCY_BED_SECRET:}
   url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire"
-
+  hospital-url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire"
 ---
 spring:
   config:
