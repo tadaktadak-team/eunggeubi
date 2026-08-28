@@ -11,7 +11,9 @@ spring:
       read-timeout: 30s
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      # 키가 없어도 앱은 뜨게 한다(AI 기능을 쓸 때만 실제로 필요).
+      # 빈 문자열이면 OpenAI 자동설정이 "키를 설정하라"며 기동을 막으므로 더미값을 기본으로 둔다.
+      api-key: ${OPENAI_API_KEY:dummy}
       embedding:
         options:
           model: text-embedding-3-small
@@ -21,7 +23,9 @@ spring:
         host: localhost
         port: 6334
         collection-name: health_info
-        initialize-schema: true
+        # true면 부팅 시점에 Qdrant에 접속을 시도해서, Qdrant가 없으면 앱 자체가 뜨지 않는다.
+        # 컬렉션 생성은 인덱싱 배치(QdrantCollectionResetService)가 직접 하므로 false로 둔다.
+        initialize-schema: false
 
 jwt:
   access-token-validity-ms: 3600000       # access 토큰 1시간
@@ -30,7 +34,16 @@ jwt:
 kdca:
   health-info:
     base-url: https://api.kdca.go.kr/api/provide/healthInfo
-    token: ${KDCA_TOKEN}
+    # 토큰이 없어도 앱은 뜨게 한다(인덱싱 배치를 돌릴 때만 실제로 필요).
+    token: ${KDCA_TOKEN:}
+
+# 심평원 병원/약국 API. URL은 비밀값이 아니라 공통으로 두고, 인증키만 환경변수로 주입한다.
+medical_locator:
+  secret: ${MEDICAL_LOCATOR_SECRET:}
+  hospital:
+    url: "http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList"
+  pharmacy:
+    url: "http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList"
 
 ---
 spring:
@@ -48,33 +61,4 @@ spring:
       ddl-auto: update
     show-sql: true
     open-in-view: false
-
----
-spring:
-  config:
-    activate:
-      on-profile: prod
-
-  # 운영 환경에서는 환경변수로 주입한다.
-  datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/eunggeubi}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${DB_USERNAME:eunggeubi}
-    password: ${DB_PASSWORD:}
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-    open-in-view: false
-
-jwt:
-  secret: ${JWT_SECRET}
-
-medical_locator:
-  secret: ${MEDICAL_LOCATOR_SECRET}
-  hospital:
-    url: "http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList"
-  pharmacy:
-    url: "http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList"
 
