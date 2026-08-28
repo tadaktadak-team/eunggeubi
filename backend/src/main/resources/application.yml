@@ -78,3 +78,5 @@ medical_locator:
   pharmacy:
     url: "http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList"
 
+emergency_bed:
+  url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire"
