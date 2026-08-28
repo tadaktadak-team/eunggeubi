@@ -3,10 +3,34 @@ spring:
     name: eunggeubi
   profiles:
     active: local
+  # KDCA/OpenAI 등 외부 API 호출이 응답 없이 무한정 멈추는 걸 막기 위한 전역 타임아웃.
+  # (Boot가 자동구성한 RestClient.Builder를 쓰는 클라이언트엔 전부 적용됨)
+  http:
+    client:
+      connect-timeout: 15s
+      read-timeout: 30s
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      embedding:
+        options:
+          model: text-embedding-3-small
+          dimensions: 1536
+    vectorstore:
+      qdrant:
+        host: localhost
+        port: 6334
+        collection-name: health_info
+        initialize-schema: true
 
 jwt:
   access-token-validity-ms: 3600000       # access 토큰 1시간
   refresh-token-validity-ms: 1209600000   # refresh 토큰 14일
+
+kdca:
+  health-info:
+    base-url: https://api.kdca.go.kr/api/provide/healthInfo
+    token: ${KDCA_TOKEN}
 
 ---
 spring:
@@ -46,3 +70,11 @@ spring:
 
 jwt:
   secret: ${JWT_SECRET}
+
+medical_locator:
+  secret: ${MEDICAL_LOCATOR_SECRET}
+  hospital:
+    url: "http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList"
+  pharmacy:
+    url: "http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList"
+
