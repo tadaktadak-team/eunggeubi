@@ -20,6 +20,11 @@ export function useSymptomChat(initialMessage?: string) {
       setMessages((prev) => [...prev, ...aiMessages]);
     } catch (e) {
       console.error(e);
+      const message = e instanceof Error ? e.message : '요청 중 오류가 발생했습니다.';
+      setMessages((prev) => [
+        ...prev,
+        { id: nextChatMessageId(), type: 'answer', segments: [{ text: message, sourceIndexes: [] }], sources: [] },
+      ]);
     } finally {
       setLoading(false);
     }
