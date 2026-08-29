@@ -16,9 +16,8 @@ export default function MedicalLocatorScreen() {
   const [beds, setBeds] = useState<EmergencyBed[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [location, setLocation] = useState<Location.LocationObject | null>(
-    null
-  );
+  const [location, setLocation] =
+    useState<Location.LocationObject | null>(null);
 
   useEffect(() => {
     loadEmergencyBeds();
@@ -29,6 +28,7 @@ export default function MedicalLocatorScreen() {
       setLoading(true);
       setError(null);
 
+      // 위치 권한 요청
       const { status } =
         await Location.requestForegroundPermissionsAsync();
 
@@ -36,6 +36,7 @@ export default function MedicalLocatorScreen() {
         throw new Error("위치 권한이 필요합니다.");
       }
 
+      // 현재 위치 가져오기
       const currentLocation =
         await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
@@ -48,33 +49,38 @@ export default function MedicalLocatorScreen() {
 
       console.log("현재 위치:", latitude, longitude);
 
+      // 현재 위치의 주소 확인
       const addresses = await Location.reverseGeocodeAsync({
         latitude,
         longitude,
       });
 
       if (addresses.length === 0) {
-        throw new Error("현재 위치의 주소를 확인할 수 없습니다.");
+        throw new Error(
+          "현재 위치의 주소를 확인할 수 없습니다."
+        );
       }
 
       const address = addresses[0];
 
       console.log("현재 주소:", address);
 
-      const stage1 = "서울특별시";
-      const stage2 = "강남구";
+      // 시·도만 사용
+      const stage1 = address.region;
 
-      if (!stage1 || !stage2) {
-        throw new Error("현재 위치의 지역 정보를 확인할 수 없습니다.");
+      if (!stage1) {
+        throw new Error(
+          "현재 위치의 지역 정보를 확인할 수 없습니다."
+        );
       }
 
-      console.log("조회 지역:", stage1, stage2);
+      console.log("조회 지역:", stage1);
 
+      // 응급실 조회
       const data = await getEmergencyBeds(
         latitude,
         longitude,
-        stage1,
-        stage2
+        stage1
       );
 
       setBeds(data);
@@ -84,17 +90,21 @@ export default function MedicalLocatorScreen() {
       if (e instanceof Error) {
         setError(e.message);
       } else {
-        setError("응급실 정보를 불러오지 못했습니다.");
+        setError(
+          "응급실 정보를 불러오지 못했습니다."
+        );
       }
     } finally {
       setLoading(false);
     }
   }
 
+  // 로딩 화면
   if (loading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
+
         <Text style={styles.message}>
           주변 응급실을 찾고 있어요...
         </Text>
@@ -102,6 +112,7 @@ export default function MedicalLocatorScreen() {
     );
   }
 
+  // 에러 화면
   if (error) {
     return (
       <View style={styles.center}>
@@ -114,6 +125,7 @@ export default function MedicalLocatorScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>주변 응급실</Text>
 
+      {/* 지도 */}
       {location && (
         <MapView
           style={styles.map}
@@ -126,25 +138,29 @@ export default function MedicalLocatorScreen() {
           showsUserLocation
         >
           {beds
-  .filter(
-    (item) =>
-      item.latitude != null && item.longitude != null
-  )
-  .map((item) => (
-    <Marker
-      key={item.hpid}
-      coordinate={{
-        latitude: Number(item.latitude),
-        longitude: Number(item.longitude),
-      }}
-      title={item.name}
-      description={`${item.availableBeds ?? "-"}병상`}
-    />
-  ))}
+            .filter(
+              (item) =>
+                item.latitude != null &&
+                item.longitude != null
+            )
+            .map((item) => (
+              <Marker
+                key={item.hpid}
+                coordinate={{
+                  latitude: Number(item.latitude),
+                  longitude: Number(item.longitude),
+                }}
+                title={item.name}
+                description={`${item.availableBeds ?? "-"}병상`}
+              />
+            ))}
         </MapView>
       )}
 
-      <Text style={styles.sectionTitle}>주변 응급실</Text>
+      {/* 병원 목록 */}
+      <Text style={styles.sectionTitle}>
+        주변 응급실
+      </Text>
 
       <FlatList
         data={beds}
@@ -152,7 +168,9 @@ export default function MedicalLocatorScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.row}>
-              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.name}>
+                {item.name}
+              </Text>
 
               <Text style={styles.beds}>
                 {item.availableBeds ?? "-"}병상
@@ -165,7 +183,9 @@ export default function MedicalLocatorScreen() {
                 : "거리 정보 없음"}
             </Text>
 
-            <Text style={styles.address}>{item.address}</Text>
+            <Text style={styles.address}>
+              {item.address}
+            </Text>
 
             <Text style={styles.congestion}>
               혼잡도{" "}

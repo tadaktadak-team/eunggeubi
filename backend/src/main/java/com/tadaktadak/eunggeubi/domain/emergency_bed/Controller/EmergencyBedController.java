@@ -20,13 +20,11 @@ public class EmergencyBedController {
     @GetMapping
     public List<EmergencyBedResponse> getEmergencyBeds(
             @RequestParam String stage1,
-            @RequestParam String stage2,
             @RequestParam double latitude,
             @RequestParam double longitude
     ) {
         return emergencyBedService.findNearbyEmergencyBeds(
                 stage1,
-                stage2,
                 latitude,
                 longitude
         );
