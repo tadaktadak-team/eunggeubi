@@ -1,5 +1,6 @@
 package com.tadaktadak.eunggeubi.global.config;
 
+import com.tadaktadak.eunggeubi.global.security.JwtAuthenticationEntryPoint;
 import com.tadaktadak.eunggeubi.global.security.JwtAuthenticationFilter;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -29,6 +31,7 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(e -> e.authenticationEntryPoint(jwtAuthenticationEntryPoint))
 
                 // 경로별 접근 권한
                 .authorizeHttpRequests(auth -> auth
