@@ -7,6 +7,7 @@ import {
   View,
 } from "react-native";
 import * as Location from "expo-location";
+import MapView, { Marker } from "react-native-maps";
 
 import { getEmergencyBeds } from "../api/emergencyBed";
 import { EmergencyBed } from "../types/emergencyBed";
@@ -15,6 +16,9 @@ export default function MedicalLocatorScreen() {
   const [beds, setBeds] = useState<EmergencyBed[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [location, setLocation] = useState<Location.LocationObject | null>(
+    null
+  );
 
   useEffect(() => {
     loadEmergencyBeds();
@@ -32,12 +36,15 @@ export default function MedicalLocatorScreen() {
         throw new Error("위치 권한이 필요합니다.");
       }
 
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
+      const currentLocation =
+        await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
 
-      const latitude = location.coords.latitude;
-      const longitude = location.coords.longitude;
+      setLocation(currentLocation);
+
+      const latitude = currentLocation.coords.latitude;
+      const longitude = currentLocation.coords.longitude;
 
       console.log("현재 위치:", latitude, longitude);
 
@@ -54,8 +61,8 @@ export default function MedicalLocatorScreen() {
 
       console.log("현재 주소:", address);
 
-      const stage1 = address.region;
-      const stage2 = "도봉구";
+      const stage1 = "서울특별시";
+      const stage2 = "강남구";
 
       if (!stage1 || !stage2) {
         throw new Error("현재 위치의 지역 정보를 확인할 수 없습니다.");
@@ -107,6 +114,38 @@ export default function MedicalLocatorScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>주변 응급실</Text>
 
+      {location && (
+        <MapView
+          style={styles.map}
+          initialRegion={{
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }}
+          showsUserLocation
+        >
+          {beds
+  .filter(
+    (item) =>
+      item.latitude != null && item.longitude != null
+  )
+  .map((item) => (
+    <Marker
+      key={item.hpid}
+      coordinate={{
+        latitude: Number(item.latitude),
+        longitude: Number(item.longitude),
+      }}
+      title={item.name}
+      description={`${item.availableBeds ?? "-"}병상`}
+    />
+  ))}
+        </MapView>
+      )}
+
+      <Text style={styles.sectionTitle}>주변 응급실</Text>
+
       <FlatList
         data={beds}
         keyExtractor={(item) => item.hpid}
@@ -149,7 +188,6 @@ export default function MedicalLocatorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: "#fff",
   },
 
@@ -163,11 +201,27 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "700",
-    marginBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+
+  map: {
+    width: "100%",
+    height: 300,
+  },
+
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 10,
   },
 
   card: {
     padding: 16,
+    marginHorizontal: 20,
     marginBottom: 12,
     borderRadius: 12,
     backgroundColor: "#f5f5f5",
@@ -207,6 +261,7 @@ const styles = StyleSheet.create({
 
   message: {
     marginTop: 12,
+    paddingHorizontal: 20,
     color: "#666",
   },
 
