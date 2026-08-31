@@ -35,76 +35,76 @@ export default function SymptomChatScreen() {
   const goFirstAidGuide = () => navigation.navigate('FirstAidGuide', {});
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={insets.top}
-    >
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerRow}>
-          <Pressable style={styles.side} onPress={() => navigation.goBack()} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color={colors.text} />
-          </Pressable>
-          <AiAvatar />
-          <View style={styles.headerText}>
-            <Text style={styles.headerTitle}>AI 증상 상담</Text>
-            <Text style={styles.headerSubtitle}>참고 정보만 제공해요 · 진단 아님</Text>
+      <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={insets.top}
+      >
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <View style={styles.headerRow}>
+            <Pressable style={styles.side} onPress={() => navigation.goBack()} hitSlop={8}>
+              <Ionicons name="chevron-back" size={26} color={colors.text} />
+            </Pressable>
+            <AiAvatar />
+            <View style={styles.headerText}>
+              <Text style={styles.headerTitle}>AI 증상 상담</Text>
+              <Text style={styles.headerSubtitle}>참고 정보만 제공해요 · 진단 아님</Text>
+            </View>
+            <Pressable style={styles.side} onPress={goFirstAidGuide} hitSlop={8}>
+              <Ionicons name="alert-circle-outline" size={22} color={colors.textSub} />
+            </Pressable>
           </View>
-          <Pressable style={styles.side} onPress={goFirstAidGuide} hitSlop={8}>
-            <Ionicons name="alert-circle-outline" size={22} color={colors.textSub} />
+        </View>
+
+        <ScrollView
+            ref={scrollRef}
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+            keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+        >
+          {messages.map((message) => {
+            if (message.type === 'user') {
+              return <ChatBubbleUser key={message.id} text={message.text} />;
+            }
+            if (message.type === 'reference') {
+              return <ReferenceInfoCard key={message.id} message={message} />;
+            }
+            return (
+                <ChecklistCard
+                    key={message.id}
+                    message={message}
+                    onToggleItem={(itemId) => toggleChecklistItem(message.id, itemId)}
+                    onSubmit={() => submitChecklist(message.id)}
+                />
+            );
+          })}
+
+          {loading && (
+              <View style={styles.typingRow}>
+                <AiAvatar />
+                <Text style={styles.typingText}>입력 중...</Text>
+              </View>
+          )}
+        </ScrollView>
+
+        <View style={styles.inputBar}>
+          <TextInput
+              style={styles.textInput}
+              placeholder="증상을 입력하세요..."
+              placeholderTextColor={colors.placeholder}
+              value={inputText}
+              onChangeText={setInputText}
+              onSubmitEditing={onSend}
+              returnKeyType="send"
+          />
+          <Pressable style={styles.sendBtn} onPress={onSend} hitSlop={8}>
+            <Ionicons name="arrow-forward" size={18} color={colors.white} />
           </Pressable>
         </View>
-      </View>
 
-      <ScrollView
-        ref={scrollRef}
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-      >
-        {messages.map((message) => {
-          if (message.type === 'user') {
-            return <ChatBubbleUser key={message.id} text={message.text} />;
-          }
-          if (message.type === 'reference') {
-            return <ReferenceInfoCard key={message.id} message={message} />;
-          }
-          return (
-            <ChecklistCard
-              key={message.id}
-              message={message}
-              onToggleItem={(itemId) => toggleChecklistItem(message.id, itemId)}
-              onSubmit={() => submitChecklist(message.id)}
-            />
-          );
-        })}
-
-        {loading && (
-          <View style={styles.typingRow}>
-            <AiAvatar />
-            <Text style={styles.typingText}>입력 중...</Text>
-          </View>
-        )}
-      </ScrollView>
-
-      <View style={styles.inputBar}>
-        <TextInput
-          style={styles.textInput}
-          placeholder="증상을 입력하세요..."
-          placeholderTextColor={colors.placeholder}
-          value={inputText}
-          onChangeText={setInputText}
-          onSubmitEditing={onSend}
-          returnKeyType="send"
-        />
-        <Pressable style={styles.sendBtn} onPress={onSend} hitSlop={8}>
-          <Ionicons name="arrow-forward" size={18} color={colors.white} />
-        </Pressable>
-      </View>
-
-      <DisclaimerFooter />
-    </KeyboardAvoidingView>
+        <DisclaimerFooter />
+      </KeyboardAvoidingView>
   );
 }
 

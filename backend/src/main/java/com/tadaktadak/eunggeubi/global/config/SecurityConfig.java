@@ -1,5 +1,6 @@
 package com.tadaktadak.eunggeubi.global.config;
 
+import com.tadaktadak.eunggeubi.global.security.JwtAuthenticationEntryPoint;
 import com.tadaktadak.eunggeubi.global.security.JwtAuthenticationFilter;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
+    private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -29,12 +31,19 @@ public class SecurityConfig {
                 .formLogin(form -> form.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(e -> e.authenticationEntryPoint(jwtAuthenticationEntryPoint))
 
                 // 경로별 접근 권한
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/drugs/**").permitAll()   // 회원가입·로그인·약품검색
-                        .requestMatchers("/health", "/error").permitAll()                // 서버 상태체크
-                        .anyRequest().authenticated()                                   // 나머지는 토큰 필수
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/api/hospitals",
+                                "/api/pharmacies",
+                                "/api/emergency-beds",
+                                "/api/drugs/**"
+                        ).permitAll()   // 인증/위치/약품 정보 전역 허용
+                        .requestMatchers("/health", "/error").permitAll()        // 서버 상태체크
+                        .anyRequest().authenticated()                  // 나머지는 토큰 필수
                 )
 
                 // 시큐리티 기본 필터 앞에 우리 JWT 필터 끼워넣기

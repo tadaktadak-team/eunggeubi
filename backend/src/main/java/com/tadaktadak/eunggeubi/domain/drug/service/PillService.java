@@ -60,6 +60,10 @@ public class PillService {
 
             String responseString = restTemplate.getForObject(uri, String.class);
             JsonNode rootNode = objectMapper.readTree(responseString);
+
+            // 💡 추가: body 파싱 전에 게이트웨이 / 서비스 에러 검증
+            validateApiResponse(rootNode);
+
             JsonNode itemsNode = rootNode.path("body").path("items");
 
             if (itemsNode.isArray()) {
@@ -67,12 +71,37 @@ public class PillService {
                     resultList.add(mapToPillSearchResponse(item));
                 }
             }
+        } catch (ExternalApiException e) {
+            throw e; // 💡 검증 로직에서 직접 던진 예외는 그대로 전달
         } catch (Exception e) {
             log.error("낱알식별 Open API 검색 실패: {}", e.getMessage(), e);
             throw new ExternalApiException("낱알식별 API 연동 중 오류가 발생했습니다.", e);
         }
 
         return resultList;
+    }
+
+    // 💡 추가: 공통 API 응답 에러 검증 메서드
+    private void validateApiResponse(JsonNode rootNode) {
+        // 1. 공공데이터포털 게이트웨이 에러 검사
+        if (rootNode.has("OpenAPI_ServiceResponse")) {
+            String errMsg = rootNode.path("OpenAPI_ServiceResponse")
+                    .path("cmmMsgHeader")
+                    .path("errMsg").asText();
+            log.error("낱알식별 API 게이트웨이 에러: {}", errMsg);
+            throw new ExternalApiException("API 게이트웨이 에러: " + errMsg, null);
+        }
+
+        // 2. 식약처 API 내부 서비스 에러 검사 (resultCode가 "00"이 아닌 경우)
+        JsonNode headerNode = rootNode.path("header");
+        if (!headerNode.isMissingNode() && headerNode.has("resultCode")) {
+            String resultCode = headerNode.path("resultCode").asText();
+            if (!"00".equals(resultCode)) {
+                String resultMsg = headerNode.path("resultMsg").asText();
+                log.error("낱알식별 API 서비스 에러: [{}] {}", resultCode, resultMsg);
+                throw new ExternalApiException("API 서비스 에러: " + resultMsg, null);
+            }
+        }
     }
 
     private PillSearchResponse mapToPillSearchResponse(JsonNode item) {

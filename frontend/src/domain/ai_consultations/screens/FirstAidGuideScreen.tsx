@@ -1,25 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { FirstAidGuideDto, getFirstAidGuide, searchFirstAidGuide } from '../api/firstAid';
 import DisclaimerFooter from '../components/DisclaimerFooter';
 import SymptomChip from '../components/SymptomChip';
-import { AiConsultationStackParamList, FIRST_AID_SITUATIONS, FirstAidSituation } from '../types';
+import { AiConsultationStackParamList, FIRST_AID_SITUATIONS } from '../types';
 
 type Nav = NativeStackNavigationProp<AiConsultationStackParamList>;
 type GuideRoute = RouteProp<AiConsultationStackParamList, 'FirstAidGuide'>;
-
-// TODO: 지금은 고정된 응급처치 문구입니다. 실제 의료 검수를 거친 콘텐츠(또는 백엔드 조회)로 교체가 필요해요.
-const FIRST_AID_STEPS: Record<FirstAidSituation, string[]> = {
-  화상: ['흐르는 찬물에 15분 식히기', '물집 터뜨리지 않기', '깨끗한 거즈로 덮기'],
-  코피: ['고개를 앞으로 숙이기', '콧볼을 5~10분간 지그시 눌러주기', '얼음찜질로 혈관 수축시키기'],
-  골절: ['다친 부위를 움직이지 않기', '부목 등으로 고정하기', '얼음찜질로 붓기 줄이기'],
-  기도막힘: ['기침을 하도록 유도하기', '등을 세게 두드리기(견갑골 사이)', '하임리히법 시행하기'],
-};
 
 export default function FirstAidGuideScreen() {
   const navigation = useNavigation<Nav>();
@@ -27,17 +20,46 @@ export default function FirstAidGuideScreen() {
   const insets = useSafeAreaInsets();
 
   const [searchText, setSearchText] = useState('');
-  const [situation, setSituation] = useState<FirstAidSituation>(params?.situation ?? FIRST_AID_SITUATIONS[0]);
+  const [situation, setSituation] = useState<string>(params?.situation ?? FIRST_AID_SITUATIONS[0]);
+  const [guide, setGuide] = useState<FirstAidGuideDto | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const onSearchSubmit = () => {
+  // 선택된 상황(situation)이 바뀔 때마다 서버에서 해당 응급처치 단계를 조회
+  const loadGuide = useCallback(async (target: string) => {
+    setLoading(true);
+    try {
+      const result = await getFirstAidGuide(target);
+      setGuide(result);
+    } catch (e) {
+      console.error(e);
+      Alert.alert('오류', '응급처치 정보를 불러오지 못했어요.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadGuide(situation);
+  }, [situation, loadGuide]);
+
+  const onSearchSubmit = async () => {
     const trimmed = searchText.trim();
     if (!trimmed) return;
 
-    const matched = FIRST_AID_SITUATIONS.find((s) => trimmed.includes(s) || s.includes(trimmed));
-    if (matched) {
-      setSituation(matched);
-    } else {
-      Alert.alert('안내', '해당 상황을 찾지 못했어요. 아래 목록에서 골라주세요.');
+    setLoading(true);
+    try {
+      const result = await searchFirstAidGuide(trimmed);
+      if (result) {
+        setSituation(result.situation);
+        setGuide(result);
+      } else {
+        Alert.alert('안내', '해당 상황을 찾지 못했어요. 아래 목록에서 골라주세요.');
+      }
+    } catch (e) {
+      console.error(e);
+      Alert.alert('오류', '검색 중 문제가 발생했어요.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -53,57 +75,63 @@ export default function FirstAidGuideScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerRow}>
-          <Pressable style={styles.side} onPress={() => navigation.goBack()} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color={colors.text} />
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <View style={styles.headerRow}>
+            <Pressable style={styles.side} onPress={() => navigation.goBack()} hitSlop={8}>
+              <Ionicons name="chevron-back" size={26} color={colors.text} />
+            </Pressable>
+            <Text style={styles.headerTitle}>응급처치 안내</Text>
+            <View style={styles.side} />
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={18} color={colors.placeholder} />
+            <TextInput
+                style={styles.searchInput}
+                placeholder="상황 입력 (예: 화상, 코피)"
+                placeholderTextColor={colors.placeholder}
+                value={searchText}
+                onChangeText={setSearchText}
+                onSubmitEditing={onSearchSubmit}
+                returnKeyType="search"
+            />
+          </View>
+
+          <View style={styles.chipRow}>
+            {FIRST_AID_SITUATIONS.map((s) => (
+                <SymptomChip key={s} label={s} active={s === situation} onPress={() => setSituation(s)} />
+            ))}
+          </View>
+
+          {loading ? (
+              <ActivityIndicator color={colors.primary} style={styles.loading} />
+          ) : (
+              guide && (
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{guide.title}</Text>
+                    {guide.steps.map((step, index) => (
+                        <View key={step} style={styles.stepRow}>
+                          <View style={styles.stepBadge}>
+                            <Text style={styles.stepBadgeText}>{index + 1}</Text>
+                          </View>
+                          <Text style={styles.stepText}>{step}</Text>
+                        </View>
+                    ))}
+                  </View>
+              )
+          )}
+
+          <Pressable style={styles.callBtn} onPress={callEmergency}>
+            <Ionicons name="call" size={18} color={colors.white} />
+            <Text style={styles.callBtnText}>119 연결</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>응급처치 안내</Text>
-          <View style={styles.side} />
-        </View>
+        </ScrollView>
+
+        <DisclaimerFooter />
       </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color={colors.placeholder} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="상황 입력 (예: 화상, 코피)"
-            placeholderTextColor={colors.placeholder}
-            value={searchText}
-            onChangeText={setSearchText}
-            onSubmitEditing={onSearchSubmit}
-            returnKeyType="search"
-          />
-        </View>
-
-        <View style={styles.chipRow}>
-          {FIRST_AID_SITUATIONS.map((s) => (
-            <SymptomChip key={s} label={s} active={s === situation} onPress={() => setSituation(s)} />
-          ))}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{situation} 응급처치</Text>
-          {FIRST_AID_STEPS[situation].map((step, index) => (
-            <View key={step} style={styles.stepRow}>
-              <View style={styles.stepBadge}>
-                <Text style={styles.stepBadgeText}>{index + 1}</Text>
-              </View>
-              <Text style={styles.stepText}>{step}</Text>
-            </View>
-          ))}
-        </View>
-
-        <Pressable style={styles.callBtn} onPress={callEmergency}>
-          <Ionicons name="call" size={18} color={colors.white} />
-          <Text style={styles.callBtnText}>119 연결</Text>
-        </Pressable>
-      </ScrollView>
-
-      <DisclaimerFooter />
-    </View>
   );
 }
 
@@ -131,6 +159,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: font.body, color: colors.text },
   chipRow: { flexDirection: 'row', gap: spacing.sm },
+  loading: { marginVertical: spacing.xl },
   card: {
     backgroundColor: colors.white,
     borderWidth: 1,

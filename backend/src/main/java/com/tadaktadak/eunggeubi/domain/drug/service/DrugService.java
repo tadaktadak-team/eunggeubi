@@ -50,6 +50,10 @@ public class DrugService {
 
             String responseString = restTemplate.getForObject(uri, String.class);
             JsonNode rootNode = objectMapper.readTree(responseString);
+
+            // 💡 추가된 부분: 본문을 열어보기 전에 게이트웨이/서비스 에러 검증
+            validateApiResponse(rootNode);
+
             JsonNode itemsNode = rootNode.path("body").path("items");
 
             if (itemsNode.isArray()) {
@@ -57,6 +61,8 @@ public class DrugService {
                     resultList.add(mapToDrugInfoResponse(item));
                 }
             }
+        } catch (ExternalApiException e) {
+            throw e; // 검증 로직에서 발생한 커스텀 에러는 그대로 던짐
         } catch (Exception e) {
             log.error("e약은요 Open API 검색 실패: {}", e.getMessage(), e);
             throw new ExternalApiException("e약은요 API 연동 중 오류가 발생했습니다.", e);
@@ -71,13 +77,13 @@ public class DrugService {
     public DrugInfoResponse getDrugDetail(String itemSeq) {
         String responseString;
 
-        // 1) API 통신 처리 (itemName으로 검색하여 1건을 조회)
+        // 1) API 통신 처리
         try {
             String encodedItemSeq = URLEncoder.encode(itemSeq, StandardCharsets.UTF_8.toString());
 
             URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
                     .queryParam("serviceKey", serviceKey)
-                    .queryParam("itemName", encodedItemSeq) 
+                    .queryParam("itemName", encodedItemSeq)
                     .queryParam("type", "json")
                     .queryParam("numOfRows", 1)
                     .build(true)
@@ -91,31 +97,60 @@ public class DrugService {
             throw new ExternalApiException("e약은요 API 통신에 실패했습니다.", e);
         }
 
-        // 2) 데이터 파싱 처리
+        // 2) 데이터 파싱 및 에러 검증 처리
         try {
             JsonNode rootNode = objectMapper.readTree(responseString);
+
+            // 💡 추가된 부분: 본문을 열어보기 전에 게이트웨이/서비스 에러 검증
+            validateApiResponse(rootNode);
+
             JsonNode itemsNode = rootNode.path("body").path("items");
 
             if (itemsNode.isArray() && !itemsNode.isEmpty()) {
                 return mapToDrugInfoResponse(itemsNode.get(0));
             }
+        } catch (ExternalApiException e) {
+            throw e; // 검증 로직에서 발생한 커스텀 에러는 그대로 던짐
         } catch (Exception e) {
             log.error("e약은요 Open API 응답 파싱 실패: {}", e.getMessage(), e);
             throw new ExternalApiException("e약은요 API 응답 파싱 중 오류가 발생했습니다.", e);
         }
 
-        // 3) 통신 성공했으나 검색 결과가 없는 경우 -> 400 Bad Request
+        // 3) 통신 성공했으나 검색 결과가 없는 경우
         throw new IllegalArgumentException("해당 약물 정보를 찾을 수 없습니다: " + itemSeq);
+    }
+
+    // 💡 추가된 메서드: API 응답 에러 공통 검증 로직
+    private void validateApiResponse(JsonNode rootNode) {
+        // 1. 공공데이터포털 게이트웨이 에러 검사 (트래픽 초과, 잘못된 키 등)
+        if (rootNode.has("OpenAPI_ServiceResponse")) {
+            String errMsg = rootNode.path("OpenAPI_ServiceResponse")
+                    .path("cmmMsgHeader")
+                    .path("errMsg").asText();
+            log.error("공공데이터포털 게이트웨이 에러: {}", errMsg);
+            throw new ExternalApiException("API 게이트웨이 에러: " + errMsg, null);
+        }
+
+        // 2. 식약처 API 내부 서비스 에러 검사 (resultCode가 "00"이 아닌 경우)
+        JsonNode headerNode = rootNode.path("header");
+        if (!headerNode.isMissingNode() && headerNode.has("resultCode")) {
+            String resultCode = headerNode.path("resultCode").asText();
+            if (!"00".equals(resultCode)) {
+                String resultMsg = headerNode.path("resultMsg").asText();
+                log.error("식약처 API 서비스 에러: [{}] {}", resultCode, resultMsg);
+                throw new ExternalApiException("API 서비스 에러: " + resultMsg, null);
+            }
+        }
     }
 
     private DrugInfoResponse mapToDrugInfoResponse(JsonNode item) {
         return DrugInfoResponse.builder()
                 .itemSeq(getTextOrNull(item, "itemSeq"))
                 .name(getTextOrNull(item, "itemName"))
-                .efficacy(getTextOrNull(item, "efcyQesitm"))       // 효능/효과
-                .useInfo(getTextOrNull(item, "useMethodQesitm"))   // 용법/용량
-                .caution(getTextOrNull(item, "atpnQesitm"))        // 주의사항
-                .itemImage(getTextOrNull(item, "itemImage"))       // 알약 이미지 URL
+                .efficacy(getTextOrNull(item, "efcyQesitm"))
+                .useInfo(getTextOrNull(item, "useMethodQesitm"))
+                .caution(getTextOrNull(item, "atpnQesitm"))
+                .itemImage(getTextOrNull(item, "itemImage"))
                 .drugType("일반의약품")
                 .build();
     }

@@ -3,11 +3,52 @@ spring:
     name: eunggeubi
   profiles:
     active: local
+  # KDCA/OpenAI 등 외부 API 호출이 응답 없이 무한정 멈추는 걸 막기 위한 전역 타임아웃.
+  # (Boot가 자동구성한 RestClient.Builder를 쓰는 클라이언트엔 전부 적용됨)
+  http:
+    client:
+      connect-timeout: 15s
+      read-timeout: 30s
+  ai:
+    openai:
+      # 키가 없어도 앱은 뜨게 한다(AI 기능을 쓸 때만 실제로 필요).
+      # 빈 문자열이면 OpenAI 자동설정이 "키를 설정하라"며 기동을 막으므로 더미값을 기본으로 둔다.
+      api-key: ${OPENAI_API_KEY:dummy}
+      embedding:
+        options:
+          model: text-embedding-3-small
+          dimensions: 1536
+    vectorstore:
+      qdrant:
+        host: localhost
+        port: 6334
+        collection-name: health_info
+        # true면 부팅 시점에 Qdrant에 접속을 시도해서, Qdrant가 없으면 앱 자체가 뜨지 않는다.
+        # 컬렉션 생성은 인덱싱 배치(QdrantCollectionResetService)가 직접 하므로 false로 둔다.
+        initialize-schema: false
 
 jwt:
   access-token-validity-ms: 3600000       # access 토큰 1시간
   refresh-token-validity-ms: 1209600000   # refresh 토큰 14일
 
+kdca:
+  health-info:
+    base-url: https://api.kdca.go.kr/api/provide/healthInfo
+    # 토큰이 없어도 앱은 뜨게 한다(인덱싱 배치를 돌릴 때만 실제로 필요).
+    token: ${KDCA_TOKEN:}
+
+# 심평원 병원/약국 API. URL은 비밀값이 아니라 공통으로 두고, 인증키만 환경변수로 주입한다.
+medical_locator:
+  secret: ${MEDICAL_LOCATOR_SECRET:}
+  hospital:
+    url: "http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList"
+  pharmacy:
+    url: "http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList"
+
+emergency_bed:
+  secret: ${EMERGENCY_BED_SECRET:}
+  url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire"
+  hospital-url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire"
 ---
 spring:
   config:
@@ -26,10 +67,16 @@ spring:
     open-in-view: false
 
 ---
+# AI 인덱싱/리허설/검색점검 배치를 돌릴 때만 Qdrant 컬렉션 자동 생성을 켠다.
+# (일반 실행에서는 꺼둬야 Qdrant 없이도 서버가 기동된다)
 spring:
   config:
     activate:
-      on-profile: prod
+      on-profile: "index | rehearsal | search-check"
+  ai:
+    vectorstore:
+      qdrant:
+        initialize-schema: true
 
   # 운영 환경에서는 환경변수로 주입한다.
   datasource:
