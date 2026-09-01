@@ -29,9 +29,9 @@
     "typescript": "~5.9.2"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "start": "node scripts/start-with-lan-ip.js -c",
+    "android": "node scripts/start-with-lan-ip.js --android",
+    "ios": "node scripts/start-with-lan-ip.js --ios",
     "web": "expo start --web",
     "lint": "expo lint",
     "format": "prettier --write ."
