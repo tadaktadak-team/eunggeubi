@@ -15,8 +15,12 @@ spring:
       # 빈 문자열이면 OpenAI 자동설정이 "키를 설정하라"며 기동을 막으므로 더미값을 기본으로 둔다.
       api-key: ${OPENAI_API_KEY:dummy}
       embedding:
+        # text-embedding-3-large: 짧은 구어체 표현과 긴 격식체 문서 사이의 의미 유사도를 -small보다
+        # 잘 잡아준다고 알려진 모델. Qdrant 컬렉션이 1536차원으로 고정돼 있어서(재생성 없이 그대로 쓰려고)
+        # dimensions:1536으로 잘라서 쓴다 (large의 기본 출력은 3072차원이지만 OpenAI가 잘라 써도
+        # 성능 저하가 크지 않다고 명시함).
         options:
-          model: text-embedding-3-small
+          model: text-embedding-3-large
           dimensions: 1536
     vectorstore:
       qdrant:
@@ -28,8 +32,20 @@ spring:
         initialize-schema: false
 
 jwt:
+  # 로컬 개발용 기본값 - 운영 환경은 반드시 JWT_SECRET 환경변수로 덮어써야 한다.
+  # (없으면 앱이 아예 안 뜨는 대신, 다른 값들처럼 개발 편의를 위해 더미 기본값을 둔다)
+  secret: ${JWT_SECRET:CO0RVgGhGpDCjgZmTk4HhJHcPNAMY7hA3kHctJzwwdjqPXzcK5M3ZygoQsChYKMc}
   access-token-validity-ms: 3600000       # access 토큰 1시간
   refresh-token-validity-ms: 1209600000   # refresh 토큰 14일
+
+openapi:
+  e-drug:
+    url: https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList
+    service-key: ${E_DRUG_SECRET:}
+
+  pill-ident:
+    url: https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03
+    service-key: ${PILL_IDENT_SECRET:}
 
 kdca:
   health-info:
@@ -90,15 +106,3 @@ spring:
       ddl-auto: validate
     show-sql: false
     open-in-view: false
-
-jwt:
-  secret: ${JWT_SECRET}
-
-openapi:
-  e-drug:
-    url: https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList
-    service-key: ${E_DRUG_SECRET}
-
-  pill-ident:
-    url: https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03
-    service-key: ${PILL_IDENT_SECRET}

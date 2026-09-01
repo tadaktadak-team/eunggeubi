@@ -43,6 +43,7 @@ public class SecurityConfig {
                                 "/api/drugs/**"
                         ).permitAll()   // 인증/위치/약품 정보 전역 허용
                         .requestMatchers("/health", "/error").permitAll()        // 서버 상태체크
+                        .requestMatchers("/api/ai-consultations/**").permitAll()  // AI 증상 상담: 비로그인도 이용 가능
                         .anyRequest().authenticated()                  // 나머지는 토큰 필수
                 )
 

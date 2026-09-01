@@ -1,10 +1,56 @@
 // AI 증상 상담 채팅 메시지
-export type ChatMessage = UserChatMessage | ReferenceChatMessage | ChecklistChatMessage;
+export type ChatMessage =
+  | UserChatMessage
+  | ReferenceChatMessage
+  | ChecklistChatMessage
+  | AnswerChatMessage
+  | RegeneratedAnswerChatMessage;
 
 export interface UserChatMessage {
   id: string;
   type: 'user';
   text: string;
+}
+
+// 백엔드 RAG 응답(POST /api/ai-consultations) 그대로 담는 메시지.
+// 문장(segment) 단위로 근거 자료 번호(sourceIndexes)를 갖고 있어서, 문장별로 인용 배지를 붙일 수 있다.
+// consultationId는 이 답변이 저장된 상담 id - 뒤이어 자동으로 붙는 체크리스트 생성/제출에 쓰인다.
+// 네트워크 에러를 로컬에서 흉내낸 메시지에는 실제 상담 id가 없어서 없을 수 있다.
+export interface AnswerChatMessage {
+  id: string;
+  type: 'answer';
+  consultationId?: number;
+  segments: AnswerSegment[];
+  sources: AnswerSource[];
+}
+
+// 체크리스트 결과를 반영해 다시 생성한 답변(POST /{id}/regenerate). 문장별 인용이 아니라
+// 메시지 전체에 대한 flat 출처 목록 - 백엔드 스키마가 그렇게 되어 있다(AiConsultationController 참고).
+export interface RegeneratedAnswerChatMessage {
+  id: string;
+  type: 'regenerated';
+  message: string;
+  sources: RegeneratedSource[];
+  disclaimer: string;
+}
+
+export interface RegeneratedSource {
+  referenceSourceId: number;
+  title: string;
+  urlOrOrg: string;
+}
+
+export interface AnswerSegment {
+  text: string;
+  sourceIndexes: number[]; // AnswerSource.index를 가리킴. 비어있으면 특정 자료에 근거하지 않은 문장.
+}
+
+export interface AnswerSource {
+  index: number;
+  disease: string;
+  section: string;
+  sourceName: string;
+  cntntsSn: string;
 }
 
 export interface ReferenceChatMessage {
@@ -18,6 +64,7 @@ export interface ReferenceChatMessage {
 export interface ChecklistChatMessage {
   id: string;
   type: 'checklist';
+  consultationId: number; // 제출(submit)·재생성(regenerate) 호출에 그대로 쓰인다
   title: string;
   items: ChecklistItem[];
   answered: boolean; // 답변하기를 눌렀는지 여부 (누르면 체크박스 비활성화)

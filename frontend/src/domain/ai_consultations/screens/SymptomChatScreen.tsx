@@ -7,10 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import AiAvatar from '../components/AiAvatar';
+import AnswerCard from '../components/AnswerCard';
 import ChatBubbleUser from '../components/ChatBubbleUser';
 import ChecklistCard from '../components/ChecklistCard';
 import DisclaimerFooter from '../components/DisclaimerFooter';
 import ReferenceInfoCard from '../components/ReferenceInfoCard';
+import RegeneratedAnswerCard from '../components/RegeneratedAnswerCard';
 import { useSymptomChat } from '../hooks/useSymptomChat';
 import { AiConsultationStackParamList } from '../types';
 
@@ -69,6 +71,12 @@ export default function SymptomChatScreen() {
             }
             if (message.type === 'reference') {
               return <ReferenceInfoCard key={message.id} message={message} />;
+            }
+            if (message.type === 'answer') {
+              return <AnswerCard key={message.id} message={message} />;
+            }
+            if (message.type === 'regenerated') {
+              return <RegeneratedAnswerCard key={message.id} message={message} />;
             }
             return (
                 <ChecklistCard

@@ -1,67 +1,34 @@
-import { ChatMessage } from '../types';
+import { api } from '../../../shared/api/client';
+import {
+  AnswerChatMessage,
+  AnswerSegment,
+  AnswerSource,
+  ChecklistChatMessage,
+  ChecklistItem,
+  RegeneratedAnswerChatMessage,
+  RegeneratedSource,
+} from '../types';
 
-// TODO: 백엔드 AI 상담 API 연동 전까지 사용하는 목업입니다.
-// 실제 연동 시 emergency/api/emergency.ts 처럼
-// `api.post<...>('/api/ai-consultations/messages', { text }, { auth: true })` 형태로 교체하세요.
-
-interface SymptomKnowledge {
-  reference: { title: string; body: string; source: string };
-  checklistTitle: string;
-  checklistItems: string[];
+interface ConsultationResponseDto {
+  answer: AnswerSegment[];
+  sources: AnswerSource[];
+  consultationId: number;
+  sessionId: string;
+  guestCode: string | null; // 새 게스트 세션일 때만 값이 옴 (기존 세션 이어가는 요청이면 null)
 }
 
-const KNOWLEDGE: Record<string, SymptomKnowledge> = {
-  두통: {
-    reference: {
-      title: '참고 정보예요',
-      body: '두통은 긴장성, 편두통, 군발성 등 다양한 원인으로 알려져 있어요. 대부분 휴식으로 호전된다고 알려져 있지만, 갑작스럽고 심한 두통은 주의가 필요해요.',
-      source: '질병관리청 가이드라인',
-    },
-    checklistTitle: '몇 가지 확인해볼게요',
-    checklistItems: ['발열이 동반되나요?', '구토가 있나요?', '갑자기 심해졌나요?'],
-  },
-  복통: {
-    reference: {
-      title: '참고 정보예요',
-      body: '복통은 소화불량, 장염, 생리통 등 흔한 원인부터 주의가 필요한 원인까지 다양해요. 통증 위치와 양상에 따라 원인이 크게 달라질 수 있어요.',
-      source: '질병관리청 가이드라인',
-    },
-    checklistTitle: '몇 가지 확인해볼게요',
-    checklistItems: ['통증이 배 전체가 아닌 한쪽에 집중되나요?', '구토나 설사가 있나요?', '식은땀이 날 정도로 심한가요?'],
-  },
-  발열: {
-    reference: {
-      title: '참고 정보예요',
-      body: '발열은 감염에 대한 우리 몸의 정상적인 반응인 경우가 많아요. 수분을 충분히 섭취하고 휴식하면 대부분 호전되지만, 고열이 지속되면 진료가 필요해요.',
-      source: '질병관리청 가이드라인',
-    },
-    checklistTitle: '몇 가지 확인해볼게요',
-    checklistItems: ['체온이 38도 이상인가요?', '하루 이상 열이 지속되나요?', '오한이나 근육통이 동반되나요?'],
-  },
-  어지럼: {
-    reference: {
-      title: '참고 정보예요',
-      body: '어지럼은 이석증 같은 귀 문제, 저혈압, 빈혈 등 다양한 원인으로 나타날 수 있어요. 대부분 크게 위험하지 않지만 반복되면 원인 확인이 필요해요.',
-      source: '질병관리청 가이드라인',
-    },
-    checklistTitle: '몇 가지 확인해볼게요',
-    checklistItems: ['빙빙 도는 느낌인가요?', '두통이나 이명이 동반되나요?', '갑자기 쓰러질 뻔했나요?'],
-  },
-};
+interface ChecklistDto {
+  checklistId: number;
+  title: string;
+  items: string[];
+  status: string;
+}
 
-const DEFAULT_KNOWLEDGE: SymptomKnowledge = {
-  reference: {
-    title: '참고 정보예요',
-    body: '입력하신 증상에 대한 일반적인 참고 정보를 안내해드릴게요. 증상이 계속되거나 심해지면 병원 진료를 받아보세요.',
-    source: '질병관리청 가이드라인',
-  },
-  checklistTitle: '몇 가지 확인해볼게요',
-  checklistItems: ['증상이 하루 이상 지속되나요?', '다른 통증이 동반되나요?', '갑자기 심해졌나요?'],
-};
-
-function findKnowledge(text: string): SymptomKnowledge {
-  const hitKeyword = Object.keys(KNOWLEDGE).find((keyword) => text.includes(keyword));
-  return hitKeyword ? KNOWLEDGE[hitKeyword] : DEFAULT_KNOWLEDGE;
+interface RegenerateResponseDto {
+  message: string;
+  isDiagnosis: boolean;
+  sources: RegeneratedSource[];
+  disclaimer: string;
 }
 
 let idSeq = 0;
@@ -70,30 +37,89 @@ function nextId() {
   return `msg-${Date.now()}-${idSeq}`;
 }
 
-// 증상 텍스트를 보내면 [참고정보 카드, 체크리스트 카드]를 응답으로 준다.
-export function requestSymptomAdvice(text: string): Promise<ChatMessage[]> {
-  const knowledge = findKnowledge(text);
+export interface SymptomAdviceResult {
+  answerMessage: AnswerChatMessage;
+  checklistMessage: ChecklistChatMessage | null;
+  sessionId: string;
+  guestCode: string | null; // 이번 호출로 새로 발급됐으면 값이 있고, 기존 걸 그대로 썼으면 null
+}
 
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve([
-        {
-          id: nextId(),
-          type: 'reference',
-          title: knowledge.reference.title,
-          body: knowledge.reference.body,
-          source: knowledge.reference.source,
-        },
-        {
-          id: nextId(),
-          type: 'checklist',
-          title: knowledge.checklistTitle,
-          items: knowledge.checklistItems.map((label) => ({ id: nextId(), label, checked: false })),
-          answered: false,
-        },
-      ]);
-    }, 500); // 실제 응답을 기다리는 느낌을 주기 위한 지연
-  });
+// 증상 텍스트를 보내면 1차 답변을 받고, 답변에 실제 출처가 있으면(=참고할 근거가 있으면) 이어서
+// 체크리스트도 자동으로 생성해서 같이 돌려준다. 체크리스트 생성이 실패해도 1차 답변은 이미 받았으니
+// 조용히 넘어간다(사용자에게 1차 답변만이라도 보여주는 게 낫다).
+export async function requestSymptomAdvice(
+  text: string,
+  sessionId?: string,
+  guestCode?: string,
+): Promise<SymptomAdviceResult> {
+  const response = await api.post<ConsultationResponseDto>(
+    '/api/ai-consultations',
+    { query: text, sessionId, guestCode },
+    { auth: true }, // accessToken 자동 첨부 (게스트는 토큰 없이도 통과 - 백엔드가 permitAll)
+  );
+
+  const answerMessage: AnswerChatMessage = {
+    id: nextId(),
+    type: 'answer',
+    consultationId: response.consultationId,
+    segments: response.answer,
+    sources: response.sources,
+  };
+
+  const effectiveGuestCode = response.guestCode ?? guestCode ?? undefined;
+  let checklistMessage: ChecklistChatMessage | null = null;
+  if (response.sources.length > 0) {
+    try {
+      checklistMessage = await generateChecklist(response.consultationId, effectiveGuestCode);
+    } catch (e) {
+      console.error('체크리스트 생성 실패', e);
+    }
+  }
+
+  return {
+    answerMessage,
+    checklistMessage,
+    sessionId: response.sessionId,
+    guestCode: response.guestCode,
+  };
+}
+
+async function generateChecklist(consultationId: number, guestCode?: string): Promise<ChecklistChatMessage> {
+  const checklist = await api.post<ChecklistDto>(
+    `/api/ai-consultations/${consultationId}/checklist`,
+    { guestCode },
+    { auth: true },
+  );
+
+  const items: ChecklistItem[] = checklist.items.map((label) => ({ id: nextId(), label, checked: false }));
+  return { id: nextId(), type: 'checklist', consultationId, title: checklist.title, items, answered: false };
+}
+
+export function submitChecklistAnswers(consultationId: number, selectedItems: string[], guestCode?: string) {
+  return api.post<{ checklistResponseId: number; status: string }>(
+    `/api/ai-consultations/${consultationId}/checklist/submit`,
+    { selectedItems, guestCode },
+    { auth: true },
+  );
+}
+
+export async function regenerateAnswer(
+  consultationId: number,
+  guestCode?: string,
+): Promise<RegeneratedAnswerChatMessage> {
+  const response = await api.post<RegenerateResponseDto>(
+    `/api/ai-consultations/${consultationId}/regenerate`,
+    { guestCode },
+    { auth: true },
+  );
+
+  return {
+    id: nextId(),
+    type: 'regenerated',
+    message: response.message,
+    sources: response.sources,
+    disclaimer: response.disclaimer,
+  };
 }
 
 export function nextChatMessageId() {
