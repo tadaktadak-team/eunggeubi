@@ -26,7 +26,7 @@ import java.util.Map;
 public class EmergencyBedService {
 
     private final RestTemplate restTemplate;
-    private final XmlMapper xmlMapper;
+    private final XmlMapper xmlMapper = new XmlMapper();
 
     @Value("${emergency_bed.url}")
     private String apiUrl;
@@ -73,7 +73,7 @@ public class EmergencyBedService {
 
             // 5. 가까운 응급실 순으로 정렬
 
-            // 사용자 위치 기준 10km 이내의 응급실만 표시
+            // 사용자 위치 기준 15km 이내의 응급실만 표시
             result.removeIf(item ->
                     item.getDistance() == null || item.getDistance() > 15.0
             );
