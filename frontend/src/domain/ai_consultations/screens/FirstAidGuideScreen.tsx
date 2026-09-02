@@ -75,63 +75,63 @@ export default function FirstAidGuideScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <View style={styles.headerRow}>
-          <Pressable style={styles.side} onPress={() => navigation.goBack()} hitSlop={8}>
-            <Ionicons name="chevron-back" size={26} color={colors.text} />
-          </Pressable>
-          <Text style={styles.headerTitle}>응급처치 안내</Text>
-          <View style={styles.side} />
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={18} color={colors.placeholder} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="상황 입력 (예: 화상, 코피)"
-            placeholderTextColor={colors.placeholder}
-            value={searchText}
-            onChangeText={setSearchText}
-            onSubmitEditing={onSearchSubmit}
-            returnKeyType="search"
-          />
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: insets.top }]}>
+          <View style={styles.headerRow}>
+            <Pressable style={styles.side} onPress={() => navigation.goBack()} hitSlop={8}>
+              <Ionicons name="chevron-back" size={26} color={colors.text} />
+            </Pressable>
+            <Text style={styles.headerTitle}>응급처치 안내</Text>
+            <View style={styles.side} />
+          </View>
         </View>
 
-        <View style={styles.chipRow}>
-          {FIRST_AID_SITUATIONS.map((s) => (
-            <SymptomChip key={s} label={s} active={s === situation} onPress={() => setSituation(s)} />
-          ))}
-        </View>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={18} color={colors.placeholder} />
+            <TextInput
+                style={styles.searchInput}
+                placeholder="상황 입력 (예: 화상, 코피)"
+                placeholderTextColor={colors.placeholder}
+                value={searchText}
+                onChangeText={setSearchText}
+                onSubmitEditing={onSearchSubmit}
+                returnKeyType="search"
+            />
+          </View>
 
-        {loading ? (
-          <ActivityIndicator color={colors.primary} style={styles.loading} />
-        ) : (
-          guide && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>{guide.title}</Text>
-              {guide.steps.map((step, index) => (
-                <View key={step} style={styles.stepRow}>
-                  <View style={styles.stepBadge}>
-                    <Text style={styles.stepBadgeText}>{index + 1}</Text>
+          <View style={styles.chipRow}>
+            {FIRST_AID_SITUATIONS.map((s) => (
+                <SymptomChip key={s} label={s} active={s === situation} onPress={() => setSituation(s)} />
+            ))}
+          </View>
+
+          {loading ? (
+              <ActivityIndicator color={colors.primary} style={styles.loading} />
+          ) : (
+              guide && (
+                  <View style={styles.card}>
+                    <Text style={styles.cardTitle}>{guide.title}</Text>
+                    {guide.steps.map((step, index) => (
+                        <View key={step} style={styles.stepRow}>
+                          <View style={styles.stepBadge}>
+                            <Text style={styles.stepBadgeText}>{index + 1}</Text>
+                          </View>
+                          <Text style={styles.stepText}>{step}</Text>
+                        </View>
+                    ))}
                   </View>
-                  <Text style={styles.stepText}>{step}</Text>
-                </View>
-              ))}
-            </View>
-          )
-        )}
+              )
+          )}
 
-        <Pressable style={styles.callBtn} onPress={callEmergency}>
-          <Ionicons name="call" size={18} color={colors.white} />
-          <Text style={styles.callBtnText}>119 연결</Text>
-        </Pressable>
-      </ScrollView>
+          <Pressable style={styles.callBtn} onPress={callEmergency}>
+            <Ionicons name="call" size={18} color={colors.white} />
+            <Text style={styles.callBtnText}>119 연결</Text>
+          </Pressable>
+        </ScrollView>
 
-      <DisclaimerFooter />
-    </View>
+        <DisclaimerFooter />
+      </View>
   );
 }
 

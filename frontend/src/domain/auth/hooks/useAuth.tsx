@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { setOnSessionExpired } from '../../../shared/api/client';
 
 import {
   clearTokens,
@@ -37,6 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setLoading(false);
       }
     })();
+  }, []);
+
+  // client.ts에서 재발급까지 실패하면 로그인 상태를 해제
+  useEffect(() => {
+    setOnSessionExpired(() => setUserId(null));
+    return () => setOnSessionExpired(null);
   }, []);
 
   const signIn = async (email: string, password: string) => {
