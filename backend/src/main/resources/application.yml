@@ -52,14 +52,14 @@ kdca:
 medical_locator:
   secret: ${MEDICAL_LOCATOR_SECRET:}
   hospital:
-    url: "http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList"
+    url: http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList
   pharmacy:
-    url: "http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList"
+    url: http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList
 
 emergency_bed:
   secret: ${EMERGENCY_BED_SECRET:}
-  url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire"
-  hospital-url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire"
+  url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire
+  hospital-url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire
 
 ---
 spring:
