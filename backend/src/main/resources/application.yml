@@ -3,23 +3,20 @@ spring:
     name: eunggeubi
   profiles:
     active: local
-  # KDCA/OpenAI 등 외부 API 호출이 응답 없이 무한정 멈추는 걸 막기 위한 전역 타임아웃.
-  # (Boot가 자동구성한 RestClient.Builder를 쓰는 클라이언트엔 전부 적용됨)
+
+  # 외부 API가 응답 없이 멈추는 걸 막는 전역 타임아웃 (RestClient 기반 클라이언트에 적용)
   http:
     client:
       connect-timeout: 15s
       read-timeout: 30s
+
   ai:
     openai:
-      # 키가 없어도 앱은 뜨게 한다(AI 기능을 쓸 때만 실제로 필요).
-      # 빈 문자열이면 OpenAI 자동설정이 "키를 설정하라"며 기동을 막으므로 더미값을 기본으로 둔다.
+      # 키가 없어도 앱은 뜨게 한다. 빈 문자열이면 자동설정이 기동을 막으므로 더미값을 기본으로 둔다.
       api-key: ${OPENAI_API_KEY:dummy}
       embedding:
-        # text-embedding-3-large: 짧은 구어체 표현과 긴 격식체 문서 사이의 의미 유사도를 -small보다
-        # 잘 잡아준다고 알려진 모델. Qdrant 컬렉션이 1536차원으로 고정돼 있어서(재생성 없이 그대로 쓰려고)
-        # dimensions:1536으로 잘라서 쓴다 (large의 기본 출력은 3072차원이지만 OpenAI가 잘라 써도
-        # 성능 저하가 크지 않다고 명시함).
         options:
+          # Qdrant 컬렉션이 1536차원으로 고정돼 있어서 large 출력(3072)을 잘라서 쓴다.
           model: text-embedding-3-large
           dimensions: 1536
     vectorstore:
@@ -27,22 +24,22 @@ spring:
         host: localhost
         port: 6334
         collection-name: health_info
-        # true면 부팅 시점에 Qdrant에 접속을 시도해서, Qdrant가 없으면 앱 자체가 뜨지 않는다.
-        # 컬렉션 생성은 인덱싱 배치(QdrantCollectionResetService)가 직접 하므로 false로 둔다.
+        # true면 부팅 때 Qdrant에 접속해서, 없으면 앱이 안 뜬다. 컬렉션 생성은 인덱싱 배치가 직접 한다.
         initialize-schema: false
 
+# 시크릿은 커밋되지 않는 곳에만 둔다: 로컬은 application-local.yml, 그 외는 JWT_SECRET 환경변수.
+# 기본값을 두면 설정을 빠뜨려도 앱이 그냥 떠서, 공개된 키로 토큰이 위조될 수 있다.
 jwt:
-  # 로컬 개발용 기본값 - 운영 환경은 반드시 JWT_SECRET 환경변수로 덮어써야 한다.
-  # (없으면 앱이 아예 안 뜨는 대신, 다른 값들처럼 개발 편의를 위해 더미 기본값을 둔다)
-  secret: ${JWT_SECRET:CO0RVgGhGpDCjgZmTk4HhJHcPNAMY7hA3kHctJzwwdjqPXzcK5M3ZygoQsChYKMc}
-  access-token-validity-ms: 3600000       # access 토큰 1시간
-  refresh-token-validity-ms: 1209600000   # refresh 토큰 14일
+  secret: ${JWT_SECRET}
+  access-token-validity-ms: 3600000       # 1시간
+  refresh-token-validity-ms: 1209600000   # 14일
 
+# 아래 외부 API들: URL은 비밀값이 아니라 공통으로 두고, 인증키만 환경변수로 주입한다.
+# 인증키가 없어도 앱은 뜨고, 해당 기능을 호출할 때만 실패한다.
 openapi:
   e-drug:
     url: https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList
     service-key: ${E_DRUG_SECRET:}
-
   pill-ident:
     url: https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03
     service-key: ${PILL_IDENT_SECRET:}
@@ -50,10 +47,8 @@ openapi:
 kdca:
   health-info:
     base-url: https://api.kdca.go.kr/api/provide/healthInfo
-    # 토큰이 없어도 앱은 뜨게 한다(인덱싱 배치를 돌릴 때만 실제로 필요).
     token: ${KDCA_TOKEN:}
 
-# 심평원 병원/약국 API. URL은 비밀값이 아니라 공통으로 두고, 인증키만 환경변수로 주입한다.
 medical_locator:
   secret: ${MEDICAL_LOCATOR_SECRET:}
   hospital:
@@ -65,6 +60,7 @@ emergency_bed:
   secret: ${EMERGENCY_BED_SECRET:}
   url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire"
   hospital-url: "https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire"
+
 ---
 spring:
   config:
@@ -74,7 +70,6 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/eunggeubi?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
     driver-class-name: com.mysql.cj.jdbc.Driver
-
 
   jpa:
     hibernate:
@@ -93,16 +88,3 @@ spring:
     vectorstore:
       qdrant:
         initialize-schema: true
-
-  # 운영 환경에서는 환경변수로 주입한다.
-  datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/eunggeubi}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${DB_USERNAME:eunggeubi}
-    password: ${DB_PASSWORD:}
-
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-    open-in-view: false
