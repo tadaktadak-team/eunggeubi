@@ -28,6 +28,7 @@ export const BLOOD_TYPES = ['A', 'B', 'O', 'AB'];
 export type MyPageStackParamList = {
   MyPageHome: undefined;
   Guardian: undefined;
-  GuardianForm: { guardian?: Guardian } | undefined; // 있으면 수정, 없으면 등록
+  GuardianForm: { guardian?: Guardian } | undefined;
   Health: undefined;
+  ChangePassword: undefined;
 };

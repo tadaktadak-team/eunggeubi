@@ -32,6 +32,7 @@ const QUICK: { key: string; label: string; icon: IconName }[] = [
 ];
 
 const MENUS: { key: string; label: string; sub?: string; icon: IconName }[] = [
+  { key: 'password', label: '비밀번호 변경', icon: 'lock-closed-outline' },
   { key: 'notification', label: '알림 설정', sub: '보호자·복약 알림 관리', icon: 'notifications-outline' },
   { key: 'terms', label: '이용약관 · 개인정보처리방침', icon: 'document-text-outline' },
   { key: 'support', label: '고객센터', sub: '문의 및 도움말', icon: 'headset-outline' },
@@ -136,7 +137,7 @@ export default function MyPageHomeScreen() {
             <Pressable
               key={m.key}
               style={[styles.menuRow, i > 0 && styles.menuBorder]}
-              onPress={() => go(m.label)}
+              onPress={() => (m.key === 'password' ? navigation.navigate('ChangePassword') : go(m.label))}
             >
               <Ionicons name={m.icon} size={20} color={colors.textSub} />
               <View style={{ flex: 1 }}>
