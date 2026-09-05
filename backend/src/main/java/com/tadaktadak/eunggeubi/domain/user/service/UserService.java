@@ -1,5 +1,6 @@
 package com.tadaktadak.eunggeubi.domain.user.service;
 
+import com.tadaktadak.eunggeubi.domain.user.dto.MyInfoResponse;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,13 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+
+    @Transactional(readOnly = true)
+    public MyInfoResponse getMyInfo(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+        return MyInfoResponse.from(user);
+    }
 
     @Transactional
     public void changePassword(Long userId, String currentPassword, String newPassword) {
