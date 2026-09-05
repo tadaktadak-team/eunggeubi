@@ -1,10 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
-import { CompositeNavigationProp, useNavigation } from '@react-navigation/native';
+import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { MyPageStackParamList } from '../types';
+import { getGuardians } from '../api/guardian';
+import { getHealthProfile } from '../api/health';
+import { getMyInfo } from '../api/user';
+import { Guardian, HealthProfile, MyInfo, MyPageStackParamList } from '../types';
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../../auth/hooks/useAuth';
@@ -15,15 +19,20 @@ type Nav = CompositeNavigationProp<
 >;
 type IconName = keyof typeof Ionicons.glyphMap;
 
-// TODO: API 연동 시 교체 (GET /users/me, 보호자 수, 상담 수, 건강 프로필)
-const MOCK = {
-  name: '홍길동',
-  email: 'hong@example.com',
-  consultCount: 12,
-  guardianCount: 2,
-  alertOn: true,
-  healthSummary: '혈액형 A+ · 고혈압 · 페니실린 알레르기',
-};
+// 건강 프로필을 카드 한 줄짜리 요약 문구로 만든다. 항목이 많으면 앞의 3개만 보여주고 나머지는 개수로.
+function buildHealthSummary(profile: HealthProfile | null): string {
+  if (!profile) return '건강 프로필을 등록해보세요';
+
+  const items = [
+    profile.bloodType ? `혈액형 ${profile.bloodType}` : null,
+    ...profile.diseases,
+    ...profile.medications,
+  ].filter((v): v is string => !!v);
+
+  if (items.length === 0) return '건강 프로필을 등록해보세요';
+  if (items.length <= 3) return items.join(' · ');
+  return `${items.slice(0, 3).join(' · ')} 외 ${items.length - 3}건`;
+}
 
 const QUICK: { key: string; label: string; icon: IconName }[] = [
   { key: 'guardian', label: '보호자 관리', icon: 'people-outline' },
@@ -42,6 +51,43 @@ const MENUS: { key: string; label: string; sub?: string; icon: IconName }[] = [
 export default function MyPageHomeScreen() {
   const navigation = useNavigation<Nav>();
   const { isLoggedIn, signOut } = useAuth();
+
+  const [myInfo, setMyInfo] = useState<MyInfo | null>(null);
+  const [guardians, setGuardians] = useState<Guardian[]>([]);
+  const [health, setHealth] = useState<HealthProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      // 서로 의존하지 않는 세 요청이라 병렬로 부른다 (순차로 하면 대기 시간이 3배)
+      const [info, guardianList, profile] = await Promise.all([
+        getMyInfo(),
+        getGuardians(),
+        getHealthProfile(),
+      ]);
+      setMyInfo(info);
+      setGuardians(guardianList);
+      setHealth(profile);
+    } catch (e: any) {
+      Alert.alert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 보호자 관리·건강 프로필에서 수정하고 돌아오면 요약도 갱신돼야 하므로 포커스마다 다시 부른다.
+  useFocusEffect(
+    useCallback(() => {
+      if (isLoggedIn) load();
+    }, [isLoggedIn, load]),
+  );
+
+  const guardianCount = guardians.length;
+  const alertOn = guardians.some((g) => g.notifyEnabled);
+  const healthSummary = buildHealthSummary(health);
+  // 소셜 전용 계정은 비밀번호가 없어서 변경 자체가 불가능하므로 메뉴에서 숨긴다.
+  const menus = MENUS.filter((m) => !(m.key === 'password' && myInfo?.socialOnly));
 
   // TODO: 세부화면 만들면 navigation.navigate로 교체
   const go = (label: string) => Alert.alert(label, '준비 중입니다.');
@@ -72,6 +118,14 @@ export default function MyPageHomeScreen() {
     );
   }
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -85,8 +139,8 @@ export default function MyPageHomeScreen() {
         <Pressable style={styles.profileCard} onPress={() => go('계정 정보')}>
           <Ionicons name="person-circle-outline" size={48} color={colors.textSub} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.profileName}>{MOCK.name} 님</Text>
-            <Text style={styles.profileEmail}>{MOCK.email}</Text>
+            <Text style={styles.profileName}>{myInfo?.name ?? '-'} 님</Text>
+            <Text style={styles.profileEmail}>{myInfo?.email ?? ''}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
         </Pressable>
@@ -104,18 +158,19 @@ export default function MyPageHomeScreen() {
         {/* 통계 3개 */}
         <View style={styles.statRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{MOCK.consultCount}회</Text>
+            {/* 상담 횟수는 조회 API(MY04)가 아직 없어서 '-'로 둔다 */}
+            <Text style={styles.statValue}>-</Text>
             <Text style={styles.statLabel}>총 상담</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{MOCK.guardianCount}명</Text>
+            <Text style={styles.statValue}>{guardianCount}명</Text>
             <Text style={styles.statLabel}>보호자</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: colors.primary }]}>
-              {MOCK.alertOn ? 'ON' : 'OFF'}
+              {alertOn ? 'ON' : 'OFF'}
             </Text>
             <Text style={styles.statLabel}>알림</Text>
           </View>
@@ -126,14 +181,14 @@ export default function MyPageHomeScreen() {
           <Ionicons name="medkit-outline" size={22} color={colors.primary} />
           <View style={{ flex: 1 }}>
             <Text style={styles.healthTitle}>내 건강 프로필 확인하기</Text>
-            <Text style={styles.healthSub}>{MOCK.healthSummary}</Text>
+            <Text style={styles.healthSub}>{healthSummary}</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.primary} />
         </Pressable>
 
         {/* 메뉴 리스트 */}
         <View style={styles.menuCard}>
-          {MENUS.map((m, i) => (
+          {menus.map((m, i) => (
             <Pressable
               key={m.key}
               style={[styles.menuRow, i > 0 && styles.menuBorder]}
