@@ -21,7 +21,7 @@ import java.util.List;
 public class HospitalService {
 
     private final RestTemplate restTemplate;
-    private final XmlMapper xmlMapper;
+    private final XmlMapper xmlMapper = new XmlMapper();
 
     // URL은 병원/약국 각각 사용
     @Value("${medical_locator.hospital.url}")
