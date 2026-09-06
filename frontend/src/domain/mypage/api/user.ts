@@ -6,7 +6,17 @@ export function getMyInfo() {
   return api.get<MyInfo>('/api/users/me', { auth: true });
 }
 
-// 성공 시 204 No Content (본문 없음) — client.ts가 undefined로 처리해준다
+export interface ChangePasswordResult {
+  accessToken: string;
+  refreshToken: string;
+}
+
+// 서버가 기존 refresh 토큰을 전부 폐기하므로, 현재 기기가 계속 쓸 새 토큰 쌍이 함께 내려온다.
+// 받은 값을 저장하지 않으면 access 토큰이 만료되는 순간(최대 1시간) 로그아웃된다.
 export function changePassword(currentPassword: string, newPassword: string) {
-  return api.put<void>('/api/users/password', { currentPassword, newPassword }, { auth: true });
+  return api.put<ChangePasswordResult>(
+    '/api/users/password',
+    { currentPassword, newPassword },
+    { auth: true },
+  );
 }
