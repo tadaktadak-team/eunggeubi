@@ -39,14 +39,14 @@ export default function ChangePasswordScreen() {
     try {
       setSaving(true);
       const tokens = await changePassword(current, next);
-      // 서버가 기존 토큰을 전부 폐기했으므로, 새로 받은 토큰으로 교체해야 이 기기의 로그인이 유지된다.
+      //서버가 기존 토큰을 전부 폐기 -> 새로 받은 토큰으로 교체해야 이 기기의 로그인이 유지
       await saveTokens(tokens.accessToken, tokens.refreshToken);
 
       Alert.alert('변경 완료', '비밀번호가 변경됐어요.\n다른 기기에서는 로그아웃 처리했어요.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      // 현재 비밀번호 불일치 등 서버 메시지를 그대로 보여준다
+      //현재 비밀번호 불일치 등 서버 메시지를 그대로 노출
       Alert.alert('변경 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSaving(false);
