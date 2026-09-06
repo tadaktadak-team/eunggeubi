@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { nextChatMessageId, requestSymptomAdvice } from '../api/aiConsultations';
+import {
+  nextChatMessageId,
+  regenerateAnswer,
+  requestSymptomAdvice,
+  submitChecklistAnswers,
+} from '../api/aiConsultations';
 import { ChatMessage } from '../types';
 
 export function useSymptomChat(initialMessage?: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const sentInitialRef = useRef(false);
+  // 상담 세션을 이어가기 위한 값들. 화면(훅 인스턴스)이 살아있는 동안 대화 전체에서 공유한다.
+  const sessionRef = useRef<{ sessionId?: string; guestCode?: string }>({});
 
-  // 사용자 텍스트를 말풍선으로 추가하고, AI 응답(참고정보+체크리스트)을 이어서 붙인다.
+  // 사용자 텍스트를 말풍선으로 추가하고, AI 응답(+있으면 체크리스트)을 이어서 붙인다.
   const sendText = useCallback(async (text: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -16,10 +23,20 @@ export function useSymptomChat(initialMessage?: string) {
     setMessages((prev) => [...prev, { id: nextChatMessageId(), type: 'user', text: trimmed }]);
     setLoading(true);
     try {
-      const aiMessages = await requestSymptomAdvice(trimmed);
-      setMessages((prev) => [...prev, ...aiMessages]);
+      const { answerMessage, checklistMessage, sessionId, guestCode } = await requestSymptomAdvice(
+        trimmed,
+        sessionRef.current.sessionId,
+        sessionRef.current.guestCode,
+      );
+      sessionRef.current = { sessionId, guestCode: guestCode ?? sessionRef.current.guestCode };
+      setMessages((prev) => [...prev, answerMessage, ...(checklistMessage ? [checklistMessage] : [])]);
     } catch (e) {
       console.error(e);
+      const message = e instanceof Error ? e.message : '요청 중 오류가 발생했습니다.';
+      setMessages((prev) => [
+        ...prev,
+        { id: nextChatMessageId(), type: 'answer', segments: [{ text: message, sourceIndexes: [] }], sources: [] },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -43,19 +60,30 @@ export function useSymptomChat(initialMessage?: string) {
     );
   }, []);
 
-  // 체크한 항목들을 요약해서 다음 사용자 메시지로 보내고, 이어지는 AI 응답을 받는다.
+  // 체크한 항목을 서버에 제출하고, 그 결과를 반영한 재생성 답변을 이어서 받는다.
   const submitChecklist = useCallback(
-    (messageId: string) => {
-      const target = messages.find((m): m is Extract<ChatMessage, { type: 'checklist' }> => m.id === messageId && m.type === 'checklist');
+    async (messageId: string) => {
+      const target = messages.find(
+        (m): m is Extract<ChatMessage, { type: 'checklist' }> => m.id === messageId && m.type === 'checklist',
+      );
       if (!target || target.answered) return;
 
       setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, answered: true } : m)));
-
-      const checkedLabels = target.items.filter((it) => it.checked).map((it) => it.label.replace(/\?$/, ''));
-      const summary = checkedLabels.length > 0 ? `${checkedLabels.join(', ')} 있어요` : '해당 사항 없어요';
-      sendText(summary);
+      setLoading(true);
+      try {
+        const checkedLabels = target.items.filter((it) => it.checked).map((it) => it.label);
+        await submitChecklistAnswers(target.consultationId, checkedLabels, sessionRef.current.guestCode);
+        const regenerated = await regenerateAnswer(target.consultationId, sessionRef.current.guestCode);
+        setMessages((prev) => [...prev, regenerated]);
+      } catch (e) {
+        console.error(e);
+        const message = e instanceof Error ? e.message : '요청 중 오류가 발생했습니다.';
+        setMessages((prev) => [...prev, { id: nextChatMessageId(), type: 'regenerated', message, sources: [], disclaimer: '' }]);
+      } finally {
+        setLoading(false);
+      }
     },
-    [messages, sendText],
+    [messages],
   );
 
   return { messages, loading, sendText, toggleChecklistItem, submitChecklist };

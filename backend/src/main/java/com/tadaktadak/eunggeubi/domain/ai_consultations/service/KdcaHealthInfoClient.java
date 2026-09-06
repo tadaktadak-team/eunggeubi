@@ -41,9 +41,15 @@ public class KdcaHealthInfoClient {
     // String 컨버터가 이 조합을 오인해서 한글이 깨지는 문제가 있었다(직접 curl로 받은 원본
     // 바이트는 정상 UTF-8인 것 확인함). 그래서 자동 판단에 맡기지 않고 byte[]로 받아
     // UTF-8로 직접 디코딩한다.
+    //
+    // User-Agent 헤더는 반드시 있어야 한다 - KDCA API 앞단(게이트웨이/방화벽으로 추정)이
+    // User-Agent 없는 요청을 404로 막는다. curl은 기본으로 "curl/x.x.x"를 보내서 문제없이
+    // 통과하지만, Spring이 쓰는 JDK HttpClient는 기본적으로 User-Agent를 안 보내서 전부
+    // 404가 나는 걸 직접 확인했다 (curl -A ""로 재현됨).
     String fetchRawXml(String cntntsSn) {
         byte[] bytes = restClient.get()
                 .uri(baseUrl + "?TOKEN={token}&cntntsSn={id}", token, cntntsSn)
+                .header("User-Agent", "eunggeubi-backend/1.0")
                 .retrieve()
                 .body(byte[].class);
         return new String(bytes, StandardCharsets.UTF_8);

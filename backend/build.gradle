@@ -23,31 +23,38 @@ ext {
 }
 
 dependencies {
-	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	// Spring Boot
 	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
-	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
-	compileOnly 'org.projectlombok:lombok'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+	// DB
+	runtimeOnly 'com.mysql:mysql-connector-j'
 	runtimeOnly 'com.h2database:h2'
+
+	// 인증 (JWT)
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
-	runtimeOnly 'com.mysql:mysql-connector-j'
 
-	// RAG 인덱싱 파이프라인: OpenAI 임베딩 + Qdrant 벡터 저장소
+	// 공공 API 연동 (심평원·국립중앙의료원·KDCA 응답이 XML)
+	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
+
+	// AI 상담 RAG (OpenAI 임베딩 + Qdrant 벡터 저장소)
 	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 	implementation 'org.springframework.ai:spring-ai-starter-vector-store-qdrant'
-	// KDCA 건강정보 API 응답(XML) 파싱용
-	implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
-	// seed.csv 파싱용 (질병명에 콤마가 포함된 행이 있어 따옴표 인용 규칙을 제대로 지키는 파서가 필요함)
-	implementation 'org.apache.commons:commons-csv:1.14.1'
+	implementation 'org.apache.commons:commons-csv:1.14.1' // seed.csv 파싱 (인용부호 처리 필요)
 
+	// Lombok
+	compileOnly 'org.projectlombok:lombok'
 	annotationProcessor 'org.projectlombok:lombok'
+
+	// 테스트
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testCompileOnly 'org.projectlombok:lombok'
-	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 	testAnnotationProcessor 'org.projectlombok:lombok'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 dependencyManagement {
