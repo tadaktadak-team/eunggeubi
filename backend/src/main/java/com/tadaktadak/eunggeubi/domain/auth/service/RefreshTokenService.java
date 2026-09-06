@@ -11,7 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-// refresh 토큰의 발급/폐기
+//refresh 토큰의 발급/폐기
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService {

@@ -22,7 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 앱 시작 시: 저장된 refresh 토큰으로 자동 로그인 시도
+  //앱 시작 시: 저장된 refresh 토큰으로 자동 로그인 시도
   useEffect(() => {
     (async () => {
       try {
@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
   }, []);
 
-  // client.ts에서 재발급까지 실패하면 로그인 상태를 해제
+  //client.ts에서 재발급까지 실패하면 로그인 상태를 해제
   useEffect(() => {
     setOnSessionExpired(() => setUserId(null));
     return () => setOnSessionExpired(null);

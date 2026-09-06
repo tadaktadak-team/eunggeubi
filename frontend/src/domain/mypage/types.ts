@@ -27,7 +27,7 @@ export const BLOOD_TYPES = ['A', 'B', 'O', 'AB'];
 
 export type Gender = 'MALE' | 'FEMALE' | 'NONE';
 
-// GET /api/users/me 응답 (MY01_INFO01)
+// GET /api/users/me 응답
 export interface MyInfo {
   email: string;
   name: string;
@@ -35,13 +35,13 @@ export interface MyInfo {
   birthDate: string; // "1990-01-01"
   gender: Gender;
   address: string | null;
-  socialOnly: boolean; // 비밀번호가 없는 소셜 전용 계정
+  socialOnly: boolean; //소셜
 }
 
 export type MyPageStackParamList = {
   MyPageHome: undefined;
   Guardian: undefined;
-  GuardianForm: { guardian?: Guardian } | undefined; // 있으면 수정, 없으면 등록
+  GuardianForm: { guardian?: Guardian } | undefined; // 수정/등록
   Health: undefined;
   ChangePassword: undefined;
 };
