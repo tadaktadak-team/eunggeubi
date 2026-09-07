@@ -102,6 +102,12 @@ export default function MyPageHomeScreen() {
       { text: '로그아웃', style: 'destructive', onPress: () => signOut() },
     ]);
 
+  const onMenu = (key: string, label: string) => {
+    if (key === 'password') navigation.navigate('ChangePassword');
+    else if (key === 'terms') navigation.navigate('Legal');
+    else go(label);
+  };
+
   const onQuick = (key: string, label: string) => {
     if (key === 'guardian') navigation.navigate('Guardian');
     else if (key === 'health') navigation.navigate('Health');
@@ -176,7 +182,7 @@ export default function MyPageHomeScreen() {
             <Pressable
               key={m.key}
               style={[styles.menuRow, i > 0 && styles.menuBorder]}
-              onPress={() => (m.key === 'password' ? navigation.navigate('ChangePassword') : go(m.label))}
+              onPress={() => onMenu(m.key, m.label)}
             >
               <Ionicons name={m.icon} size={20} color={colors.textSub} />
               <View style={{ flex: 1 }}>

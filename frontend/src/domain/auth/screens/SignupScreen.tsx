@@ -219,6 +219,9 @@ export default function SignupScreen() {
               color={agreeTerms ? colors.primary : colors.placeholder}
             />
             <Text style={styles.checkText}>[필수] 이용약관 동의</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Legal', { tab: 'terms' })} hitSlop={8}>
+              <Text style={styles.checkLink}>보기</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
           <TouchableOpacity style={styles.check} onPress={() => setAgreePrivacy((v) => !v)}>
             <Ionicons
@@ -227,6 +230,9 @@ export default function SignupScreen() {
               color={agreePrivacy ? colors.primary : colors.placeholder}
             />
             <Text style={styles.checkText}>[필수] 개인정보 처리 동의</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Legal', { tab: 'privacy' })} hitSlop={8}>
+              <Text style={styles.checkLink}>보기</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
           <TouchableOpacity style={styles.check} onPress={() => setAgreeSensitive((v) => !v)}>
             <Ionicons
@@ -235,6 +241,9 @@ export default function SignupScreen() {
               color={agreeSensitive ? colors.primary : colors.placeholder}
             />
             <Text style={styles.checkText}>[필수] 민감정보(건강정보) 처리 동의</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Legal', { tab: 'privacy' })} hitSlop={8}>
+              <Text style={styles.checkLink}>보기</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -303,7 +312,8 @@ const styles = StyleSheet.create({
   verifiedText: { color: colors.success, fontSize: font.sub, marginBottom: spacing.md },
   hint: { color: colors.textSub, fontSize: font.caption, marginBottom: spacing.md, marginTop: -spacing.xs },
   check: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
-  checkText: { marginLeft: spacing.sm, fontSize: font.sub, color: colors.text },
+  checkText: { flex: 1, marginLeft: spacing.sm, fontSize: font.sub, color: colors.text },
+  checkLink: { fontSize: font.caption, color: colors.placeholder, textDecorationLine: 'underline' },
   nextBtn: {
     backgroundColor: colors.primary,
     height: 52,

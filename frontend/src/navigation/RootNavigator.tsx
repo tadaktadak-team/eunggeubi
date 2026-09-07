@@ -11,6 +11,7 @@ import SignupScreen from '../domain/auth/screens/SignupScreen';
 import SplashScreen from '../domain/auth/screens/SplashScreen';
 import EmergencyResultScreen from '../domain/emergency/screens/EmergencyResultScreen';
 import PlaceholderScreen from '../shared/components/PlaceholderScreen';
+import LegalScreen from '../shared/screens/LegalScreen';
 import TabBar from '../shared/components/TabBar';
 import { RootStackParamList } from './types';
 import { useState } from 'react';
@@ -59,11 +60,13 @@ export default function RootNavigator() {
               <Stack.Screen name="FindAccount" component={FindAccountScreen} />
               <Stack.Screen name="Tabs" component={TabsNavigator} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
+              <Stack.Screen name="Legal" component={LegalScreen} />
             </>
           ) : (
             <>
               <Stack.Screen name="Tabs" component={TabsNavigator} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
+              <Stack.Screen name="Legal" component={LegalScreen} />
             </>
           )}
         </Stack.Navigator>
