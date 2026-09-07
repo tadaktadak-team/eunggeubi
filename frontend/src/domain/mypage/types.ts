@@ -21,13 +21,14 @@ export interface HealthProfile {
   bloodType: string | null;
   diseases: string[];
   medications: string[];
+  allergies: string[];
 }
 
 export const BLOOD_TYPES = ['A', 'B', 'O', 'AB'];
 
 export type Gender = 'MALE' | 'FEMALE' | 'NONE';
 
-// GET /api/users/me 응답 (MY01_INFO01)
+// GET /api/users/me 응답
 export interface MyInfo {
   email: string;
   name: string;
@@ -35,13 +36,42 @@ export interface MyInfo {
   birthDate: string; // "1990-01-01"
   gender: Gender;
   address: string | null;
-  socialOnly: boolean; // 비밀번호가 없는 소셜 전용 계정
+  socialOnly: boolean; //소셜
+}
+
+// GET /api/users/me/consultations 응답 항목
+export interface ConsultationSummary {
+  sessionId: string;
+  firstQuestion: string;
+  createdAt: string; // 타임존 없는 서버 로컬시간
+}
+
+export type SenderType = 'USER' | 'AI';
+
+export interface ConsultationMessage {
+  id: number;
+  senderType: SenderType;
+  content: string;
+  regenerated: boolean;
+  createdAt: string;
+  checkedItems: string[];
+  checklistAnswered: boolean;
+}
+
+// GET /api/users/me/consultations/{sessionId} 응답 (MY04_HIST02)
+export interface ConsultationDetail {
+  sessionId: string;
+  messages: ConsultationMessage[];
 }
 
 export type MyPageStackParamList = {
   MyPageHome: undefined;
   Guardian: undefined;
-  GuardianForm: { guardian?: Guardian } | undefined; // 있으면 수정, 없으면 등록
+  GuardianForm: { guardian?: Guardian } | undefined; // 수정/등록
   Health: undefined;
   ChangePassword: undefined;
+  AccountEdit: undefined;
+  Withdraw: undefined;
+  ConsultationHistory: undefined;
+  ConsultationDetail: { sessionId: string; title: string };
 };

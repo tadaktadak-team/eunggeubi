@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Te
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { formatPhone } from '../../../shared/utils/phone';
 import { deleteGuardian, getGuardians, updateGuardian } from '../api/guardian';
 import { Guardian, MyPageStackParamList, RELATIONSHIP_LABEL } from '../types';
 
@@ -88,7 +89,7 @@ export default function GuardianScreen() {
                     <Text style={styles.relChipText}>{RELATIONSHIP_LABEL[g.relationship]}</Text>
                   </View>
                 </View>
-                <Text style={styles.phone}>{g.phone}</Text>
+                <Text style={styles.phone}>{formatPhone(g.phone)}</Text>
               </View>
               <Switch
                 value={g.notifyEnabled}
