@@ -5,10 +5,11 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { getConsultations } from '../api/consultation';
 import { getGuardians } from '../api/guardian';
 import { getHealthProfile } from '../api/health';
 import { getMyInfo } from '../api/user';
-import { Guardian, HealthProfile, MyInfo, MyPageStackParamList } from '../types';
+import { ConsultationSummary, Guardian, HealthProfile, MyInfo, MyPageStackParamList } from '../types';
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../../auth/hooks/useAuth';
@@ -55,20 +56,23 @@ export default function MyPageHomeScreen() {
   const [myInfo, setMyInfo] = useState<MyInfo | null>(null);
   const [guardians, setGuardians] = useState<Guardian[]>([]);
   const [health, setHealth] = useState<HealthProfile | null>(null);
+  const [consultations, setConsultations] = useState<ConsultationSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      // 서로 의존하지 않는 세 요청이라 병렬로 부른다 (순차로 하면 대기 시간이 3배)
-      const [info, guardianList, profile] = await Promise.all([
+      // 서로 의존하지 않는 요청이라 병렬로 부른다 (순차로 하면 대기 시간이 그만큼 늘어난다)
+      const [info, guardianList, profile, consultationList] = await Promise.all([
         getMyInfo(),
         getGuardians(),
         getHealthProfile(),
+        getConsultations(),
       ]);
       setMyInfo(info);
       setGuardians(guardianList);
       setHealth(profile);
+      setConsultations(consultationList);
     } catch (e: any) {
       Alert.alert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
     } finally {
@@ -160,8 +164,7 @@ export default function MyPageHomeScreen() {
         {/* 통계 3개 */}
         <View style={styles.statRow}>
           <View style={styles.statItem}>
-            {/* 상담 횟수는 조회 API(MY04)가 아직 없어서 '-'로 둔다 */}
-            <Text style={styles.statValue}>-</Text>
+            <Text style={styles.statValue}>{consultations.length}회</Text>
             <Text style={styles.statLabel}>총 상담</Text>
           </View>
           <View style={styles.statDivider} />
