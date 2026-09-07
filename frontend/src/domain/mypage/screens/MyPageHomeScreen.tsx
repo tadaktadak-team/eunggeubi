@@ -101,8 +101,10 @@ export default function MyPageHomeScreen() {
   const onQuick = (key: string, label: string) => {
     if (key === 'guardian') navigation.navigate('Guardian');
     else if (key === 'health') navigation.navigate('Health');
-    else go(label); // 건강/상담은 아직
+    else if (key === 'history') navigation.navigate('ConsultationHistory');
+    else go(label);
   };
+
 
   if (!isLoggedIn) {
     return (

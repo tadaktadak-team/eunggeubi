@@ -38,10 +38,35 @@ export interface MyInfo {
   socialOnly: boolean; //소셜
 }
 
+// GET /api/users/me/consultations 응답 항목
+export interface ConsultationSummary {
+  sessionId: string;
+  firstQuestion: string;
+  createdAt: string; // 타임존 없는 서버 로컬시간
+}
+
+export type SenderType = 'USER' | 'AI';
+
+export interface ConsultationMessage {
+  id: number;
+  senderType: SenderType;
+  content: string;
+  regenerated: boolean;
+  createdAt: string;
+}
+
+// GET /api/users/me/consultations/{sessionId} 응답 (MY04_HIST02)
+export interface ConsultationDetail {
+  sessionId: string;
+  messages: ConsultationMessage[];
+}
+
 export type MyPageStackParamList = {
   MyPageHome: undefined;
   Guardian: undefined;
   GuardianForm: { guardian?: Guardian } | undefined; // 수정/등록
   Health: undefined;
   ChangePassword: undefined;
+  ConsultationHistory: undefined;
+  ConsultationDetail: { sessionId: string; title: string };
 };
