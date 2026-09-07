@@ -140,7 +140,7 @@ export default function MyPageHomeScreen() {
         </View>
 
         {/* 프로필 카드 */}
-        <Pressable style={styles.profileCard} onPress={() => go('계정 정보')}>
+        <Pressable style={styles.profileCard} onPress={() => navigation.navigate('AccountEdit')}>
           <Ionicons name="person-circle-outline" size={48} color={colors.textSub} />
           <View style={{ flex: 1 }}>
             <Text style={styles.profileName}>{myInfo?.name ?? '-'} 님</Text>
@@ -188,11 +188,17 @@ export default function MyPageHomeScreen() {
           ))}
         </View>
 
-        {/* 로그아웃 + 버전 */}
+        {/* 로그아웃 + 회원 탈퇴 + 버전 */}
         <View style={styles.footer}>
-          <Pressable onPress={onLogout}>
-            <Text style={styles.logout}>로그아웃</Text>
-          </Pressable>
+          <View style={styles.footerRow}>
+            <Pressable onPress={onLogout}>
+              <Text style={styles.logout}>로그아웃</Text>
+            </Pressable>
+            <Text style={styles.footerDivider}>·</Text>
+            <Pressable onPress={() => navigation.navigate('Withdraw')}>
+              <Text style={styles.logout}>회원 탈퇴</Text>
+            </Pressable>
+          </View>
           <Text style={styles.version}>v1.0.0</Text>
         </View>
       </ScrollView>
@@ -241,6 +247,8 @@ const styles = StyleSheet.create({
   menuSub: { fontSize: font.caption, color: colors.textSub, marginTop: 2 },
 
   footer: { alignItems: 'center', gap: spacing.xs, marginTop: spacing.md },
+  footerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  footerDivider: { color: colors.placeholder, fontSize: font.sub },
   logout: { color: colors.textSub, fontSize: font.sub, textDecorationLine: 'underline' },
   version: { color: colors.placeholder, fontSize: font.caption },
 

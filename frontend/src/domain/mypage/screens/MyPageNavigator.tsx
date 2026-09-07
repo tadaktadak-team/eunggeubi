@@ -6,6 +6,8 @@ import GuardianScreen from './GuardianScreen';
 import GuardianFormScreen from './GuardianFormScreen';
 import HealthScreen from './HealthScreen';
 import ChangePasswordScreen from './ChangePasswordScreen';
+import AccountEditScreen from './AccountEditScreen';
+import WithdrawScreen from './WithdrawScreen';
 import ConsultationHistoryScreen from './ConsultationHistoryScreen';
 import ConsultationDetailScreen from './ConsultationDetailScreen';
 
@@ -20,6 +22,8 @@ export default function MyPageNavigator() {
       <Stack.Screen name="GuardianForm" component={GuardianFormScreen} />
       <Stack.Screen name="Health" component={HealthScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      <Stack.Screen name="AccountEdit" component={AccountEditScreen} />
+      <Stack.Screen name="Withdraw" component={WithdrawScreen} />
       <Stack.Screen name="ConsultationHistory" component={ConsultationHistoryScreen} />
       <Stack.Screen name="ConsultationDetail" component={ConsultationDetailScreen} />
     </Stack.Navigator>

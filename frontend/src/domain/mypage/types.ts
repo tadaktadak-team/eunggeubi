@@ -69,6 +69,8 @@ export type MyPageStackParamList = {
   GuardianForm: { guardian?: Guardian } | undefined; // 수정/등록
   Health: undefined;
   ChangePassword: undefined;
+  AccountEdit: undefined;
+  Withdraw: undefined;
   ConsultationHistory: undefined;
   ConsultationDetail: { sessionId: string; title: string };
 };
