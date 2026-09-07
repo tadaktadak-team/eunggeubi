@@ -27,6 +27,7 @@ function buildHealthSummary(profile: HealthProfile | null): string {
   const items = [
     profile.bloodType ? `혈액형 ${profile.bloodType}` : null,
     ...profile.diseases,
+    ...profile.allergies,
     ...profile.medications,
   ].filter((v): v is string => !!v);
 
@@ -87,7 +88,7 @@ export default function MyPageHomeScreen() {
   const healthSummary = buildHealthSummary(health);
   const quickValues: Record<string, string> = {
     guardian: `${guardians.length}명`,
-    health: health?.bloodType || health?.diseases.length || health?.medications.length ? '등록됨' : '미등록',
+    health: health?.bloodType || health?.diseases.length || health?.medications.length || health?.allergies.length ? '등록됨' : '미등록',
     history: `${consultations.length}회`,
   };
   // 소셜 전용 계정은 비밀번호가 없어서 변경 자체가 불가능하므로 메뉴에서 숨긴다.

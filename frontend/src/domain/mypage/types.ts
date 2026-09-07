@@ -21,6 +21,7 @@ export interface HealthProfile {
   bloodType: string | null;
   diseases: string[];
   medications: string[];
+  allergies: string[];
 }
 
 export const BLOOD_TYPES = ['A', 'B', 'O', 'AB'];

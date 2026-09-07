@@ -67,6 +67,7 @@ export default function HealthScreen() {
   const [bloodType, setBloodType] = useState<string | null>(null);
   const [diseases, setDiseases] = useState<string[]>([]);
   const [medications, setMedications] = useState<string[]>([]);
+  const [allergies, setAllergies] = useState<string[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -75,6 +76,7 @@ export default function HealthScreen() {
         setBloodType(p.bloodType);
         setDiseases(p.diseases);
         setMedications(p.medications);
+        setAllergies(p.allergies);
       } catch (e: any) {
         Alert.alert('오류', e?.message ?? '불러오지 못했어요.');
       } finally {
@@ -91,7 +93,7 @@ export default function HealthScreen() {
   const onSave = async () => {
     try {
       setSaving(true);
-      await saveHealthProfile({ bloodType, diseases, medications });
+      await saveHealthProfile({ bloodType, diseases, medications, allergies });
       Alert.alert('저장 완료', '건강 프로필이 저장됐어요.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
@@ -140,6 +142,7 @@ export default function HealthScreen() {
 
         <TagSection title="지병" items={diseases} onAdd={addTo(setDiseases)} onRemove={removeFrom(setDiseases)} />
         <TagSection title="복용 중인 약" items={medications} onAdd={addTo(setMedications)} onRemove={removeFrom(setMedications)} />
+        <TagSection title="알레르기" items={allergies} onAdd={addTo(setAllergies)} onRemove={removeFrom(setAllergies)} />
 
         <Pressable style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={onSave} disabled={saving}>
           <Text style={styles.saveText}>{saving ? '저장 중...' : '저장'}</Text>
