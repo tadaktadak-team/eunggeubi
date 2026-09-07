@@ -4,6 +4,7 @@ import com.tadaktadak.eunggeubi.domain.auth.repository.RefreshTokenRepository;
 import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
 import com.tadaktadak.eunggeubi.domain.user.dto.ChangePasswordResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.MyInfoResponse;
+import com.tadaktadak.eunggeubi.domain.user.dto.UpdateMyInfoRequest;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
@@ -57,5 +58,37 @@ public class UserService {
         String newAccessToken = jwtProvider.createAccessToken(userId);
 
         return new ChangePasswordResponse(newAccessToken, newRefreshToken);
+    }
+
+    @Transactional
+    public MyInfoResponse updateMyInfo(Long userId, UpdateMyInfoRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+
+        user.updateProfile(request.name().trim(), request.phone().trim(),
+                request.birthDate(), request.gender(),
+                request.address() == null ? null : request.address().trim());
+
+        return MyInfoResponse.from(user);
+    }
+
+    @Transactional
+    public void withdraw(Long userId, String password) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+
+        if (user.isWithdrawn()) {
+            throw new IllegalArgumentException("이미 탈퇴한 계정입니다.");
+        }
+
+        //소셜 전용 계정은 확인할 비밀번호가 없다
+        if (user.getPassword() != null) {
+            if (password == null || !passwordEncoder.matches(password, user.getPassword())) {
+                throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+            }
+        }
+
+        user.withdraw();
+        refreshTokenService.revokeAll(userId);
     }
 }
