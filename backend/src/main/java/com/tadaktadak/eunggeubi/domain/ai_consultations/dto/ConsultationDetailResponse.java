@@ -14,7 +14,8 @@ public record ConsultationDetailResponse(
             String content,
             boolean regenerated,
             LocalDateTime createdAt,
-            List<String> checkedItems //없으면 null
+            List<String> checkedItems,
+            boolean checklistAnswered
     ) {
     }
 }

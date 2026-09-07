@@ -54,6 +54,7 @@ export interface ConsultationMessage {
   regenerated: boolean;
   createdAt: string;
   checkedItems: string[];
+  checklistAnswered: boolean;
 }
 
 // GET /api/users/me/consultations/{sessionId} 응답 (MY04_HIST02)

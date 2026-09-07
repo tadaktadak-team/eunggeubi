@@ -41,16 +41,19 @@ function MessageBubble({ message }: { message: ConsultationMessage }) {
         </View>
       </View>
 
-      {/* 체크리스트에서 고른 항목을 사용자가 답한 말풍선처럼 보여준다 */}
-      {message.checkedItems.length > 0 && (
+      {message.checklistAnswered && (
         <View style={styles.userRow}>
           <View style={[styles.userBubble, { gap: spacing.xs }]}>
-            {message.checkedItems.map((item) => (
-              <View key={item} style={styles.checkedRow}>
-                <Ionicons name="checkmark" size={15} color={colors.white} />
-                <Text style={[styles.userText, { flex: 1 }]}>{item}</Text>
-              </View>
-            ))}
+            {message.checkedItems.length > 0 ? (
+              message.checkedItems.map((item) => (
+                <View key={item} style={styles.checkedRow}>
+                  <Ionicons name="checkmark" size={15} color={colors.white} />
+                  <Text style={[styles.userText, { flexShrink: 1 }]}>{item}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.userText}>해당하는 항목이 없어요</Text>
+            )}
           </View>
         </View>
       )}

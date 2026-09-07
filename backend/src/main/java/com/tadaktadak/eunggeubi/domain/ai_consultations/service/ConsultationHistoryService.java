@@ -57,7 +57,8 @@ public class ConsultationHistoryService {
                         m.getContent(),
                         m.isRegenerated(),
                         m.getCreatedAt(),
-                        checkedItems.getOrDefault(m.getId(), List.of())))
+                        checkedItems.getOrDefault(m.getId(), List.of()),
+                        checkedItems.containsKey(m.getId())))
                 .toList();
 
         return new ConsultationDetailResponse(sessionId, dtos);
@@ -97,10 +98,7 @@ public class ConsultationHistoryService {
             if (response == null) {
                 return;
             }
-            List<String> checked = response.selectedItemList();
-            if (!checked.isEmpty()) {
-                result.put(consultationId, checked);
-            }
+            result.put(consultationId, response.selectedItemList());
         });
         return result;
     }
