@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { formatPhone, toDigits } from '../../../shared/utils/phone';
 import { getMyInfo, updateMyInfo } from '../api/user';
 import { Gender, MyPageStackParamList } from '../types';
 
@@ -16,7 +17,6 @@ const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: 'NONE', label: '선택 안 함' },
 ];
 
-const toDigits = (v: string) => v.replace(/\D/g, '');
 const toISODate = (d: string) =>
   /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : null;
 
@@ -118,9 +118,9 @@ export default function AccountEditScreen() {
         <Text style={styles.label}>전화번호</Text>
         <TextInput
           style={styles.input}
-          value={phone}
-          onChangeText={setPhone}
-          placeholder="01000000000"
+          value={formatPhone(phone)}
+          onChangeText={(v) => setPhone(toDigits(v))}
+          placeholder="010-0000-0000"
           placeholderTextColor={colors.placeholder}
           keyboardType="phone-pad"
         />

@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { formatPhone, toDigits } from '../../../shared/utils/phone';
 import * as authApi from '../api/auth';
 import { Purpose } from '../types';
 
@@ -115,11 +116,11 @@ export default function FindAccountScreen() {
       <View style={styles.row}>
         <TextInput
           style={[styles.input, styles.rowInput, phoneVerified && styles.inputDisabled]}
-          placeholder="전화번호 ('-' 없이)"
+          placeholder="010-0000-0000"
           placeholderTextColor={colors.placeholder}
           keyboardType="number-pad"
-          value={phone}
-          onChangeText={setPhone}
+          value={formatPhone(phone)}
+          onChangeText={(v) => setPhone(toDigits(v))}
           editable={!phoneVerified}
         />
         <TouchableOpacity
