@@ -14,7 +14,6 @@ function formatDate(createdAt: string) {
   return createdAt.slice(0, 10).replace(/-/g, '.');
 }
 
-// 읽기 전용 기록이라 AI상담 화면의 말풍선을 그대로 쓰지 않고 여기서 단순하게 그린다.
 function MessageBubble({ message }: { message: ConsultationMessage }) {
   if (message.senderType === 'USER') {
     return (
@@ -27,18 +26,34 @@ function MessageBubble({ message }: { message: ConsultationMessage }) {
   }
 
   return (
-    <View style={styles.aiRow}>
-      <View style={styles.avatar}>
-        <Ionicons name="heart" size={14} color={colors.primary} />
+    <View style={{ gap: spacing.md }}>
+      <View style={styles.aiRow}>
+        <View style={styles.avatar}>
+          <Ionicons name="heart" size={14} color={colors.primary} />
+        </View>
+        <View style={styles.aiBubble}>
+          {message.regenerated && (
+            <View style={styles.regenChip}>
+              <Text style={styles.regenChipText}>체크리스트 반영 답변</Text>
+            </View>
+          )}
+          <Text style={styles.aiText}>{message.content}</Text>
+        </View>
       </View>
-      <View style={styles.aiBubble}>
-        {message.regenerated && (
-          <View style={styles.regenChip}>
-            <Text style={styles.regenChipText}>체크리스트 반영 답변</Text>
+
+      {/* 체크리스트에서 고른 항목을 사용자가 답한 말풍선처럼 보여준다 */}
+      {message.checkedItems.length > 0 && (
+        <View style={styles.userRow}>
+          <View style={[styles.userBubble, { gap: spacing.xs }]}>
+            {message.checkedItems.map((item) => (
+              <View key={item} style={styles.checkedRow}>
+                <Ionicons name="checkmark" size={15} color={colors.white} />
+                <Text style={[styles.userText, { flex: 1 }]}>{item}</Text>
+              </View>
+            ))}
           </View>
-        )}
-        <Text style={styles.aiText}>{message.content}</Text>
-      </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -153,4 +168,5 @@ const styles = StyleSheet.create({
 
   note: { backgroundColor: colors.inputBg, borderRadius: radius.md, padding: spacing.lg },
   noteText: { fontSize: font.caption, color: colors.textSub, lineHeight: 18 },
+  checkedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
 });
