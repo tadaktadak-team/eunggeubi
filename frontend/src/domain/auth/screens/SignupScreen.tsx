@@ -241,7 +241,10 @@ export default function SignupScreen() {
               color={agreeSensitive ? colors.primary : colors.placeholder}
             />
             <Text style={styles.checkText}>[필수] 민감정보(건강정보) 처리 동의</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Legal', { tab: 'privacy' })} hitSlop={8}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Legal', { tab: 'privacy', section: '제4조' })}
+              hitSlop={8}
+            >
               <Text style={styles.checkLink}>보기</Text>
             </TouchableOpacity>
           </TouchableOpacity>
