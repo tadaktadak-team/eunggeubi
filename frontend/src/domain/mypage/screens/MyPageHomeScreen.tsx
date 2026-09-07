@@ -94,28 +94,22 @@ export default function MyPageHomeScreen() {
   // 소셜 전용 계정은 비밀번호가 없어서 변경 자체가 불가능하므로 메뉴에서 숨긴다.
   const menus = MENUS.filter((m) => !(m.key === 'password' && myInfo?.socialOnly));
 
-  // TODO: 세부화면 만들면 navigation.navigate로 교체
-  const go = (label: string) => Alert.alert(label, '준비 중입니다.');
-
   const onLogout = () =>
     Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
       { text: '취소', style: 'cancel' },
       { text: '로그아웃', style: 'destructive', onPress: () => signOut() },
     ]);
 
-  const onMenu = (key: string, label: string) => {
+  const onMenu = (key: string) => {
     if (key === 'password') navigation.navigate('ChangePassword');
     else if (key === 'terms') navigation.navigate('Legal');
-    else go(label);
   };
 
-  const onQuick = (key: string, label: string) => {
+  const onQuick = (key: string) => {
     if (key === 'guardian') navigation.navigate('Guardian');
     else if (key === 'health') navigation.navigate('Health');
     else if (key === 'history') navigation.navigate('ConsultationHistory');
-    else go(label);
   };
-
 
   if (!isLoggedIn) {
     return (
@@ -159,7 +153,7 @@ export default function MyPageHomeScreen() {
         {/* 퀵 액션 (통계를 함께 표시해 별도 통계 줄 없이 진입점 하나로 합친다) */}
         <View style={styles.quickRow}>
           {QUICK.map((q) => (
-            <Pressable key={q.key} style={styles.quickItem} onPress={() => onQuick(q.key, q.label)}>
+            <Pressable key={q.key} style={styles.quickItem} onPress={() => onQuick(q.key)}>
               <Ionicons name={q.icon} size={24} color={colors.primary} />
               <Text style={styles.quickValue}>{quickValues[q.key]}</Text>
               <Text style={styles.quickLabel}>{q.label}</Text>
@@ -183,7 +177,7 @@ export default function MyPageHomeScreen() {
             <Pressable
               key={m.key}
               style={[styles.menuRow, i > 0 && styles.menuBorder]}
-              onPress={() => onMenu(m.key, m.label)}
+              onPress={() => onMenu(m.key)}
             >
               <Ionicons name={m.icon} size={20} color={colors.textSub} />
               <View style={{ flex: 1 }}>
