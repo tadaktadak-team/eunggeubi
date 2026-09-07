@@ -37,6 +37,7 @@ export default function SignupScreen() {
   const [address, setAddress] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreePrivacy, setAgreePrivacy] = useState(false);
+  const [agreeSensitive, setAgreeSensitive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const sendCode = async () => {
@@ -71,7 +72,9 @@ export default function SignupScreen() {
     if (!phoneVerified) return Alert.alert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
     const birthDate = toISODate(birth);
     if (!birthDate) return Alert.alert('생년월일', '생년월일 8자리를 정확히 입력해주세요. (예: 19900101)');
-    if (!agreeTerms || !agreePrivacy) return Alert.alert('약관 동의', '필수 약관에 동의해주세요.');
+    if (!agreeTerms || !agreePrivacy || !agreeSensitive) {
+      return Alert.alert('약관 동의', '필수 약관에 동의해주세요.');
+    }
 
     setSubmitting(true);
     try {
@@ -85,7 +88,7 @@ export default function SignupScreen() {
         address: address.trim() || undefined,
         agreeService: agreeTerms,
         agreePrivacy,
-        agreeSensitiveInfo: agreePrivacy,
+        agreeSensitiveInfo: agreeSensitive,
       });
       if (res.guardianConsentRequired) {
         Alert.alert('보호자 동의 필요', '만 14세 미만은 보호자 동의가 필요해요.\n(보호자 동의 기능은 곧 추가돼요)');
@@ -222,7 +225,15 @@ export default function SignupScreen() {
               size={22}
               color={agreePrivacy ? colors.primary : colors.placeholder}
             />
-            <Text style={styles.checkText}>[필수] 개인정보·민감정보 처리 동의</Text>
+            <Text style={styles.checkText}>[필수] 개인정보 처리 동의</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.check} onPress={() => setAgreeSensitive((v) => !v)}>
+            <Ionicons
+              name={agreeSensitive ? 'checkbox' : 'square-outline'}
+              size={22}
+              color={agreeSensitive ? colors.primary : colors.placeholder}
+            />
+            <Text style={styles.checkText}>[필수] 민감정보(건강정보) 처리 동의</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
