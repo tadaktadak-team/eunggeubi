@@ -8,19 +8,21 @@ import java.util.List;
 public record HealthProfileResponse(
         String bloodType,
         List<String> diseases,
-        List<String> medications
+        List<String> medications,
+        List<String> allergies
 ) {
     public static HealthProfileResponse from(HealthProfile p) {
         return new HealthProfileResponse(
                 p.getBloodType(),
                 toList(p.getDiseases()),
-                toList(p.getMedications())
+                toList(p.getMedications()),
+                toList(p.getAllergies())
         );
     }
 
     //프로필이 없는 경우 빈 프로필 반환
     public static HealthProfileResponse empty() {
-        return new HealthProfileResponse(null, List.of(), List.of());
+        return new HealthProfileResponse(null, List.of(), List.of(), List.of());
     }
 
     //콤마로 구분해둔 값들을 리스트에 담기
