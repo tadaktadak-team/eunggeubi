@@ -43,10 +43,7 @@ const QUICK: { key: string; label: string; icon: IconName }[] = [
 
 const MENUS: { key: string; label: string; sub?: string; icon: IconName }[] = [
   { key: 'password', label: '비밀번호 변경', icon: 'lock-closed-outline' },
-  { key: 'notification', label: '알림 설정', sub: '보호자·복약 알림 관리', icon: 'notifications-outline' },
   { key: 'terms', label: '이용약관 · 개인정보처리방침', icon: 'document-text-outline' },
-  { key: 'support', label: '고객센터', sub: '문의 및 도움말', icon: 'headset-outline' },
-  { key: 'notice', label: '공지사항', icon: 'megaphone-outline' },
 ];
 
 export default function MyPageHomeScreen() {
@@ -87,9 +84,12 @@ export default function MyPageHomeScreen() {
     }, [isLoggedIn, load]),
   );
 
-  const guardianCount = guardians.length;
-  const alertOn = guardians.some((g) => g.notifyEnabled);
   const healthSummary = buildHealthSummary(health);
+  const quickValues: Record<string, string> = {
+    guardian: `${guardians.length}명`,
+    health: health?.bloodType || health?.diseases.length || health?.medications.length ? '등록됨' : '미등록',
+    history: `${consultations.length}회`,
+  };
   // 소셜 전용 계정은 비밀번호가 없어서 변경 자체가 불가능하므로 메뉴에서 숨긴다.
   const menus = MENUS.filter((m) => !(m.key === 'password' && myInfo?.socialOnly));
 
@@ -135,10 +135,8 @@ export default function MyPageHomeScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* 상단 타이틀 + 알림벨 */}
         <View style={styles.header}>
           <Text style={styles.pageTitle}>마이페이지</Text>
-          <Ionicons name="notifications-outline" size={24} color={colors.text} />
         </View>
 
         {/* 프로필 카드 */}
@@ -151,34 +149,15 @@ export default function MyPageHomeScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
         </Pressable>
 
-        {/* 퀵 액션 3개 */}
+        {/* 퀵 액션 (통계를 함께 표시해 별도 통계 줄 없이 진입점 하나로 합친다) */}
         <View style={styles.quickRow}>
           {QUICK.map((q) => (
             <Pressable key={q.key} style={styles.quickItem} onPress={() => onQuick(q.key, q.label)}>
               <Ionicons name={q.icon} size={24} color={colors.primary} />
+              <Text style={styles.quickValue}>{quickValues[q.key]}</Text>
               <Text style={styles.quickLabel}>{q.label}</Text>
             </Pressable>
           ))}
-        </View>
-
-        {/* 통계 3개 */}
-        <View style={styles.statRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{consultations.length}회</Text>
-            <Text style={styles.statLabel}>총 상담</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{guardianCount}명</Text>
-            <Text style={styles.statLabel}>보호자</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.primary }]}>
-              {alertOn ? 'ON' : 'OFF'}
-            </Text>
-            <Text style={styles.statLabel}>알림</Text>
-          </View>
         </View>
 
         {/* 건강 프로필 하이라이트 */}
@@ -240,13 +219,9 @@ const styles = StyleSheet.create({
 
   quickRow: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.md, paddingVertical: spacing.lg },
   quickItem: { flex: 1, alignItems: 'center', gap: spacing.xs },
-  quickLabel: { fontSize: font.sub, color: colors.text, fontWeight: '600' },
+  quickValue: { fontSize: font.h3, fontWeight: '800', color: colors.text },
+  quickLabel: { fontSize: font.caption, color: colors.textSub },
 
-  statRow: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: radius.md, paddingVertical: spacing.lg },
-  statItem: { flex: 1, alignItems: 'center', gap: spacing.xs },
-  statDivider: { width: 1, backgroundColor: colors.border },
-  statValue: { fontSize: font.h3, fontWeight: '800', color: colors.text },
-  statLabel: { fontSize: font.caption, color: colors.textSub },
 
   healthCard: {
     flexDirection: 'row',
