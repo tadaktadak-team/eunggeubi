@@ -15,13 +15,16 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.tadaktadak.eunggeubi.domain.hospital.dto.HospitalDetailResponse;
+import java.util.Comparator;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class HospitalService {
 
     private final RestTemplate restTemplate;
-    private final XmlMapper xmlMapper;
+    private final XmlMapper xmlMapper = new XmlMapper();
 
     // URL은 병원/약국 각각 사용
     @Value("${medical_locator.hospital.url}")
@@ -33,6 +36,12 @@ public class HospitalService {
     // 서비스키는 하나만 사용
     @Value("${medical_locator.secret}")
     private String serviceKey;
+
+    @Value("${medical_locator.detail.url}")
+    private String detailApiUrl;
+
+    @Value("${medical_locator.subject.url}")
+    private String subjectApiUrl;
 
     public List<MedicalFacilityResponse> findNearbyHospitals(
             double latitude,
@@ -58,6 +67,125 @@ public class HospitalService {
                 longitude,
                 "약국"
         );
+    }
+    /**
+     * 병원 상세정보(진료시간, 진료과목) 조회
+     */
+    public HospitalDetailResponse findHospitalDetail(String ykiho) {
+        try {
+            String detailResponse = getDetailApiResponse(ykiho);
+            String subjectResponse = getSubjectApiResponse(ykiho);
+
+            JsonNode detailRoot = xmlMapper.readTree(detailResponse);
+            JsonNode detailItem = detailRoot.path("body").path("items").path("item");
+
+            List<HospitalDetailResponse.DepartmentInfo> departments =
+                    parseDepartments(subjectResponse);
+
+            return HospitalDetailResponse.builder()
+                    .ykiho(ykiho)
+                    .mondayStart(text(detailItem, "trmtMonStart"))
+                    .mondayEnd(text(detailItem, "trmtMonEnd"))
+                    .tuesdayStart(text(detailItem, "trmtTueStart"))
+                    .tuesdayEnd(text(detailItem, "trmtTueEnd"))
+                    .wednesdayStart(text(detailItem, "trmtWedStart"))
+                    .wednesdayEnd(text(detailItem, "trmtWedEnd"))
+                    .thursdayStart(text(detailItem, "trmtThuStart"))
+                    .thursdayEnd(text(detailItem, "trmtThuEnd"))
+                    .fridayStart(text(detailItem, "trmtFriStart"))
+                    .fridayEnd(text(detailItem, "trmtFriEnd"))
+                    .saturdayStart(text(detailItem, "trmtSatStart"))
+                    .saturdayEnd(text(detailItem, "trmtSatEnd"))
+                    .lunchTime(text(detailItem, "lunchWeek"))
+                    .closedOnSunday(text(detailItem, "noTrmtSun"))
+                    .closedOnHoliday(text(detailItem, "noTrmtHoli"))
+                    .parkingCapacity(intValue(detailItem, "parkQty"))
+                    .parkingFee(text(detailItem, "parkXpnsYn"))
+                    .parkingNote(text(detailItem, "parkEtc"))
+                    .nearestSubwayStation(text(detailItem, "plcNm"))
+                    .subwayExit(text(detailItem, "plcDir"))
+                    .subwayDistance(text(detailItem, "plcDist"))
+                    .departments(departments)
+                    .build();
+
+        } catch (Exception e) {
+            log.error("병원 상세정보 조회 실패 (ykiho={})", ykiho, e);
+            throw new RuntimeException("병원 상세정보를 불러오지 못했습니다.");
+        }
+    }
+
+    private String getDetailApiResponse(String ykiho) {
+        URI uri = UriComponentsBuilder
+                .fromHttpUrl(detailApiUrl)
+                .queryParam("serviceKey", serviceKey)
+                .queryParam("ykiho", ykiho)
+                .queryParam("pageNo", 1)
+                .queryParam("numOfRows", 10)
+                .build(true)
+                .toUri();
+
+        byte[] responseBytes = restTemplate.getForObject(uri, byte[].class);
+        return new String(responseBytes, StandardCharsets.UTF_8);
+    }
+
+    private String getSubjectApiResponse(String ykiho) {
+        URI uri = UriComponentsBuilder
+                .fromHttpUrl(subjectApiUrl)
+                .queryParam("serviceKey", serviceKey)
+                .queryParam("ykiho", ykiho)
+                .queryParam("pageNo", 1)
+                .queryParam("numOfRows", 30)
+                .build(true)
+                .toUri();
+
+        byte[] responseBytes = restTemplate.getForObject(uri, byte[].class);
+        return new String(responseBytes, StandardCharsets.UTF_8);
+    }
+
+    private List<HospitalDetailResponse.DepartmentInfo> parseDepartments(String response)
+            throws Exception {
+
+        JsonNode root = xmlMapper.readTree(response);
+        JsonNode items = root.path("body").path("items").path("item");
+
+        if (items.isObject()) {
+            items = xmlMapper.createArrayNode().add(items);
+        }
+
+        List<HospitalDetailResponse.DepartmentInfo> result = new ArrayList<>();
+
+        if (!items.isArray()) {
+            return result;
+        }
+
+        for (JsonNode item : items) {
+            result.add(
+                    HospitalDetailResponse.DepartmentInfo.builder()
+                            .name(text(item, "dgsbjtCdNm"))
+                            .doctorCount(intValue(item, "dgsbjtPrSdrCnt"))
+                            .build()
+            );
+        }
+
+        // 전문의 수 기준 내림차순 정렬 (많은 과목이 위로)
+        result.sort(Comparator.comparing(
+                HospitalDetailResponse.DepartmentInfo::getDoctorCount,
+                Comparator.nullsLast(Comparator.reverseOrder())
+        ));
+
+        return result;
+    }
+
+    private Integer intValue(JsonNode node, String field) {
+        String value = text(node, field);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private List<MedicalFacilityResponse> findNearby(
