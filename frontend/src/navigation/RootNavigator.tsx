@@ -16,6 +16,7 @@ import TabBar from '../shared/components/TabBar';
 import { RootStackParamList } from './types';
 import { useState } from 'react';
 import LoginRequiredSheet from '../domain/auth/screens/../components/LoginRequiredSheet';
+import DrugNavigator from '../domain/drug/screens/DrugNavigator';
 import MyPageNavigator from '../domain/mypage/screens/MyPageNavigator';
 
 const Tab = createBottomTabNavigator();
@@ -32,9 +33,7 @@ function TabsNavigator() {
         <Tab.Screen name="Hospital" options={{ title: '병원찾기' }}>
           {() => <PlaceholderScreen name="병원찾기" />}
         </Tab.Screen>
-        <Tab.Screen name="Medicine" options={{ title: '약물정보' }}>
-          {() => <PlaceholderScreen name="약물정보" />}
-        </Tab.Screen>
+        <Tab.Screen name="Medicine" component={DrugNavigator} options={{ title: '약물정보' }} />
         <Tab.Screen name="My" component={MyPageNavigator} options={{ title: '마이' }} />
       </Tab.Navigator>
 
