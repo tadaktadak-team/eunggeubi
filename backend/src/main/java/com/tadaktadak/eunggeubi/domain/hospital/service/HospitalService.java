@@ -250,7 +250,7 @@ public class HospitalService {
                             .latitude(doubleValue(item, "YPos"))
                             .longitude(doubleValue(item, "XPos"))
                             .type(text(item, "clCdNm"))
-                            .distance(doubleValue(item, "distance"))
+                            .distance(toKm(doubleValue(item, "distance")))
                             .build()
             );
         }
@@ -263,6 +263,12 @@ public class HospitalService {
         return value.isMissingNode() || value.isNull()
                 ? null
                 : value.asText();
+    }
+    private Double toKm(Double meters) {
+        if (meters == null) {
+            return null;
+        }
+        return Math.round(meters / 1000 * 10) / 10.0;
     }
 
     private Double doubleValue(JsonNode node, String field) {

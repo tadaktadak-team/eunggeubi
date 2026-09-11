@@ -4,16 +4,34 @@ import {
   FlatList,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 
 import { getEmergencyBeds } from "../api/emergencyBed";
 import { EmergencyBed } from "../types/emergencyBed";
+import { getNearbyHospitals, getNearbyPharmacies } from "../api/medicalFacility";
+import { MedicalFacility } from "../types/medicalFacility";
+
+type FilterType = "all" | "hospital" | "pharmacy" | "emergency";
+
+const FILTER_COLORS: Record<FilterType, string> = {
+  all: "#616161",
+  hospital: "#1E88E5",
+  pharmacy: "#43A047",
+  emergency: "#E53935",
+};
 
 export default function MedicalLocatorScreen() {
   const [beds, setBeds] = useState<EmergencyBed[]>([]);
+  const [hospitals, setHospitals] = useState<MedicalFacility[]>([]);
+  const [pharmacies, setPharmacies] = useState<MedicalFacility[]>([]);
+  const [filter, setFilter] = useState<FilterType>("all");
+  const [searchText, setSearchText] = useState("");
+  const [visibleCount, setVisibleCount] = useState(5);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] =
@@ -22,6 +40,10 @@ export default function MedicalLocatorScreen() {
   useEffect(() => {
     loadEmergencyBeds();
   }, []);
+
+  useEffect(() => {
+    setVisibleCount(5);
+  }, [filter, searchText]);
 
   async function loadEmergencyBeds() {
     try {
@@ -84,6 +106,16 @@ export default function MedicalLocatorScreen() {
       );
 
       setBeds(data);
+
+      // 병원·약국 조회
+      const [hospitalData, pharmacyData] = await Promise.all([
+        getNearbyHospitals(latitude, longitude),
+        getNearbyPharmacies(latitude, longitude),
+      ]);
+
+      setHospitals(hospitalData);
+      setPharmacies(pharmacyData);
+
     } catch (e) {
       console.error("응급실 조회 실패:", e);
 
@@ -99,31 +131,156 @@ export default function MedicalLocatorScreen() {
     }
   }
 
+  // 필터에 따라 지도에 표시할 마커 데이터 구성
+  const markerItems: {
+    id: string;
+    name: string;
+    latitude: number | null;
+    longitude: number | null;
+    color: string;
+  }[] = [
+    ...(filter === "all" || filter === "emergency"
+      ? beds.map((b) => ({
+          id: `bed-${b.hpid}`,
+          name: b.name,
+          latitude: b.latitude,
+          longitude: b.longitude,
+          color: FILTER_COLORS.emergency,
+        }))
+      : []),
+    ...(filter === "all" || filter === "hospital"
+      ? hospitals.map((h) => ({
+          id: `hospital-${h.ykiho}`,
+          name: h.name,
+          latitude: h.latitude,
+          longitude: h.longitude,
+          color: FILTER_COLORS.hospital,
+        }))
+      : []),
+    ...(filter === "all" || filter === "pharmacy"
+      ? pharmacies.map((p) => ({
+          id: `pharmacy-${p.ykiho}`,
+          name: p.name,
+          latitude: p.latitude,
+          longitude: p.longitude,
+          color: FILTER_COLORS.pharmacy,
+        }))
+      : []),
+  ];
+
+  // 필터에 따라 목록에 표시할 데이터 구성 (공통 형태로 변환)
+  const listItems: {
+    id: string;
+    name: string;
+    address: string;
+    distance: number | null;
+    badge: string;
+    category: string;
+  }[] = [
+    ...(filter === "all" || filter === "emergency"
+      ? beds.map((b) => ({
+          id: `bed-${b.hpid}`,
+          name: b.name,
+          address: b.address,
+          distance: b.distance,
+          badge: `${b.availableBeds ?? "-"}병상`,
+          category: "응급실",
+        }))
+      : []),
+    ...(filter === "all" || filter === "hospital"
+      ? hospitals.map((h) => ({
+          id: `hospital-${h.ykiho}`,
+          name: h.name,
+          address: h.address,
+          distance: h.distance,
+          badge: "병원",
+          category: "병원",
+        }))
+      : []),
+    ...(filter === "all" || filter === "pharmacy"
+      ? pharmacies.map((p) => ({
+          id: `pharmacy-${p.ykiho}`,
+          name: p.name,
+          address: p.address,
+          distance: p.distance,
+          badge: "약국",
+          category: "약국",
+        }))
+      : []),
+  ];
+
+  // 검색어 필터링
+  const filteredItems = searchText.trim()
+    ? listItems.filter((item) =>
+        item.name.toLowerCase().includes(searchText.trim().toLowerCase())
+      )
+    : listItems;
+
+  const visibleItems = filteredItems.slice(0, visibleCount);
+  const hasMore = filteredItems.length > visibleCount;
+
   // 로딩 화면
   if (loading) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center}>
         <ActivityIndicator size="large" />
 
         <Text style={styles.message}>
-          주변 응급실을 찾고 있어요...
+          주변 의료기관을 찾고 있어요...
         </Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   // 에러 화면
   if (error) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center}>
         <Text style={styles.error}>{error}</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>주변 응급실</Text>
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.title}>병원·약국 찾기</Text>
+
+      {/* 필터 탭 */}
+      <View style={styles.filterRow}>
+        {(
+          [
+            { key: "all", label: "전체" },
+            { key: "hospital", label: "병원" },
+            { key: "pharmacy", label: "약국" },
+            { key: "emergency", label: "응급실" },
+          ] as { key: FilterType; label: string }[]
+        ).map((item) => (
+          <View key={item.key} style={styles.filterButtonWrapper}>
+            <Text
+              style={[
+                styles.filterButton,
+                filter === item.key && {
+                  backgroundColor: FILTER_COLORS[item.key],
+                  color: "#fff",
+                },
+              ]}
+              onPress={() => setFilter(item.key)}
+            >
+              {item.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* 검색창 */}
+      <View style={styles.searchWrapper}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="병원, 약국 이름 검색"
+          value={searchText}
+          onChangeText={setSearchText}
+        />
+      </View>
 
       {/* 지도 */}
       {location && (
@@ -137,7 +294,7 @@ export default function MedicalLocatorScreen() {
           }}
           showsUserLocation
         >
-          {beds
+          {markerItems
             .filter(
               (item) =>
                 item.latitude != null &&
@@ -145,35 +302,44 @@ export default function MedicalLocatorScreen() {
             )
             .map((item) => (
               <Marker
-                key={item.hpid}
+                key={item.id}
                 coordinate={{
                   latitude: Number(item.latitude),
                   longitude: Number(item.longitude),
                 }}
-                title={item.name}
-                description={`${item.availableBeds ?? "-"}병상`}
-              />
+              >
+                <View
+                  style={[
+                    styles.markerLabel,
+                    { backgroundColor: item.color },
+                  ]}
+                >
+                  <Text style={styles.markerText} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                </View>
+              </Marker>
             ))}
         </MapView>
       )}
 
-      {/* 병원 목록 */}
+      {/* 목록 */}
       <Text style={styles.sectionTitle}>
-        주변 응급실
+        주변 의료기관
       </Text>
 
       <FlatList
-        data={beds}
-        keyExtractor={(item) => item.hpid}
+        data={visibleItems}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.row}>
               <Text style={styles.name}>
-                {item.name}
+                [{item.category}] {item.name}
               </Text>
 
               <Text style={styles.beds}>
-                {item.availableBeds ?? "-"}병상
+                {item.badge}
               </Text>
             </View>
 
@@ -186,22 +352,25 @@ export default function MedicalLocatorScreen() {
             <Text style={styles.address}>
               {item.address}
             </Text>
-
-            <Text style={styles.congestion}>
-              혼잡도{" "}
-              {item.congestion != null
-                ? `${item.congestion}%`
-                : "-"}
-            </Text>
           </View>
         )}
         ListEmptyComponent={
           <Text style={styles.message}>
-            주변 응급실 정보가 없습니다.
+            주변 의료기관 정보가 없습니다.
           </Text>
         }
+        ListFooterComponent={
+          hasMore ? (
+            <Text
+              style={styles.moreButton}
+              onPress={() => setVisibleCount((prev) => prev + 5)}
+            >
+              더보기 ({filteredItems.length - visibleCount}개 더 있음)
+            </Text>
+          ) : null
+        }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -222,8 +391,42 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "700",
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 8,
     paddingBottom: 12,
+  },
+
+  filterRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    gap: 8,
+  },
+
+  filterButtonWrapper: {
+    flex: 1,
+  },
+
+  filterButton: {
+    textAlign: "center",
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#f0f0f0",
+    color: "#666",
+    fontWeight: "600",
+    overflow: "hidden",
+  },
+
+  searchWrapper: {
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+  },
+
+  searchInput: {
+    backgroundColor: "#f0f0f0",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
   },
 
   map: {
@@ -260,8 +463,9 @@ const styles = StyleSheet.create({
   },
 
   beds: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
+    color: "#1E88E5",
   },
 
   distance: {
@@ -274,11 +478,6 @@ const styles = StyleSheet.create({
     color: "#666",
   },
 
-  congestion: {
-    marginTop: 8,
-    fontWeight: "600",
-  },
-
   message: {
     marginTop: 12,
     paddingHorizontal: 20,
@@ -288,5 +487,29 @@ const styles = StyleSheet.create({
   error: {
     color: "#d00",
     textAlign: "center",
+  },
+
+  markerLabel: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    maxWidth: 120,
+  },
+
+  markerText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+
+  moreButton: {
+    textAlign: "center",
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 12,
+    backgroundColor: "#f0f0f0",
+    color: "#1E88E5",
+    fontWeight: "700",
   },
 });
