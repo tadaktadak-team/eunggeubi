@@ -3,11 +3,15 @@ package com.tadaktadak.eunggeubi.domain.ai_consultations.service;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.ConsultationRequest;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.ConsultationResponse;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawAnswer;
+import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawSearchQuery;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.AiConsultation;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.ReferenceSource;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.SenderType;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.AiConsultationRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ReferenceSourceRepository;
+import com.tadaktadak.eunggeubi.domain.health.entity.HealthProfile;
+import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -19,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 // health_info 컬렉션에서 관련 문서를 검색한 뒤, 그 문서만 근거로 LLM 답변을 생성한다(RAG).
 // 답변은 문장(segment) 단위로 쪼개고 각 문장이 인용한 참고자료 번호를 함께 받아서,
@@ -31,18 +34,24 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AiConsultationService {
 
-    // "의료 자문을 대체하지 않습니다" 고지는 모델에게 매번 붙이라고 프롬프트로 부탁하는 대신
-    // 서버가 응답 끝에 결정적으로 붙인다 - 컴플라이언스성 문구를 모델의 지시 준수에만 맡기면
-    // 실제로 빠뜨리는 경우가 있었다. DB에는 중복 저장하지 않고 응답에서만 붙인다.
-    private static final ConsultationResponse.AnswerSegment DISCLAIMER =
-            new ConsultationResponse.AnswerSegment("이 안내는 의료 자문을 대체하지 않습니다.", List.of());
+    // 모델이 119 안내 규칙(AiConsultationPrompts.CONSULT_PROMPT 5번)을 놓쳐도, 사용자 입력에 명백한
+    // 응급 징후(EmergencySignalGuard)가 있으면 이 문장을 코드가 강제로 답변 맨 앞에 붙인다.
+    private static final ConsultationResponse.AnswerSegment FORCED_EMERGENCY_NOTICE =
+            new ConsultationResponse.AnswerSegment("지금 말씀하신 증상은 응급 상황일 수 있습니다. 즉시 119에 신고해주세요.", List.of());
+
+    // 후속 질문에 맥락을 얼마나 태울지 - 프롬프트 길이/비용을 생각해서 최근 몇 개(=몇 턴)로 제한한다.
+    private static final int MAX_HISTORY_MESSAGES = 6;
 
     private final RagRetrievalService ragRetrievalService;
     private final ChatClient chatClient;
     private final AiConsultationRepository aiConsultationRepository;
     private final ReferenceSourceRepository referenceSourceRepository;
+    private final HealthProfileRepository healthProfileRepository;
 
-    @Transactional
+    // ponytail: 이 메서드 전체를 트랜잭션으로 감싸지 않는다 - RAG 검색+LLM 호출이 초 단위로 걸리는데
+    // 그동안 DB 커넥션을 잡고 있으면 동시 요청 몇 개만으로 커넥션 풀이 고갈된다. 저장(save)은 Spring
+    // Data가 호출마다 개별 트랜잭션으로 처리하므로 그대로 안전하다. 대신 LLM 실패 시 이미 저장된
+    // userMessage가 롤백되지 않고 남을 수 있다(응답 없는 사용자 메시지) - 감내 가능한 트레이드오프.
     public ConsultationResponse consult(ConsultationRequest request, Long userId) {
         boolean isNewSession = isBlank(request.sessionId());
         String sessionId = isNewSession ? UUID.randomUUID().toString() : request.sessionId();
@@ -51,6 +60,11 @@ public class AiConsultationService {
         // 클라이언트가 이미 갖고 있는 값을 그대로 쓴다 (재발급하면 이전 메시지와 소유권이 끊어짐).
         boolean guestCodeIssued = userId == null && isBlank(request.guestCode());
         String guestCode = userId != null ? null : (guestCodeIssued ? generateGuestCode() : request.guestCode());
+
+        // 후속 질문("그럼 며칠 지나면 병원 가야해요?")은 이전 대화를 알아야 뭘 묻는지 이해가 된다 -
+        // 새 세션이면 이전 대화가 없으니 빈 목록, 아니면 이번 사용자 메시지를 저장하기 전에(=순수하게
+        // "이전" 턴만) 최근 것만 잘라서 가져온다.
+        List<AiConsultation> priorTurns = isNewSession ? List.of() : recentTurns(sessionId);
 
         AiConsultation userMessage = aiConsultationRepository.save(AiConsultation.builder()
                 .userId(userId)
@@ -62,8 +76,14 @@ public class AiConsultationService {
                 .regenerated(false)
                 .build());
 
-        List<Document> docs = ragRetrievalService.retrieve(request.query());
-        GenerationResult result = docs.isEmpty() ? GenerationResult.noResult() : generate(request.query(), docs);
+        String searchQuery = buildSearchQuery(priorTurns, rewriteQueryForSearch(request.query()));
+        List<Document> docs = ragRetrievalService.retrieve(searchQuery);
+        // 검색어에는 안 넣는다 - "복통, 고혈압" 같은 병명이 섞이면 지금 증상과 무관한 문서를 끌어올 수
+        // 있다. 프롬프트에만 참고 정보로 얹어서, 관련 있을 때만 모델이 알아서 반영하게 한다.
+        String healthProfileSummary = buildHealthProfileSummary(userId);
+        GenerationResult result = docs.isEmpty()
+                ? GenerationResult.noResult()
+                : generate(request.query(), docs, buildConversationHistory(priorTurns), healthProfileSummary);
 
         AiConsultation aiMessage = aiConsultationRepository.save(AiConsultation.builder()
                 .userId(userId)
@@ -79,18 +99,120 @@ public class AiConsultationService {
 
         saveReferenceSources(aiMessage.getId(), result.citedSources());
 
-        List<ConsultationResponse.AnswerSegment> answer =
-                Stream.concat(result.segments().stream(), Stream.of(DISCLAIMER)).toList();
+        List<ConsultationResponse.AnswerSegment> answer = buildAnswer(request.query(), result.segments());
 
         return new ConsultationResponse(
                 answer, result.citedSources(), aiMessage.getId(), sessionId,
-                guestCodeIssued ? guestCode : null);
+                guestCodeIssued ? guestCode : null, ConsultationDisclaimer.TEXT);
     }
 
-    private GenerationResult generate(String query, List<Document> docs) {
+    // 응급 징후가 있는데 모델이 119 안내를 빠뜨렸을 때만 강제 문장을 추가한다(이미 안내했으면 중복 방지).
+    private List<ConsultationResponse.AnswerSegment> buildAnswer(
+            String query, List<ConsultationResponse.AnswerSegment> segments) {
+        if (!EmergencySignalGuard.containsEmergencySignal(query)) {
+            return segments;
+        }
+
+        boolean alreadyAdvised119 = segments.stream().anyMatch(s -> s.text().contains("119"));
+        if (alreadyAdvised119) {
+            // 응급 키워드는 있었지만 모델이 이미 알아서 119 안내를 넣었다 - 정상 경로, 중복 추가 안 함.
+            log.info("응급 징후 감지, 모델이 이미 119 안내를 포함해 코드 추가 없이 통과. query=\"{}\"", query);
+            return segments;
+        }
+
+        // 마지막 방어선 실제 발동 - 모델이 119 규칙(CONSULT_PROMPT 5번)을 놓쳤다.
+        log.warn("응급 징후 감지했으나 모델 응답에 119 안내가 없어 코드가 강제로 추가했습니다. query=\"{}\"", query);
+        return Stream.concat(Stream.of(FORCED_EMERGENCY_NOTICE), segments.stream()).toList();
+    }
+
+    // 세션의 최근 대화를 시간순으로 가져온다(이번 사용자 메시지 저장 전이라 "이전" 턴만 잡힌다).
+    // 길게 이어진 세션이라도 프롬프트/검색어에 태울 건 최근 몇 개로만 자른다(MAX_HISTORY_MESSAGES).
+    private List<AiConsultation> recentTurns(String sessionId) {
+        List<AiConsultation> all = aiConsultationRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+        return all.size() > MAX_HISTORY_MESSAGES
+                ? all.subList(all.size() - MAX_HISTORY_MESSAGES, all.size())
+                : all;
+    }
+
+    // 후속 질문만 그대로 벡터 검색하면 증상 키워드가 없어서 엉뚱한 문서가 걸린다. 이전 사용자
+    // 발화들을 검색어에 같이 넣어서 보정한다. currentQuery는 이미 rewriteQueryForSearch를 거친
+    // 검색용 문구다.
+    private String buildSearchQuery(List<AiConsultation> priorTurns, String currentQuery) {
+        String priorUserText = priorTurns.stream()
+                .filter(m -> m.getSenderType() == SenderType.USER)
+                .map(AiConsultation::getContent)
+                .collect(Collectors.joining(" "));
+        return priorUserText.isBlank() ? currentQuery : priorUserText + " " + currentQuery;
+    }
+
+    // 사용자의 일상어 증상 표현을 검색용 의학 용어로 바꾼다(예: "발이 부어요" -> "부종 다리 발목 붓기") -
+    // 실제로 이렇게 안 바꾸면 "부종" 문서가 top 5는커녕 top 20 밖으로 밀려서 검색이 아예 안 됐다.
+    // 최종 답변 생성 프롬프트의 [질문]에는 원래 사용자 문장을 그대로 쓴다 - 검색에만 쓰는 용도다.
+    // LLM 호출이라 실패할 수 있어서, 실패하면 원래 질문 그대로 검색하도록 폴백한다.
+    private String rewriteQueryForSearch(String query) {
+        try {
+            RawSearchQuery raw = chatClient.prompt()
+                    .system(AiConsultationPrompts.QUERY_REWRITE_PROMPT)
+                    .user(query)
+                    .call()
+                    .entity(RawSearchQuery.class);
+            if (raw != null && raw.searchTerms() != null && !raw.searchTerms().isBlank()) {
+                return raw.searchTerms();
+            }
+        } catch (Exception e) {
+            log.warn("검색어 재작성 호출이 실패했습니다. 원래 질문으로 검색합니다. query=\"{}\"", query, e);
+        }
+        return query;
+    }
+
+    // 모델이 후속 질문에 자연스럽게 이어 답하도록 최근 대화를 프롬프트에 텍스트로 준다.
+    private String buildConversationHistory(List<AiConsultation> priorTurns) {
+        return priorTurns.stream()
+                .map(m -> "%s: %s".formatted(m.getSenderType() == SenderType.USER ? "사용자" : "AI", m.getContent()))
+                .collect(Collectors.joining("\n"));
+    }
+
+    // 로그인 사용자만 - 게스트는 프로필이 없다. 기저질환/복용약/알레르기 중 채워진 것만 담는다.
+    private String buildHealthProfileSummary(Long userId) {
+        if (userId == null) {
+            return "";
+        }
+        return healthProfileRepository.findByUserId(userId).map(this::formatHealthProfile).orElse("");
+    }
+
+    private String formatHealthProfile(HealthProfile profile) {
+        List<String> parts = new ArrayList<>();
+        if (hasText(profile.getDiseases())) {
+            parts.add("기저질환: " + profile.getDiseases());
+        }
+        if (hasText(profile.getMedications())) {
+            parts.add("복용약: " + profile.getMedications());
+        }
+        if (hasText(profile.getAllergies())) {
+            parts.add("알레르기: " + profile.getAllergies());
+        }
+        return String.join(", ", parts);
+    }
+
+    private boolean hasText(String s) {
+        return s != null && !s.isBlank();
+    }
+
+    private GenerationResult generate(
+            String query, List<Document> docs, String conversationHistory, String healthProfileSummary) {
+        StringBuilder userPrompt = new StringBuilder();
+        if (!conversationHistory.isBlank()) {
+            userPrompt.append("[이전 대화]\n").append(conversationHistory).append("\n\n");
+        }
+        if (!healthProfileSummary.isBlank()) {
+            userPrompt.append("[사용자 건강정보]\n").append(healthProfileSummary).append("\n\n");
+        }
+        userPrompt.append("[참고자료]\n").append(ragRetrievalService.buildContext(docs))
+                .append("\n\n[질문]\n").append(query);
+
         RawAnswer raw = chatClient.prompt()
                 .system(AiConsultationPrompts.CONSULT_PROMPT)
-                .user("[참고자료]\n%s\n\n[질문]\n%s".formatted(ragRetrievalService.buildContext(docs), query))
+                .user(userPrompt.toString())
                 .call()
                 .entity(RawAnswer.class);
 
@@ -127,7 +249,21 @@ public class AiConsultationService {
         String plainText = segments.stream()
                 .map(ConsultationResponse.AnswerSegment::text)
                 .collect(Collectors.joining(" "));
-        String symptomKeyword = (String) docs.get(0).getMetadata().get("disease");
+
+        // 마지막 방어선: 프롬프트로 진단하지 말라고 지시해도(CONSULT_PROMPT) 모델이 어길 수 있다
+        // (ConsultationRegenerationService와 같은 이유). 걸리면 부분 수정 대신 통째로 안전한 문구로
+        // 교체한다 - 부분 수정은 문장을 어색하게 만들 위험이 크다.
+        if (DiagnosisLanguageGuard.containsDiagnosticLanguage(plainText)) {
+            log.warn("1차 답변에서 진단형 표현이 감지되어 폴백 문구로 대체합니다. query=\"{}\"", query);
+            return GenerationResult.diagnosticLanguageDetected();
+        }
+
+        // 체크리스트 생성(ChecklistService)이 이 키워드를 그대로 쓰므로, 검색만 되고 답변에서 실제로
+        // 인용되지 않은 문서(=답변과 무관할 수 있는 문서)의 질병명이 아니라 실제로 인용된 문서에서
+        // 뽑아야 한다. 인용된 게 하나도 없으면(citedSources 비어있음) 그때만 최상위 검색 결과로 폴백한다.
+        String symptomKeyword = citedSources.isEmpty()
+                ? (String) docs.get(0).getMetadata().get("disease")
+                : citedSources.get(0).disease();
 
         return new GenerationResult(segments, citedSources, plainText, symptomKeyword);
     }
@@ -174,6 +310,13 @@ public class AiConsultationService {
 
         static GenerationResult generationFailed() {
             String text = "일시적인 오류로 답변을 생성하지 못했습니다. 잠시 후 다시 시도해주세요.";
+            return new GenerationResult(
+                    List.of(new ConsultationResponse.AnswerSegment(text, List.of())), List.of(), text, null);
+        }
+
+        static GenerationResult diagnosticLanguageDetected() {
+            String text = "죄송합니다, 답변을 안전하게 정리하는 중 문제가 발생했습니다. 제공된 참고자료로는 확정적인 "
+                    + "안내가 어려우니, 증상이 지속되거나 심해지면 병원 진료를 받아보세요.";
             return new GenerationResult(
                     List.of(new ConsultationResponse.AnswerSegment(text, List.of())), List.of(), text, null);
         }

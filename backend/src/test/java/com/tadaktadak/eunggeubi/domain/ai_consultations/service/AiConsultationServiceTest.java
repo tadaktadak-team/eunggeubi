@@ -11,14 +11,17 @@ import static org.mockito.Mockito.when;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.ConsultationRequest;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.ConsultationResponse;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawAnswer;
+import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawSearchQuery;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.AiConsultation;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.ReferenceSource;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.AiConsultationRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ReferenceSourceRepository;
+import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -32,10 +35,12 @@ class AiConsultationServiceTest {
     private final ChatClient chatClient = mock(ChatClient.class);
     private final AiConsultationRepository aiConsultationRepository = mock(AiConsultationRepository.class);
     private final ReferenceSourceRepository referenceSourceRepository = mock(ReferenceSourceRepository.class);
+    private final HealthProfileRepository healthProfileRepository = mock(HealthProfileRepository.class);
     private final AtomicLong idSequence = new AtomicLong(1);
 
     private final AiConsultationService service = new AiConsultationService(
-            ragRetrievalService, chatClient, aiConsultationRepository, referenceSourceRepository);
+            ragRetrievalService, chatClient, aiConsultationRepository, referenceSourceRepository,
+            healthProfileRepository);
 
     @Test
     void 검색결과가_없으면_저장은_하되_fallback_문구를_반환한다() {
@@ -45,8 +50,9 @@ class AiConsultationServiceTest {
         ConsultationResponse response = service.consult(
                 new ConsultationRequest("주식 투자로 돈 버는 방법 알려줘", null, null), null);
 
-        assertThat(response.answer()).hasSize(2); // fallback 문장 + DISCLAIMER
+        assertThat(response.answer()).hasSize(1); // fallback 문장 하나 (disclaimer는 이제 별도 필드)
         assertThat(response.answer().get(0).text()).contains("제공된 정보로는 답변드리기 어렵습니다");
+        assertThat(response.disclaimer()).isEqualTo(ConsultationDisclaimer.TEXT);
         assertThat(response.sources()).isEmpty();
         assertThat(response.consultationId()).isNotNull();
         assertThat(response.sessionId()).isNotNull();
@@ -73,14 +79,85 @@ class AiConsultationServiceTest {
         ConsultationResponse response = service.consult(
                 new ConsultationRequest("화상 응급처치 어떻게 하나요", null, "existing-guest-code"), null);
 
-        assertThat(response.answer()).hasSize(3); // 문장 2개 + DISCLAIMER
+        assertThat(response.answer()).hasSize(2); // 문장 2개 (disclaimer는 이제 별도 필드)
         assertThat(response.answer().get(1).sourceIndexes()).containsExactly(1); // 9는 필터링됨
+        assertThat(response.disclaimer()).isEqualTo(ConsultationDisclaimer.TEXT);
         assertThat(response.sources()).hasSize(1);
         assertThat(response.sources().get(0).disease()).isEqualTo("화상");
         // 이미 guestCode를 들고 있는 요청이라 새로 발급하지 않는다
         assertThat(response.guestCode()).isNull();
 
         verify(referenceSourceRepository, times(1)).save(any(ReferenceSource.class));
+    }
+
+    @Test
+    void 체크리스트용_symptomKeyword는_실제로_인용된_문서에서_뽑는다() {
+        stubSave();
+        // 검색 1등(고혈압)은 실제 답변에서 한 번도 인용 안 되고, 2등(두통)만 인용되는 상황.
+        Document topButUncited = new Document("고혈압 관련 내용", Map.of(
+                "disease", "고혈압", "section", "정의", "source", "질병관리청 국가건강정보포털", "cntntsSn", "1111"));
+        Document actuallyCited = new Document("두통 관련 내용", Map.of(
+                "disease", "두통", "section", "정의", "source", "질병관리청 국가건강정보포털", "cntntsSn", "2222"));
+        when(ragRetrievalService.retrieve(anyString())).thenReturn(List.of(topButUncited, actuallyCited));
+        when(ragRetrievalService.buildContext(List.of(topButUncited, actuallyCited))).thenReturn("...");
+
+        // 2번(두통)만 인용
+        stubChatClientEntity(RawAnswer.class, new RawAnswer(
+                List.of(new RawAnswer.RawSegment("두통에는 충분한 휴식이 도움이 됩니다.", List.of(2)))));
+
+        service.consult(new ConsultationRequest("두통이 있어요", null, "g1"), null);
+
+        ArgumentCaptor<AiConsultation> captor = ArgumentCaptor.forClass(AiConsultation.class);
+        verify(aiConsultationRepository, times(2)).save(captor.capture());
+        AiConsultation aiMessage = captor.getAllValues().get(1); // 1번째는 USER 저장, 2번째가 AI 저장
+        // 검색 1등인 "고혈압"이 아니라, 실제로 인용된 "두통"이어야 한다.
+        assertThat(aiMessage.getSymptomKeyword()).isEqualTo("두통");
+    }
+
+    @Test
+    void 검색어_재작성이_성공하면_재작성된_검색어로_검색한다() {
+        stubSave();
+        Document doc = new Document("부종 관련 내용", Map.of(
+                "disease", "부종", "section", "정의", "source", "질병관리청 국가건강정보포털", "cntntsSn", "6544"));
+        when(ragRetrievalService.retrieve(anyString())).thenReturn(List.of(doc));
+        when(ragRetrievalService.buildContext(List.of(doc))).thenReturn("...");
+
+        ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
+        ChatClient.CallResponseSpec callResponseSpec = mock(ChatClient.CallResponseSpec.class);
+        when(chatClient.prompt()).thenReturn(requestSpec);
+        when(requestSpec.system(anyString())).thenReturn(requestSpec);
+        when(requestSpec.user(anyString())).thenReturn(requestSpec);
+        when(requestSpec.call()).thenReturn(callResponseSpec);
+        when(callResponseSpec.entity(RawSearchQuery.class)).thenReturn(new RawSearchQuery("부종 다리 발목 붓기"));
+        when(callResponseSpec.entity(RawAnswer.class)).thenReturn(new RawAnswer(
+                List.of(new RawAnswer.RawSegment("부종은 다리에 흔히 생깁니다.", List.of(1)))));
+
+        service.consult(new ConsultationRequest("발이 부어요", null, "g1"), null);
+
+        ArgumentCaptor<String> searchQueryCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ragRetrievalService).retrieve(searchQueryCaptor.capture());
+        // 원래 질문("발이 부어요") 그대로가 아니라, 재작성된 검색어로 검색해야 한다.
+        assertThat(searchQueryCaptor.getValue()).isEqualTo("부종 다리 발목 붓기");
+    }
+
+    @Test
+    void 검색어_재작성_호출이_실패하면_원래_질문으로_검색한다() {
+        stubSave();
+        when(ragRetrievalService.retrieve(anyString())).thenReturn(List.of());
+
+        ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
+        ChatClient.CallResponseSpec callResponseSpec = mock(ChatClient.CallResponseSpec.class);
+        when(chatClient.prompt()).thenReturn(requestSpec);
+        when(requestSpec.system(anyString())).thenReturn(requestSpec);
+        when(requestSpec.user(anyString())).thenReturn(requestSpec);
+        when(requestSpec.call()).thenReturn(callResponseSpec);
+        // entity(RawSearchQuery.class)를 일부러 스텁하지 않음 - 모키토 기본값(null)으로 재작성 실패를 흉내낸다.
+
+        service.consult(new ConsultationRequest("발이 부어요", null, "g1"), null);
+
+        ArgumentCaptor<String> searchQueryCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ragRetrievalService).retrieve(searchQueryCaptor.capture());
+        assertThat(searchQueryCaptor.getValue()).isEqualTo("발이 부어요");
     }
 
     private void stubSave() {

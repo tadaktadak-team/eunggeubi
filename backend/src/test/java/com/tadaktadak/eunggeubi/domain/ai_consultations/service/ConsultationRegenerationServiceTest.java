@@ -5,11 +5,15 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawRegeneratedAnswer;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RegenerateResponse;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.AiConsultation;
+import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.Checklist;
+import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.ChecklistResponse;
+import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.ChecklistStatus;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.ReferenceSource;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.SenderType;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.AiConsultationRepository;
@@ -21,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -105,6 +110,49 @@ class ConsultationRegenerationServiceTest {
         assertThat(response.isDiagnosis()).isFalse();
         assertThat(response.sources()).hasSize(1);
         assertThat(response.disclaimer()).isNotBlank();
+    }
+
+    @Test
+    void 재생성된_응답을_또_재생성해도_원본_체크리스트_응답을_찾는다() {
+        // 원본 1차 답변(id=60)에 체크리스트가 달려있고, 그걸 한 번 재생성한 응답(id=61,
+        // basedOnResponseId=60)을 "또" 재생성하는 상황 - basedOnResponseId를 원본까지 따라
+        // 올라가야만 체크리스트를 찾을 수 있다.
+        AiConsultation original = baseAiMessage(60L, "g1");
+        when(aiConsultationRepository.findById(60L)).thenReturn(Optional.of(original));
+
+        AiConsultation onceRegenerated = AiConsultation.builder()
+                .sessionId("s1").sessionRoot(false).guestCode("g1")
+                .senderType(SenderType.AI).content("재생성된 1차 안내").regenerated(true)
+                .parentId(59L).basedOnResponseId(60L)
+                .build();
+        ReflectionTestUtils.setField(onceRegenerated, "id", 61L);
+        when(aiConsultationRepository.findById(61L)).thenReturn(Optional.of(onceRegenerated));
+
+        stubSave();
+
+        Checklist checklist = Checklist.builder()
+                .consultationId(60L).symptomKeyword("두통").title("두통 관련 확인사항")
+                .source("질병관리청 국가건강정보포털").items(List.of("시야가 흐려지나요?"))
+                .status(ChecklistStatus.COMPLETED)
+                .build();
+        ReflectionTestUtils.setField(checklist, "id", 900L);
+        when(checklistRepository.findTopByConsultationIdOrderByCreatedAtDesc(60L))
+                .thenReturn(Optional.of(checklist));
+
+        ChecklistResponse checklistResponse = ChecklistResponse.builder()
+                .checklistId(900L).userId(null).selectedItems(List.of("시야가 흐려지나요?"))
+                .build();
+        when(checklistResponseRepository.findTopByChecklistIdOrderByCreatedAtDesc(900L))
+                .thenReturn(Optional.of(checklistResponse));
+
+        when(ragRetrievalService.retrieve(anyString())).thenReturn(List.of());
+
+        service.regenerate(61L, null, "g1");
+
+        // resolveCheckedItems가 제대로 체인을 타서 "시야가 흐려지나요?"를 찾아 검색어에 반영했는지 확인.
+        ArgumentCaptor<String> queryCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ragRetrievalService).retrieve(queryCaptor.capture());
+        assertThat(queryCaptor.getValue()).contains("시야가 흐려지나요?");
     }
 
     private AiConsultation baseAiMessage(long id, String guestCode) {
