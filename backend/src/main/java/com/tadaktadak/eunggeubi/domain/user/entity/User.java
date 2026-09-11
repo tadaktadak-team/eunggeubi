@@ -68,23 +68,27 @@ public class User extends BaseTimeEntity {
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
     }
-    // 회원 탈퇴 (상태를 WITHDRAWN으로 — 소프트 삭제)
-    public void withdraw() {
-        this.status = UserStatus.WITHDRAWN;
-    }
 
     // 회원 정보 수정 (이메일·비밀번호는 변경 불가)
-    public void updateProfile(String name, String phone, LocalDate birthDate,
-                              Gender gender, String address) {
+    public void updateProfile(String name, String phone, LocalDate birthDate, Gender gender, String address) {
         this.name = name;
         this.phone = phone;
         this.birthDate = birthDate;
         this.gender = gender;
         this.address = address;
     }
+
+    // 회원 탈퇴 (상태를 WITHDRAWN으로 — 소프트 삭제)
+    public void withdraw() {
+        this.status = UserStatus.WITHDRAWN;
+    }
+
+    public boolean isWithdrawn() {
+        return this.status == UserStatus.WITHDRAWN;
+    }
+
     // 보호자 동의 완료 → 계정 활성화
     public void activate() {
         this.status = UserStatus.ACTIVE;
     }
-
 }

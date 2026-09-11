@@ -133,9 +133,10 @@ export default function LoginScreen() {
           <TouchableOpacity style={styles.guest} onPress={() => navigation.navigate('Tabs')}>
             <Text style={styles.guestText}>로그인 없이 이용하기</Text>
           </TouchableOpacity>
-          <Text style={styles.guestSub}>
-            일부 기능(보호자 알림·상담이력 저장)은{'\n'}로그인 후 사용 가능합니다
-          </Text>
+
+          <TouchableOpacity style={styles.legal} onPress={() => navigation.navigate('Legal')}>
+            <Text style={styles.legalText}>이용약관 · 개인정보처리방침</Text>
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -200,11 +201,6 @@ const styles = StyleSheet.create({
   socialText: { fontSize: font.body, fontWeight: '700' },
   guest: { alignItems: 'center', marginTop: spacing.md },
   guestText: { color: colors.textSub, fontSize: font.sub, textDecorationLine: 'underline' },
-  guestSub: {
-    color: colors.placeholder,
-    fontSize: font.caption,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-    lineHeight: 18,
-  },
+  legal: { alignItems: 'center', marginTop: spacing.lg },
+  legalText: { color: colors.placeholder, fontSize: font.caption, textDecorationLine: 'underline' },
 });

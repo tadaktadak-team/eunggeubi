@@ -6,6 +6,7 @@ export type RootStackParamList = {
   Signup: undefined;
   SignupComplete: { email: string };
   FindAccount: { tab?: 'FIND_ID' | 'FIND_PW' } | undefined;
+  Legal: { tab?: 'terms' | 'privacy'; section?: string } | undefined;
   Tabs: undefined;
   EditProfile: undefined;
   GuardianConsent: { userId: number; email: string };

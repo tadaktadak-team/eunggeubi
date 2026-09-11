@@ -34,19 +34,24 @@ public class HealthProfile extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT") //콤마 구분
     private String medications;
 
+    @Column(columnDefinition = "TEXT") //콤마 구분
+    private String allergies;
+
     @Builder
     private HealthProfile(Long userId, String bloodType, String diseases,
-                          String medications) {
+                          String medications, String allergies) {
         this.userId = userId;
         this.bloodType = bloodType;
         this.diseases = diseases;
         this.medications = medications;
+        this.allergies = allergies;
     }
 
     // 건강 프로필 수정 (변경 감지로 반영)
-    public void update(String bloodType, String diseases, String medications) {
+    public void update(String bloodType, String diseases, String medications, String allergies) {
         this.bloodType = bloodType;
         this.diseases = diseases;
         this.medications = medications;
+        this.allergies = allergies;
     }
 }

@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
+import com.tadaktadak.eunggeubi.domain.hospital.dto.HospitalDetailResponse;
+
 @RestController
 @RequiredArgsConstructor
 public class HospitalController {
@@ -36,5 +38,14 @@ public class HospitalController {
             @RequestParam double lng
     ) {
         return hospitalService.findNearbyPharmacies(lat, lng);
+    }
+    @GetMapping(
+            value = "/api/hospitals/detail",
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public HospitalDetailResponse getHospitalDetail(
+            @RequestParam String ykiho
+    ) {
+        return hospitalService.findHospitalDetail(ykiho);
     }
 }

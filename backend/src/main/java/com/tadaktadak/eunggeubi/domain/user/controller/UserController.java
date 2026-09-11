@@ -1,8 +1,9 @@
 package com.tadaktadak.eunggeubi.domain.user.controller;
 
 import com.tadaktadak.eunggeubi.domain.user.dto.ChangePasswordRequest;
+import com.tadaktadak.eunggeubi.domain.user.dto.ChangePasswordResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.MyInfoResponse;
-import com.tadaktadak.eunggeubi.domain.user.dto.UpdateProfileRequest;
+import com.tadaktadak.eunggeubi.domain.user.dto.UpdateMyInfoRequest;
 import com.tadaktadak.eunggeubi.domain.user.dto.WithdrawRequest;
 import com.tadaktadak.eunggeubi.domain.user.service.UserService;
 import jakarta.validation.Valid;
@@ -30,23 +31,25 @@ public class UserController {
         return userService.getMyInfo(userId);
     }
 
-    @PostMapping("/me")
-    public ResponseEntity<MyInfoResponse> updateProfile(@AuthenticationPrincipal Long userId,
-                                                        @Valid @RequestBody UpdateProfileRequest request) {
-        return ResponseEntity.ok(userService.updateProfile(userId, request));
-    }
-
+    //비밀번호 변경
     @PutMapping("/password")
-    public ResponseEntity<Void> changePassword(@AuthenticationPrincipal Long userId,
-                                               @Valid @RequestBody ChangePasswordRequest request) {
-        userService.changePassword(userId, request.currentPassword(), request.newPassword());
-        return ResponseEntity.noContent().build();
+    public ChangePasswordResponse changePassword(@AuthenticationPrincipal Long userId,
+                                                 @Valid @RequestBody ChangePasswordRequest request) {
+        return userService.changePassword(userId, request.currentPassword(), request.newPassword());
     }
 
-    @PostMapping("/withdraw")
+    //회원 정보 수정
+    @PutMapping("/me")
+    public MyInfoResponse updateMyInfo(@AuthenticationPrincipal Long userId,
+                                       @Valid @RequestBody UpdateMyInfoRequest request) {
+        return userService.updateMyInfo(userId, request);
+    }
+
+    //회원 탈퇴
+    @PostMapping("/me/withdraw")
     public ResponseEntity<Void> withdraw(@AuthenticationPrincipal Long userId,
-                                         @Valid @RequestBody WithdrawRequest request) {
+                                         @RequestBody WithdrawRequest request) {
         userService.withdraw(userId, request.password());
-        return ResponseEntity.noContent().build(); // 204
+        return ResponseEntity.noContent().build();
     }
 }

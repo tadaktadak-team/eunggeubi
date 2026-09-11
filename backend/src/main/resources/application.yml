@@ -55,6 +55,10 @@ medical_locator:
     url: http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList
   pharmacy:
     url: http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList
+  detail:
+    url: https://apis.data.go.kr/B551182/MadmDtlInfoService2.8/getDtlInfo2.8
+  subject:
+    url: https://apis.data.go.kr/B551182/MadmDtlInfoService2.8/getDgsbjtInfo2.8
 
 emergency_bed:
   secret: ${EMERGENCY_BED_SECRET:}

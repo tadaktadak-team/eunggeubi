@@ -1,12 +1,12 @@
 package com.tadaktadak.eunggeubi.domain.user.service;
 
-import com.tadaktadak.eunggeubi.domain.auth.repository.RefreshTokenRepository;
+import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
+import com.tadaktadak.eunggeubi.domain.user.dto.ChangePasswordResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.MyInfoResponse;
-import com.tadaktadak.eunggeubi.domain.user.dto.UpdateProfileRequest;
+import com.tadaktadak.eunggeubi.domain.user.dto.UpdateMyInfoRequest;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
-import com.tadaktadak.eunggeubi.domain.user.entity.UserStatus;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
-import java.time.LocalDateTime;
+import com.tadaktadak.eunggeubi.global.security.JwtProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -17,8 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository userRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
+    private final JwtProvider jwtProvider;
 
     @Transactional(readOnly = true)
     public MyInfoResponse getMyInfo(Long userId) {
@@ -28,16 +29,7 @@ public class UserService {
     }
 
     @Transactional
-    public MyInfoResponse updateProfile(Long userId, UpdateProfileRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
-        user.updateProfile(request.name(), request.phone(), request.birthDate(),
-                request.gender(), request.address());
-        return MyInfoResponse.from(user);   // 변경 감지로 자동 UPDATE
-    }
-
-    @Transactional
-    public void changePassword(Long userId, String currentPassword, String newPassword) {
+    public ChangePasswordResponse changePassword(Long userId, String currentPassword, String newPassword) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
 
@@ -56,31 +48,44 @@ public class UserService {
         }
 
         user.changePassword(passwordEncoder.encode(newPassword));
+
+        //다른 기기에 남아있는 세션을 전부 끊음(access 토큰의 경우 만료까지 최대 1시간 유효), 단 현재 기기는 유지(폐기->발급)
+        refreshTokenService.revokeAll(userId);
+        String newRefreshToken = refreshTokenService.issue(userId);
+        String newAccessToken = jwtProvider.createAccessToken(userId);
+
+        return new ChangePasswordResponse(newAccessToken, newRefreshToken);
+    }
+
+    @Transactional
+    public MyInfoResponse updateMyInfo(Long userId, UpdateMyInfoRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
+
+        user.updateProfile(request.name().trim(), request.phone().trim(),
+                request.birthDate(), request.gender(),
+                request.address() == null ? null : request.address().trim());
+
+        return MyInfoResponse.from(user);
     }
 
     @Transactional
     public void withdraw(Long userId, String password) {
-        // 1. 회원 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
 
-        // 2. 이미 탈퇴한 계정이면 거부
-        if (user.getStatus() == UserStatus.WITHDRAWN) {
+        if (user.isWithdrawn()) {
             throw new IllegalArgumentException("이미 탈퇴한 계정입니다.");
         }
 
-        // 3. 비밀번호 확인 (소셜 전용 계정은 password가 null이라 자동 실패)
-        if (user.getPassword() == null
-                || !passwordEncoder.matches(password, user.getPassword())) {
-            throw new IllegalArgumentException("비밀번호가 올바르지 않습니다.");
+        //소셜 전용 계정은 확인할 비밀번호가 없다
+        if (user.getPassword() != null) {
+            if (password == null || !passwordEncoder.matches(password, user.getPassword())) {
+                throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+            }
         }
 
-        // 4. 계정 탈퇴 처리 (상태 → WITHDRAWN)
         user.withdraw();
-
-        // 5. 서버에 저장된 refresh 토큰 전부 폐기 (재로그인 불가)
-        LocalDateTime now = LocalDateTime.now();
-        refreshTokenRepository.findAllByUserIdAndRevokedAtIsNull(userId)
-                .forEach(token -> token.revoke(now));
+        refreshTokenService.revokeAll(userId);
     }
 }
