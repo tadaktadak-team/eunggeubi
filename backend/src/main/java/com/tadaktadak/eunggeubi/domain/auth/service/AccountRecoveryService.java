@@ -1,12 +1,15 @@
 package com.tadaktadak.eunggeubi.domain.auth.service;
 
 import com.tadaktadak.eunggeubi.domain.auth.entity.Purpose;
+import com.tadaktadak.eunggeubi.domain.auth.repository.RefreshTokenRepository;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +18,8 @@ public class AccountRecoveryService {
     private final UserRepository userRepository;
     private final PhoneVerificationService phoneVerificationService;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenService refreshTokenService;
 
     // 아이디(이메일) 찾기: 이름 + 인증된 전화번호 → 마스킹된 이메일
     @Transactional(readOnly = true)
@@ -38,6 +43,11 @@ public class AccountRecoveryService {
         }
 
         user.changePassword(passwordEncoder.encode(newPassword));
+
+        //다른 기기에 남아있는 세션을 전부 끊음(access 토큰의 경우 만료까지 최대 1시간 유효)
+        LocalDateTime now = LocalDateTime.now();
+        refreshTokenRepository.findByUserIdAndRevokedAtIsNull(user.getId())
+                .forEach(token -> token.revoke(now));
     }
 
     // ab****@gmail.com 형태로 마스킹

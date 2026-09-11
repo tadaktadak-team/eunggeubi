@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { formatPhone, toDigits } from '../../../shared/utils/phone';
 import { addGuardian, updateGuardian } from '../api/guardian';
 import { MyPageStackParamList, Relationship, RELATIONSHIP_LABEL, RELATIONSHIP_OPTIONS } from '../types';
 
@@ -59,8 +60,8 @@ export default function GuardianFormScreen() {
         <Text style={styles.label}>전화번호</Text>
         <TextInput
           style={styles.input}
-          value={phone}
-          onChangeText={setPhone}
+          value={formatPhone(phone)}
+          onChangeText={(v) => setPhone(toDigits(v))}
           placeholder="010-0000-0000"
           placeholderTextColor={colors.placeholder}
           keyboardType="phone-pad"

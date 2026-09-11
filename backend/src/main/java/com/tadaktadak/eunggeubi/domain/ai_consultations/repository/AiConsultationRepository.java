@@ -13,4 +13,7 @@ public interface AiConsultationRepository extends JpaRepository<AiConsultation, 
 
     // 세션에서 가장 최근 메시지 1건 (예: 최신 AI 응답)
     Optional<AiConsultation> findTopBySessionIdAndSenderTypeOrderByCreatedAtDesc(String sessionId, SenderType senderType);
+
+    //마이페이지 상담 이력 목록(세션의 첫 메세지만)
+    List<AiConsultation> findByUserIdAndSessionRootTrueOrderByCreatedAtDesc(Long userId);
 }

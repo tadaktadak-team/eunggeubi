@@ -13,9 +13,6 @@ import com.tadaktadak.eunggeubi.domain.user.entity.UserStatus;
 import com.tadaktadak.eunggeubi.domain.user.repository.TermsAgreementRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
@@ -37,6 +34,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtProvider jwtProvider;
     private final PhoneVerificationService phoneVerificationService;
+    private final RefreshTokenService refreshTokenService;
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
@@ -90,10 +88,7 @@ public class AuthService {
 
         // 4. 토큰 발급 (access + refresh)
         String accessToken = jwtProvider.createAccessToken(user.getId());
-        String refreshToken = jwtProvider.createRefreshToken(user.getId());
-
-        // 5. refresh 토큰은 해시로 DB 저장 (재발급/로그아웃 관리용)
-        saveRefreshToken(user.getId(), refreshToken);
+        String refreshToken = refreshTokenService.issue(user.getId());
 
         return new LoginResponse(user.getId(), accessToken, refreshToken, "Bearer");
     }
@@ -105,7 +100,7 @@ public class AuthService {
         }
 
         // 2. DB에 저장된 토큰인지 확인 (해시로 조회)
-        RefreshToken saved = refreshTokenRepository.findByTokenHash(hashToken(refreshToken))
+        RefreshToken saved = refreshTokenRepository.findByTokenHash(refreshTokenService.hashToken(refreshToken))
                 .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다."));
 
         // 3. 이미 폐기(로그아웃/재사용)된 토큰이면 거부
@@ -119,8 +114,7 @@ public class AuthService {
         // 5. 새 access + refresh 발급
         Long userId = jwtProvider.getUserId(refreshToken);
         String newAccessToken = jwtProvider.createAccessToken(userId);
-        String newRefreshToken = jwtProvider.createRefreshToken(userId);
-        saveRefreshToken(userId, newRefreshToken);
+        String newRefreshToken = refreshTokenService.issue(userId);
 
         return new LoginResponse(userId, newAccessToken, newRefreshToken, "Bearer");
     }
@@ -128,32 +122,8 @@ public class AuthService {
     @Transactional
     public void logout(String refreshToken) {
         // 해당 refresh 토큰 폐기 (없거나 이미 폐기여도 조용히 성공 — 멱등)
-        refreshTokenRepository.findByTokenHash(hashToken(refreshToken))
+        refreshTokenRepository.findByTokenHash(refreshTokenService.hashToken(refreshToken))
                 .ifPresent(token -> token.revoke(LocalDateTime.now()));
-    }
-
-    private void saveRefreshToken(Long userId, String refreshToken) {
-        refreshTokenRepository.save(RefreshToken.builder()
-                .userId(userId)
-                .tokenHash(hashToken(refreshToken))
-                .issuedAt(LocalDateTime.now())
-                .expiresAt(jwtProvider.getExpiration(refreshToken))
-                .build());
-    }
-
-    // refresh 토큰을 SHA-256으로 해시 (DB엔 원본 대신 해시만 저장)
-    private String hashToken(String token) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashed = digest.digest(token.getBytes(StandardCharsets.UTF_8));
-            StringBuilder sb = new StringBuilder();
-            for (byte b : hashed) {
-                sb.append(String.format("%02x", b));
-            }
-            return sb.toString();
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 알고리즘을 찾을 수 없습니다.", e);
-        }
     }
 
     private void saveTermsAgreements(Long userId) {
