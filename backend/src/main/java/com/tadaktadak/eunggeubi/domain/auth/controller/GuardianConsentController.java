@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/auth/guardian")
 @RequiredArgsConstructor
-public class GuardianController {
+public class GuardianConsentController {
 
     private final GuardianConsentService guardianConsentService;
 

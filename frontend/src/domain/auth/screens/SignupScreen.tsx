@@ -44,7 +44,7 @@ export default function SignupScreen() {
     try {
       await authApi.sendPhoneCode(phone.trim(), 'SIGNUP');
       setCodeSent(true);
-      Alert.alert('인증번호 발송', '인증번호를 발송했어요.\n(개발 중: 서버 콘솔에서 확인)');
+      Alert.alert('인증번호 발송', '인증번호를 발송했어요. 문자를 확인해주세요.');
     } catch (e: any) {
       Alert.alert('발송 실패', e?.message ?? '다시 시도해주세요.');
     }

@@ -61,6 +61,11 @@ emergency_bed:
   url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire
   hospital-url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire
 
+solapi:
+  api-key: ${SOLAPI_API_KEY:}
+  api-secret: ${SOLAPI_API_SECRET:}
+  from: ${SOLAPI_FROM:}
+
 ---
 spring:
   config:
@@ -76,6 +81,8 @@ spring:
       ddl-auto: update
     show-sql: true
     open-in-view: false
+
+
 
 ---
 # AI 인덱싱/리허설/검색점검 배치를 돌릴 때만 Qdrant 컬렉션 자동 생성을 켠다.
