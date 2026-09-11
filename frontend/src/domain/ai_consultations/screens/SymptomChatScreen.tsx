@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
@@ -23,7 +23,8 @@ export default function SymptomChatScreen() {
   const navigation = useNavigation<Nav>();
   const { params } = useRoute<ChatRoute>();
   const insets = useSafeAreaInsets();
-  const { messages, loading, sendText, toggleChecklistItem, submitChecklist } = useSymptomChat(params?.initialMessage);
+  const { messages, loading, sendText, toggleChecklistItem, submitChecklist, submitChecklistNone } =
+      useSymptomChat(params?.initialMessage);
 
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<ScrollView>(null);
@@ -34,7 +35,8 @@ export default function SymptomChatScreen() {
     setInputText('');
   };
 
-  const goFirstAidGuide = () => navigation.navigate('FirstAidGuide', {});
+  const showDisclaimer = () =>
+    Alert.alert('안내', '*참고용이며, 의료 전문가의 상담을 대체하지 않습니다.');
 
   return (
       <KeyboardAvoidingView
@@ -52,7 +54,7 @@ export default function SymptomChatScreen() {
               <Text style={styles.headerTitle}>AI 증상 상담</Text>
               <Text style={styles.headerSubtitle}>참고 정보만 제공해요 · 진단 아님</Text>
             </View>
-            <Pressable style={styles.side} onPress={goFirstAidGuide} hitSlop={8}>
+            <Pressable style={styles.side} onPress={showDisclaimer} hitSlop={8}>
               <Ionicons name="alert-circle-outline" size={22} color={colors.textSub} />
             </Pressable>
           </View>
@@ -84,6 +86,7 @@ export default function SymptomChatScreen() {
                     message={message}
                     onToggleItem={(itemId) => toggleChecklistItem(message.id, itemId)}
                     onSubmit={() => submitChecklist(message.id)}
+                    onSubmitNone={() => submitChecklistNone(message.id)}
                 />
             );
           })}
@@ -111,7 +114,9 @@ export default function SymptomChatScreen() {
           </Pressable>
         </View>
 
-        <DisclaimerFooter />
+        {/* 지금은 AI 상담이 근거로 쓰는 자료가 질병관리청 국가건강정보포털 하나뿐이라 여기 고정값으로
+            둔다 - 출처가 여러 곳이 되면 답변 카드처럼 메시지별로 받아써야 한다. */}
+        <DisclaimerFooter sourceName="질병관리청 국가건강정보포털" />
       </KeyboardAvoidingView>
   );
 }

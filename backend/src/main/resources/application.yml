@@ -67,11 +67,20 @@ medical_locator:
     url: http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList
   pharmacy:
     url: http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList
+  detail:
+    url: https://apis.data.go.kr/B551182/MadmDtlInfoService2.8/getDtlInfo2.8
+  subject:
+    url: https://apis.data.go.kr/B551182/MadmDtlInfoService2.8/getDgsbjtInfo2.8
 
 emergency_bed:
   secret: ${EMERGENCY_BED_SECRET:}
   url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire
   hospital-url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire
+
+solapi:
+  api-key: ${SOLAPI_API_KEY:}
+  api-secret: ${SOLAPI_API_SECRET:}
+  from: ${SOLAPI_FROM:}
 
 ---
 spring:
@@ -88,6 +97,8 @@ spring:
       ddl-auto: update
     show-sql: true
     open-in-view: false
+
+
 
 ---
 # AI 인덱싱/리허설/검색점검 배치를 돌릴 때만 Qdrant 컬렉션 자동 생성을 켠다.

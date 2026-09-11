@@ -26,7 +26,7 @@ import java.util.Map;
 public class EmergencyBedService {
 
     private final RestTemplate restTemplate;
-    private final XmlMapper xmlMapper;
+    private final XmlMapper xmlMapper = new XmlMapper();
 
     @Value("${emergency_bed.url}")
     private String apiUrl;
@@ -44,16 +44,16 @@ public class EmergencyBedService {
      */
     public List<EmergencyBedResponse> findNearbyEmergencyBeds(
             String stage1,
-            String stage2,
+
             double userLatitude,
             double userLongitude
     ) {
         try {
             // 1. 응급실 실시간 병상 정보 조회
-            String bedResponse = getBedApiResponse(stage1, stage2);
+            String bedResponse = getBedApiResponse(stage1);
 
             // 2. 응급의료기관 위치/기본 정보 조회
-            String hospitalResponse = getHospitalApiResponse(stage1, stage2);
+            String hospitalResponse = getHospitalApiResponse(stage1);
 
             // 3. 병원 정보는 hpid 기준으로 Map에 저장
             Map<String, JsonNode> hospitalMap = parseHospitalInfo(hospitalResponse);
@@ -61,8 +61,8 @@ public class EmergencyBedService {
 
             //  결과가 안 나올 때 어느 쪽 API가 문제인지 바로 알 수 있게 로그를 남깁니다.
             if (hospitalMap.isEmpty()) {
-                log.warn("응급의료기관 위치정보가 0건입니다. (stage1={}, stage2={}) "
-                        + "→ 병상 정보가 있어도 전부 제외됩니다.", stage1, stage2);
+                log.warn("응급의료기관 위치정보가 0건입니다. (stage1={}) "
+                        + "→ 병상 정보가 있어도 전부 제외됩니다.", stage1);
             } else {
                 log.info("응급의료기관 위치정보 {}건 로드", hospitalMap.size());
             }
@@ -73,10 +73,14 @@ public class EmergencyBedService {
 
             // 5. 가까운 응급실 순으로 정렬
 
+            // 사용자 위치 기준 15km 이내의 응급실만 표시
+            result.removeIf(item ->
+                    item.getDistance() == null || item.getDistance() > 15.0
+            );
+
             result.sort(Comparator.comparingDouble(EmergencyBedResponse::getDistance));
 
             return result;
-
         } catch (Exception e) {
             log.error("응급실 병상 정보 조회 실패", e);
             // [수정 4] RuntimeException → ExternalApiException
@@ -88,7 +92,7 @@ public class EmergencyBedService {
     /**
      * 응급실 실시간 병상 API 호출
      */
-    private String getBedApiResponse(String stage1, String stage2) {
+    private String getBedApiResponse(String stage1) {
         // [수정 5] 핵심 수정 ★ build(false) + toUriString() → build(true) + toUri()
         //  기존 코드는 인코딩되지 않은 "String"을 RestTemplate에 넘겼는데,
         //  RestTemplate은 String URL을 받으면 내부에서 한 번 더 인코딩합니다.
@@ -99,7 +103,7 @@ public class EmergencyBedService {
                 .fromHttpUrl(apiUrl)
                 .queryParam("serviceKey", serviceKey)
                 .queryParam("STAGE1", encode(stage1))
-                .queryParam("STAGE2", encode(stage2))
+
                 .queryParam("pageNo", 1)
                 .queryParam("numOfRows", 100)
                 .build(true)
@@ -111,12 +115,12 @@ public class EmergencyBedService {
     /**
      * 응급의료기관 위치/기본 정보 API 호출
      */
-    private String getHospitalApiResponse(String stage1, String stage2) {
+    private String getHospitalApiResponse(String stage1) {
         URI uri = UriComponentsBuilder
                 .fromHttpUrl(hospitalApiUrl)
                 .queryParam("serviceKey", serviceKey)
                 .queryParam("Q0", encode(stage1))
-                .queryParam("Q1", encode(stage2))
+
                 .queryParam("pageNo", 1)
                 .queryParam("numOfRows", 100)
                 .build(true)

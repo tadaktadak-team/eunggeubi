@@ -55,6 +55,10 @@ dependencies {
 	testCompileOnly 'org.projectlombok:lombok'
 	testAnnotationProcessor 'org.projectlombok:lombok'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // Solapi(구 CoolSMS) 자바 SDK
+    implementation 'net.nurigo:sdk:4.3.0'
+
 }
 
 dependencyManagement {
