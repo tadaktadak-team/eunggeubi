@@ -74,4 +74,5 @@ export type MyPageStackParamList = {
   Withdraw: undefined;
   ConsultationHistory: undefined;
   ConsultationDetail: { sessionId: string; title: string };
+  Support: undefined;
 };
