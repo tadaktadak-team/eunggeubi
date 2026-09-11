@@ -86,6 +86,49 @@ class ChecklistServiceTest {
     }
 
     @Test
+    void LLM_호출이_예외를_던져도_재시도해서_성공하면_그_결과를_쓴다() {
+        AiConsultation aiMessage = aiMessage(22L, "g1", "두통");
+        when(aiConsultationRepository.findById(22L)).thenReturn(Optional.of(aiMessage));
+        stubChecklistSave();
+
+        ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
+        ChatClient.CallResponseSpec callResponseSpec = mock(ChatClient.CallResponseSpec.class);
+        when(chatClient.prompt()).thenReturn(requestSpec);
+        when(requestSpec.system(anyString())).thenReturn(requestSpec);
+        when(requestSpec.user(anyString())).thenReturn(requestSpec);
+        when(requestSpec.call()).thenReturn(callResponseSpec);
+        // 1번째 호출은 타임아웃/429처럼 호출 자체가 실패하고, 2번째 호출에서 정상 응답이 온다고 가정.
+        when(callResponseSpec.entity(RawChecklist.class))
+                .thenThrow(new RuntimeException("OpenAI 타임아웃(테스트용)"))
+                .thenReturn(new RawChecklist(List.of("3일 이상 지속되나요?")));
+
+        ChecklistDto dto = service.generate(22L, null, "g1");
+
+        assertThat(dto.items()).containsExactly("3일 이상 지속되나요?");
+    }
+
+    @Test
+    void LLM_호출이_계속_실패하면_기본_체크리스트로_폴백한다() {
+        AiConsultation aiMessage = aiMessage(23L, "g1", "두통");
+        when(aiConsultationRepository.findById(23L)).thenReturn(Optional.of(aiMessage));
+        stubChecklistSave();
+
+        ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
+        ChatClient.CallResponseSpec callResponseSpec = mock(ChatClient.CallResponseSpec.class);
+        when(chatClient.prompt()).thenReturn(requestSpec);
+        when(requestSpec.system(anyString())).thenReturn(requestSpec);
+        when(requestSpec.user(anyString())).thenReturn(requestSpec);
+        when(requestSpec.call()).thenReturn(callResponseSpec);
+        // 3번 다 호출 자체가 실패 - 기존엔 이 경로가 재시도 없이 바로 예외를 던져 전체 요청이 500이 났다.
+        when(callResponseSpec.entity(RawChecklist.class))
+                .thenThrow(new RuntimeException("OpenAI 타임아웃(테스트용)"));
+
+        ChecklistDto dto = service.generate(23L, null, "g1");
+
+        assertThat(dto.items()).isNotEmpty(); // DEFAULT_ITEMS로 폴백, 예외가 밖으로 안 나간다
+    }
+
+    @Test
     void submit하면_체크리스트_상태가_COMPLETED로_바뀐다() {
         AiConsultation aiMessage = aiMessage(30L, "g1", "두통");
         when(aiConsultationRepository.findById(30L)).thenReturn(Optional.of(aiMessage));

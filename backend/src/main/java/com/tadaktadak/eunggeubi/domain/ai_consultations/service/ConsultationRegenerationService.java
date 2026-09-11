@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 // 체크리스트 응답을 반영해서 이전 AI 답변을 "재생성"한다 - 기존 응답을 덮어쓰지 않고 새 ai_consultations
 // 행으로 append한다(is_regenerated=true, based_on_response_id=원본 응답 id).
@@ -28,7 +27,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ConsultationRegenerationService {
 
-    private static final String DISCLAIMER = "이 정보는 참고용이며 진단이 아닙니다. 증상이 지속되면 의료진과 상담하세요.";
     private static final String NO_MATCH_MESSAGE = "제공된 정보로는 더 구체적인 안내가 어렵습니다. 증상이 지속되거나 심해지면 병원 진료를 받아보세요.";
     private static final String DIAGNOSTIC_LANGUAGE_FALLBACK =
             "죄송합니다, 안내 문구를 다시 정리하는 중 문제가 발생했습니다. 제공된 참고자료로는 확정적인 안내가 어려우니, "
@@ -41,11 +39,12 @@ public class ConsultationRegenerationService {
     private final RagRetrievalService ragRetrievalService;
     private final ChatClient chatClient;
 
-    @Transactional
+    // ponytail: 트랜잭션으로 안 감싼다 - RAG 검색+LLM 호출 동안 DB 커넥션을 잡고 있으면 동시 요청
+    // 몇 개만으로 커넥션 풀이 고갈된다(저장은 Spring Data가 save() 호출마다 개별 트랜잭션으로 처리).
     public RegenerateResponse regenerate(Long consultationId, Long userId, String guestCode) {
         AiConsultation baseMessage = getOwnedAiMessage(consultationId, userId, guestCode);
         String symptomText = resolveSymptomText(baseMessage);
-        List<String> checkedItems = resolveCheckedItems(consultationId);
+        List<String> checkedItems = resolveCheckedItems(baseMessage);
 
         String combinedQuery = checkedItems.isEmpty()
                 ? symptomText
@@ -117,7 +116,7 @@ public class ConsultationRegenerationService {
                 })
                 .toList();
 
-        return new RegenerateResponse(message, false, sourceDtos, DISCLAIMER);
+        return new RegenerateResponse(message, false, sourceDtos, ConsultationDisclaimer.TEXT);
     }
 
     private AiConsultation getOwnedAiMessage(Long consultationId, Long userId, String guestCode) {
@@ -142,12 +141,25 @@ public class ConsultationRegenerationService {
     }
 
     // 체크리스트에서 사용자가 "해당한다"고 체크한 항목들 (checklist_responses.selected_items).
-    private List<String> resolveCheckedItems(Long consultationId) {
-        return checklistRepository.findTopByConsultationIdOrderByCreatedAtDesc(consultationId)
+    // 체크리스트는 항상 "최초" AI 응답의 consultationId에 달려있다 - 재생성된 응답을 또 재생성하면
+    // basedOnResponseId를 계속 따라 올라가서 그 최초 응답을 찾아야, 두 번째 재생성에서도 체크리스트
+    // 결과가 반영된다(안 그러면 체크리스트를 못 찾아 매번 checkedItems가 빈 값으로 헛돈다).
+    private List<String> resolveCheckedItems(AiConsultation message) {
+        Long checklistOwnerId = resolveChecklistOwner(message).getId();
+        return checklistRepository.findTopByConsultationIdOrderByCreatedAtDesc(checklistOwnerId)
                 .flatMap(checklist -> checklistResponseRepository
                         .findTopByChecklistIdOrderByCreatedAtDesc(checklist.getId())
                         .map(ChecklistResponse::selectedItemList))
                 .orElse(List.of());
+    }
+
+    private AiConsultation resolveChecklistOwner(AiConsultation message) {
+        AiConsultation current = message;
+        while (current.getBasedOnResponseId() != null) {
+            current = aiConsultationRepository.findById(current.getBasedOnResponseId())
+                    .orElseThrow(() -> new IllegalArgumentException("원본 상담을 찾을 수 없습니다."));
+        }
+        return current;
     }
 
     private ConsultationSource toSource(int index, Document doc) {

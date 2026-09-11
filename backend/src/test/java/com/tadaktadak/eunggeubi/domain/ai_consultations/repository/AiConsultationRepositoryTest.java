@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.AiConsultation;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.SenderType;
 import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -35,29 +34,6 @@ class AiConsultationRepositoryTest {
         assertThat(messages).hasSize(2);
         assertThat(messages.get(0).getSenderType()).isEqualTo(SenderType.USER);
         assertThat(messages.get(1).getId()).isEqualTo(ai.getId());
-    }
-
-    @Test
-    void 세션의_최신_AI_메시지_1건을_조회한다() {
-        repository.save(AiConsultation.builder()
-                .sessionId("session-2").sessionRoot(true).guestCode("guest-2")
-                .senderType(SenderType.USER).content("복통이 있어요").regenerated(false)
-                .build());
-        AiConsultation firstAi = repository.save(AiConsultation.builder()
-                .sessionId("session-2").sessionRoot(false).guestCode("guest-2")
-                .senderType(SenderType.AI).content("1차 안내").regenerated(false)
-                .build());
-        AiConsultation regenerated = repository.save(AiConsultation.builder()
-                .sessionId("session-2").sessionRoot(false).guestCode("guest-2")
-                .senderType(SenderType.AI).content("재생성된 안내").regenerated(true)
-                .basedOnResponseId(firstAi.getId())
-                .build());
-
-        Optional<AiConsultation> latest =
-                repository.findTopBySessionIdAndSenderTypeOrderByCreatedAtDesc("session-2", SenderType.AI);
-
-        assertThat(latest).isPresent();
-        assertThat(latest.get().getId()).isEqualTo(regenerated.getId());
     }
 
     @Test

@@ -17,7 +17,11 @@ public class RagRetrievalService {
 
     // 질문과 관련 없는 문서가 답변에 섞이는 걸 막기 위한 최소 유사도. 이 밑으로는 검색 결과에서 제외한다.
     private static final double SIMILARITY_THRESHOLD = 0.35;
-    private static final int TOP_K = 5;
+    // 5에서 8로 늘렸다 - 검색어 재작성(AiConsultationService.rewriteQueryForSearch)을 거쳐도 실제로
+    // 도움 되는 문서가 top 5 밖에 걸리는 경우가 있었다. 후보를 늘려도 안전한 이유: CONSULT_PROMPT가
+    // "참고자료에 없는 내용은 답하지 않는다"를 강제해서, 무관한 후보가 몇 개 섞여도 모델이 그냥
+    // 무시할 뿐 답변에 실제로 쓰이진 않는다(sourceIndexes로 인용된 것만 "출처"로 노출됨).
+    private static final int TOP_K = 8;
 
     private final VectorStore vectorStore;
 
