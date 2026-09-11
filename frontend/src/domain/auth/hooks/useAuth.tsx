@@ -7,6 +7,7 @@ import {
   saveTokens,
 } from '../../../shared/storage/tokenStorage';
 import * as authApi from '../api/auth';
+import * as userApi from '../../user/api/user';
 
 interface AuthContextValue {
   isLoggedIn: boolean;
@@ -14,6 +15,7 @@ interface AuthContextValue {
   loading: boolean; // 앱 시작 시 자동 로그인 확인 중 여부
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  withdraw: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -61,10 +63,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserId(null);
     }
   };
+  const withdraw = async (password: string) => {
+    await userApi.withdraw(password);
+    await clearTokens();   // 기기 저장 토큰 삭제
+    setUserId(null);       // 로그아웃 상태로 전환
+  };
 
   return (
     <AuthContext.Provider
-      value={{ isLoggedIn: userId !== null, userId, loading, signIn, signOut }}
+      value={{ isLoggedIn: userId !== null, userId, loading, signIn, signOut, withdraw }}
     >
       {children}
     </AuthContext.Provider>

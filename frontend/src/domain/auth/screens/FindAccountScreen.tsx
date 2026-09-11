@@ -71,7 +71,7 @@ export default function FindAccountScreen() {
   };
 
   const verifyCode = async () => {
-    if (!code) return Alert.alert('인증번호', '인증번호를 입력해주세요.');
+    if (!code) return Alert.alert('인증번호 발송', '인증번호를 발송했어요. 문자를 확인해주세요.');
     try {
       await authApi.verifyPhoneCode(phone.trim(), purpose, code.trim());
       setPhoneVerified(true);
