@@ -15,6 +15,7 @@ interface ConsultationResponseDto {
   consultationId: number;
   sessionId: string;
   guestCode: string | null; // 새 게스트 세션일 때만 값이 옴 (기존 세션 이어가는 요청이면 null)
+  disclaimer: string;
 }
 
 interface ChecklistDto {
@@ -64,6 +65,7 @@ export async function requestSymptomAdvice(
     consultationId: response.consultationId,
     segments: response.answer,
     sources: response.sources,
+    disclaimer: response.disclaimer,
   };
 
   const effectiveGuestCode = response.guestCode ?? guestCode ?? undefined;

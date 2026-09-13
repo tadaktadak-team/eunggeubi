@@ -7,7 +7,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -47,6 +46,8 @@ public class ChecklistResponse {
 
     public List<String> selectedItemList() {
         // "".split("\n")은 [""](원소 1개)를 주기 때문에, 체크한 게 하나도 없는 경우를 별도로 처리한다.
-        return selectedItems.isBlank() ? List.of() : Arrays.asList(selectedItems.split("\n"));
+        // Arrays.asList는 크기 고정 리스트라 .add()/.remove()를 부르면 UnsupportedOperationException이
+        // 난다 - 지금은 아무도 그렇게 안 쓰지만, 애초에 완전히 불변으로 만들어서 그 가능성 자체를 없앤다.
+        return selectedItems.isBlank() ? List.of() : List.of(selectedItems.split("\n"));
     }
 }

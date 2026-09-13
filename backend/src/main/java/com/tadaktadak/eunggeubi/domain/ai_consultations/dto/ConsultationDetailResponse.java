@@ -8,6 +8,8 @@ public record ConsultationDetailResponse(
         String sessionId,
         List<Message> messages
 ) {
+    // disclaimer는 AI 메시지에만 채운다(사용자 메시지는 null) - consult/regenerate 응답과 같은 문구를
+    // ConsultationDisclaimer에서 그대로 가져온다. DB엔 저장 안 하고 조회 시점에 붙인다.
     public record Message(
             Long id,
             String senderType,
@@ -15,7 +17,8 @@ public record ConsultationDetailResponse(
             boolean regenerated,
             LocalDateTime createdAt,
             List<String> checkedItems,
-            boolean checklistAnswered
+            boolean checklistAnswered,
+            String disclaimer
     ) {
     }
 }

@@ -56,6 +56,7 @@ export interface ConsultationMessage {
   createdAt: string;
   checkedItems: string[];
   checklistAnswered: boolean;
+  disclaimer: string | null; // AI 메시지에만 옴 (USER 메시지는 null)
 }
 
 // GET /api/users/me/consultations/{sessionId} 응답 (MY04_HIST02)
@@ -74,4 +75,5 @@ export type MyPageStackParamList = {
   Withdraw: undefined;
   ConsultationHistory: undefined;
   ConsultationDetail: { sessionId: string; title: string };
+  Support: undefined;
 };

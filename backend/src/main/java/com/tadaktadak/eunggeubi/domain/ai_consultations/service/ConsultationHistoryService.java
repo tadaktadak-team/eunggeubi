@@ -58,7 +58,8 @@ public class ConsultationHistoryService {
                         m.isRegenerated(),
                         m.getCreatedAt(),
                         checkedItems.getOrDefault(m.getId(), List.of()),
-                        checkedItems.containsKey(m.getId())))
+                        checkedItems.containsKey(m.getId()),
+                        m.getSenderType() == SenderType.AI ? ConsultationDisclaimer.TEXT : null))
                 .toList();
 
         return new ConsultationDetailResponse(sessionId, dtos);

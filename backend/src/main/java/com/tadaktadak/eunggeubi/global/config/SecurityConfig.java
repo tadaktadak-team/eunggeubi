@@ -3,7 +3,9 @@ package com.tadaktadak.eunggeubi.global.config;
 import com.tadaktadak.eunggeubi.global.security.JwtAuthenticationEntryPoint;
 import com.tadaktadak.eunggeubi.global.security.JwtAuthenticationFilter;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
+import com.tadaktadak.eunggeubi.global.security.RateLimitFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -21,6 +23,11 @@ public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
+
+    // 앞단에 X-Forwarded-For를 덮어써주는 신뢰된 프록시(nginx/ALB 등)가 확실히 있을 때만 true로 켠다.
+    // 기본 false: 이 헤더는 클라이언트가 임의로 채울 수 있어서, 잘못 켜면 레이트리밋이 그냥 우회된다.
+    @Value("${app.rate-limit.trust-proxy:false}")
+    private boolean trustProxyForwardedFor;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -49,7 +56,9 @@ public class SecurityConfig {
 
                 // 시큐리티 기본 필터 앞에 우리 JWT 필터 끼워넣기
                 .addFilterBefore(new JwtAuthenticationFilter(jwtProvider),
-                        UsernamePasswordAuthenticationFilter.class);
+                        UsernamePasswordAuthenticationFilter.class)
+                // AI 상담은 permitAll이라 JWT 인증으로도 막을 수 없다 - 그 앞에서 IP 기준으로 먼저 거른다.
+                .addFilterBefore(new RateLimitFilter(trustProxyForwardedFor), JwtAuthenticationFilter.class);
 
         return http.build();
     }

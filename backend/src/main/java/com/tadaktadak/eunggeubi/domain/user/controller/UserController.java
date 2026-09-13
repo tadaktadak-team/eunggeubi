@@ -24,7 +24,8 @@ public class UserController {
 
     private final UserService userService;
 
-    //마이페이지 예약 조회
+    // 마이페이지 요약 조회(MY01_INFO01) 겸 회원 정보 수정(MEM03) 화면의 초기값.
+    // 두 화면이 필요로 하는 필드가 같아서 응답을 MyInfoResponse 하나로 통일했다.
     @GetMapping("/me")
     public MyInfoResponse getMyInfo(@AuthenticationPrincipal Long userId) {
         return userService.getMyInfo(userId);

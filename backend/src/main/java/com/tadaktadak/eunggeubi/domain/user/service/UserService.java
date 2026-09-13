@@ -1,6 +1,5 @@
 package com.tadaktadak.eunggeubi.domain.user.service;
 
-import com.tadaktadak.eunggeubi.domain.auth.repository.RefreshTokenRepository;
 import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
 import com.tadaktadak.eunggeubi.domain.user.dto.ChangePasswordResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.MyInfoResponse;
@@ -12,8 +11,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor

@@ -31,3 +31,20 @@ export interface LoginResponse {
 export interface FindEmailResponse {
   email: string; // 마스킹된 이메일
 }
+
+export type Relationship = 'PARENT' | 'GRANDPARENT' | 'SIBLING' | 'OTHER';
+
+export interface GuardianRequest {
+  userId: number;
+  name: string;
+  phone: string;
+  relationship: Relationship;
+}
+
+export interface GuardianConsentResponse {
+  maskedPhone: string;
+}
+
+export interface ConsentStatusResponse {
+  confirmed: boolean;
+}

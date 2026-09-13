@@ -9,6 +9,9 @@ import LoginScreen from '../domain/auth/screens/LoginScreen';
 import SignupCompleteScreen from '../domain/auth/screens/SignupCompleteScreen';
 import SignupScreen from '../domain/auth/screens/SignupScreen';
 import SplashScreen from '../domain/auth/screens/SplashScreen';
+import EditProfileScreen from '../domain/user/screens/EditProfileScreen';
+import GuardianConsentScreen from '../domain/auth/screens/GuardianConsentScreen';
+import GuardianWaitingScreen from '../domain/auth/screens/GuardianWaitingScreen';
 import EmergencyResultScreen from '../domain/emergency/screens/EmergencyResultScreen';
 import PlaceholderScreen from '../shared/components/PlaceholderScreen';
 import LegalScreen from '../shared/screens/LegalScreen';
@@ -56,6 +59,8 @@ export default function RootNavigator() {
               <Stack.Screen name="Login" component={LoginScreen} />
               <Stack.Screen name="Signup" component={SignupScreen} />
               <Stack.Screen name="SignupComplete" component={SignupCompleteScreen} />
+              <Stack.Screen name="GuardianConsent" component={GuardianConsentScreen} />
+              <Stack.Screen name="GuardianWaiting" component={GuardianWaitingScreen} />
               <Stack.Screen name="FindAccount" component={FindAccountScreen} />
               <Stack.Screen name="Tabs" component={TabsNavigator} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
@@ -64,6 +69,7 @@ export default function RootNavigator() {
           ) : (
             <>
               <Stack.Screen name="Tabs" component={TabsNavigator} />
+              <Stack.Screen name="EditProfile" component={EditProfileScreen} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
               <Stack.Screen name="Legal" component={LegalScreen} />
             </>

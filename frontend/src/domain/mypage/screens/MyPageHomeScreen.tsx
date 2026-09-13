@@ -47,7 +47,15 @@ const MENUS: { key: string; label: string; sub?: string; icon: IconName }[] = [
   { key: 'password', label: '비밀번호 변경', icon: 'lock-closed-outline' },
   { key: 'terms', label: '이용약관 · 개인정보처리방침', icon: 'document-text-outline' },
   { key: 'support', label: '고객센터', sub: '문의 및 도움말', icon: 'headset-outline' },
-  { key: 'notice', label: '공지사항', icon: 'megaphone-outline' },
+];
+
+// 비로그인도 볼 수 있는 메뉴 (계정이 있어야 의미가 있는 항목은 뺀다)
+const GUEST_MENUS = MENUS.filter((m) => m.key !== 'password');
+
+const GUEST_BENEFITS = [
+  '보호자에게 위치·상황 자동 알림',
+  '상담 이력 저장 및 다시 보기',
+  '건강 프로필 관리',
 ];
 
 export default function MyPageHomeScreen() {
@@ -102,10 +110,10 @@ export default function MyPageHomeScreen() {
       { text: '로그아웃', style: 'destructive', onPress: () => signOut() },
     ]);
 
-  const onMenu = (key: string, label: string) => {
+  const onMenu = (key: string) => {
     if (key === 'password') navigation.navigate('ChangePassword');
     else if (key === 'terms') navigation.navigate('Legal');
-    else Alert.alert(label, '준비 중입니다.');
+    else if (key === 'support') navigation.navigate('Support');
   };
 
   const onQuick = (key: string) => {
@@ -113,16 +121,69 @@ export default function MyPageHomeScreen() {
     else if (key === 'history') navigation.navigate('ConsultationHistory');
   };
 
+  // 비로그인은 막힌 화면 대신 같은 레이아웃을 잠긴 상태로 보여준다 (로그인하면 뭐가 채워지는지 알 수 있게).
   if (!isLoggedIn) {
     return (
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <View style={styles.guestBox}>
-          <Ionicons name="lock-closed-outline" size={40} color={colors.placeholder} />
-          <Text style={styles.guestText}>로그인이 필요한 화면이에요</Text>
-          <Pressable style={styles.loginBtn} onPress={() => navigation.navigate('Login')}>
-            <Text style={styles.loginBtnText}>로그인 / 회원가입</Text>
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.header}>
+            <Text style={styles.pageTitle}>마이페이지</Text>
+          </View>
+
+          <Pressable style={styles.guestProfile} onPress={() => navigation.navigate('Login')}>
+            <Ionicons name="person-circle-outline" size={44} color={colors.placeholder} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.guestProfileTitle}>로그인이 필요해요</Text>
+              <Text style={styles.guestProfileSub}>로그인하고 내 정보를 관리해보세요</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
           </Pressable>
-        </View>
+
+          <View style={styles.quickRow}>
+            {QUICK.map((q) => (
+              <View key={q.key} style={styles.quickItem}>
+                <Ionicons name={q.icon} size={24} color={colors.disabled} />
+                <Text style={[styles.quickValue, { color: colors.disabled }]}>–</Text>
+                <Text style={[styles.quickLabel, { color: colors.placeholder }]}>{q.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.lockCard}>
+            <View style={styles.lockHeader}>
+              <Ionicons name="lock-closed" size={16} color={colors.primaryDark} />
+              <Text style={styles.lockTitle}>로그인하면 사용할 수 있어요</Text>
+            </View>
+            {GUEST_BENEFITS.map((b) => (
+              <View key={b} style={styles.benefitRow}>
+                <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                <Text style={styles.benefitText}>{b}</Text>
+              </View>
+            ))}
+            <Pressable style={styles.loginBtn} onPress={() => navigation.navigate('Login')}>
+              <Text style={styles.loginBtnText}>로그인 / 회원가입</Text>
+            </Pressable>
+          </View>
+
+          {/* 약관은 로그인 여부와 무관하게 열람할 수 있어야 한다 (개인정보 보호법 시행령 제31조) */}
+          <View style={styles.menuCard}>
+            {GUEST_MENUS.map((m, i) => (
+              <Pressable
+                key={m.key}
+                style={[styles.menuRow, i > 0 && styles.menuBorder]}
+                onPress={() => onMenu(m.key)}
+              >
+                <Ionicons name={m.icon} size={20} color={colors.textSub} />
+                <Text style={[styles.menuLabel, { flex: 1 }]}>{m.label}</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.placeholder} />
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.footer}>
+            <Text style={styles.version}>v1.0.0</Text>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -194,7 +255,7 @@ export default function MyPageHomeScreen() {
             <Pressable
               key={m.key}
               style={[styles.menuRow, i > 0 && styles.menuBorder]}
-              onPress={() => onMenu(m.key, m.label)}
+              onPress={() => onMenu(m.key)}
             >
               <Ionicons name={m.icon} size={20} color={colors.textSub} />
               <View style={{ flex: 1 }}>
@@ -265,8 +326,23 @@ const styles = StyleSheet.create({
   withdraw: { color: colors.textSub, fontSize: font.sub, textDecorationLine: 'underline' },
   version: { color: colors.placeholder, fontSize: font.caption },
 
-  guestBox: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, paddingHorizontal: spacing.xl },
-  guestText: { fontSize: font.body, color: colors.textSub },
+  guestProfile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.white,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+  },
+  guestProfileTitle: { fontSize: font.h3, fontWeight: '700', color: colors.text },
+  guestProfileSub: { fontSize: font.sub, color: colors.textSub, marginTop: 2 },
+
+  lockCard: { backgroundColor: colors.primaryLight, borderRadius: radius.md, padding: spacing.lg, gap: spacing.sm },
+  lockHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
+  lockTitle: { fontSize: font.sub, fontWeight: '800', color: colors.primaryDark },
+  benefitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  benefitText: { flexShrink: 1, fontSize: font.body, color: colors.text },
+
   loginBtn: { backgroundColor: colors.primary, paddingHorizontal: spacing.xxl, height: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', marginTop: spacing.md },
   loginBtnText: { color: colors.white, fontWeight: '700', fontSize: font.body },
 });

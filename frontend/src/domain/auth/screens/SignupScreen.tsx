@@ -46,7 +46,7 @@ export default function SignupScreen() {
     try {
       await authApi.sendPhoneCode(phone.trim(), 'SIGNUP');
       setCodeSent(true);
-      Alert.alert('인증번호 발송', '인증번호를 발송했어요.\n(개발 중: 서버 콘솔에서 확인)');
+      Alert.alert('인증번호 발송', '인증번호를 발송했어요. 문자를 확인해주세요.');
     } catch (e: any) {
       Alert.alert('발송 실패', e?.message ?? '다시 시도해주세요.');
     }
@@ -92,7 +92,8 @@ export default function SignupScreen() {
         agreeSensitiveInfo: agreeSensitive,
       });
       if (res.guardianConsentRequired) {
-        Alert.alert('보호자 동의 필요', '만 14세 미만은 보호자 동의가 필요해요.\n(보호자 동의 기능은 곧 추가돼요)');
+        navigation.navigate('GuardianConsent', { userId: res.userId, email: email.trim() });
+        return;
       }
       navigation.navigate('SignupComplete', { email: email.trim() });
     } catch (e: any) {

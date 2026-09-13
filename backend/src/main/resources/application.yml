@@ -14,6 +14,13 @@ spring:
     openai:
       # 키가 없어도 앱은 뜨게 한다. 빈 문자열이면 자동설정이 기동을 막으므로 더미값을 기본으로 둔다.
       api-key: ${OPENAI_API_KEY:dummy}
+      chat:
+        options:
+          # 모델/temperature를 안 정해두면 spring-ai 기본값을 그대로 쓰게 되는데, 라이브러리
+          # 버전이 올라가면 그 기본값이 조용히 바뀔 수 있다. 의료정보 안내라 환각(지어내기) 위험을
+          # 낮추는 게 중요해서 temperature도 낮게 고정한다.
+          model: gpt-4o-mini
+          temperature: 0.2
       embedding:
         options:
           # Qdrant 컬렉션이 1536차원으로 고정돼 있어서 large 출력(3072)을 잘라서 쓴다.
@@ -49,6 +56,11 @@ kdca:
     base-url: https://api.kdca.go.kr/api/provide/healthInfo
     token: ${KDCA_TOKEN:}
 
+app:
+  rate-limit:
+    # nginx/ALB 등 X-Forwarded-For를 덮어써주는 신뢰된 프록시 뒤에 배포했을 때만 true로.
+    trust-proxy: ${RATE_LIMIT_TRUST_PROXY:false}
+
 medical_locator:
   secret: ${MEDICAL_LOCATOR_SECRET:}
   hospital:
@@ -65,6 +77,11 @@ emergency_bed:
   url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire
   hospital-url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire
 
+solapi:
+  api-key: ${SOLAPI_API_KEY:}
+  api-secret: ${SOLAPI_API_SECRET:}
+  from: ${SOLAPI_FROM:}
+
 ---
 spring:
   config:
@@ -80,6 +97,8 @@ spring:
       ddl-auto: update
     show-sql: true
     open-in-view: false
+
+
 
 ---
 # AI 인덱싱/리허설/검색점검 배치를 돌릴 때만 Qdrant 컬렉션 자동 생성을 켠다.
