@@ -9,8 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Location from "expo-location";
-import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-
+import KakaoMapView, { MapMarkerData } from "../components/KakaoMapView";
 import { getEmergencyBeds } from "../api/emergencyBed";
 import { EmergencyBed } from "../types/emergencyBed";
 import { getNearbyHospitals, getNearbyPharmacies } from "../api/medicalFacility";
@@ -104,7 +103,7 @@ export default function MedicalLocatorScreen() {
         longitude,
         stage1
       );
-
+     
       setBeds(data);
 
       // 병원·약국 조회
@@ -112,7 +111,7 @@ export default function MedicalLocatorScreen() {
         getNearbyHospitals(latitude, longitude),
         getNearbyPharmacies(latitude, longitude),
       ]);
-
+      
       setHospitals(hospitalData);
       setPharmacies(pharmacyData);
 
@@ -207,7 +206,11 @@ export default function MedicalLocatorScreen() {
           category: "약국",
         }))
       : []),
-  ];
+      ].sort((a, b) => {
+    const distA = a.distance ?? Infinity;
+    const distB = b.distance ?? Infinity;
+    return distA - distB;
+      });
 
   // 검색어 필터링
   const filteredItems = searchText.trim()
@@ -282,46 +285,30 @@ export default function MedicalLocatorScreen() {
         />
       </View>
 
-      {/* 지도 */}
+                  {/* 지도 */}
       {location && (
-        <MapView
-          style={styles.map}
-          initialRegion={{
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-          showsUserLocation
-        >
-          {markerItems
-            .filter(
-              (item) =>
-                item.latitude != null &&
-                item.longitude != null
-            )
-            .map((item) => (
-              <Marker
-                key={item.id}
-                coordinate={{
-                  latitude: Number(item.latitude),
-                  longitude: Number(item.longitude),
-                }}
-              >
-                <View
-                  style={[
-                    styles.markerLabel,
-                    { backgroundColor: item.color },
-                  ]}
-                >
-                  <Text style={styles.markerText} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                </View>
-              </Marker>
-            ))}
-        </MapView>
+        <View style={styles.map}>
+          <KakaoMapView
+            centerLatitude={location.coords.latitude}
+            centerLongitude={location.coords.longitude}
+            markers={markerItems
+              .filter(
+                (item): item is typeof item & { latitude: number; longitude: number } =>
+                  item.latitude != null && item.longitude != null
+              )
+              .map(
+                (item): MapMarkerData => ({
+                  id: item.id,
+                  name: item.name,
+                  latitude: item.latitude,
+                  longitude: item.longitude,
+                  color: item.color,
+                })
+              )}
+          />
+        </View>
       )}
+      
 
       {/* 목록 */}
       <Text style={styles.sectionTitle}>

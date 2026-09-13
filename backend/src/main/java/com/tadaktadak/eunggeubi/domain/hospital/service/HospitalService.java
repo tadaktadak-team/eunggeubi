@@ -212,7 +212,11 @@ public class HospitalService {
             String response =
                     new String(responseBytes, StandardCharsets.UTF_8);
 
-            return parseResponse(response);
+            List<MedicalFacilityResponse> result = parseResponse(response);
+            result.sort(Comparator.comparingDouble(
+                    item -> item.getDistance() == null ? Double.MAX_VALUE : item.getDistance()
+            ));
+            return result;
 
         } catch (Exception e) {
             log.error("{} API 호출 실패", type, e);
