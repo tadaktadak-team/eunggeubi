@@ -5,9 +5,13 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useNavigation } from "@react-navigation/native";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../../../navigation/types";
 import * as Location from "expo-location";
 import KakaoMapView, { MapMarkerData } from "../components/KakaoMapView";
 import { getEmergencyBeds } from "../api/emergencyBed";
@@ -24,7 +28,10 @@ const FILTER_COLORS: Record<FilterType, string> = {
   emergency: "#E53935",
 };
 
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export default function MedicalLocatorScreen() {
+  const navigation = useNavigation<NavigationProp>();
   const [beds, setBeds] = useState<EmergencyBed[]>([]);
   const [hospitals, setHospitals] = useState<MedicalFacility[]>([]);
   const [pharmacies, setPharmacies] = useState<MedicalFacility[]>([]);
@@ -204,18 +211,26 @@ export default function MedicalLocatorScreen() {
     id: string;
     name: string;
     address: string;
+    phone: string;
     distance: number | null;
     badge: string;
     category: string;
+    ykiho: string | null;
+    availableBeds: number | null;
+    congestion: number | null;
   }[] = [
     ...(filter === "all" || filter === "emergency"
       ? beds.map((b) => ({
           id: `bed-${b.hpid}`,
           name: b.name,
           address: b.address,
+          phone: b.phone,
           distance: b.distance,
           badge: `${b.availableBeds ?? "-"}병상`,
           category: "응급실",
+          ykiho: null,
+          availableBeds: b.availableBeds,
+          congestion: b.congestion,
         }))
       : []),
     ...(filter === "all" || filter === "hospital"
@@ -223,9 +238,13 @@ export default function MedicalLocatorScreen() {
           id: `hospital-${h.ykiho}`,
           name: h.name,
           address: h.address,
+          phone: h.phone,
           distance: h.distance,
           badge: "병원",
           category: "병원",
+          ykiho: h.ykiho,
+          availableBeds: null,
+          congestion: null,
         }))
       : []),
     ...(filter === "all" || filter === "pharmacy"
@@ -233,9 +252,13 @@ export default function MedicalLocatorScreen() {
           id: `pharmacy-${p.ykiho}`,
           name: p.name,
           address: p.address,
+          phone: p.phone,
           distance: p.distance,
           badge: "약국",
           category: "약국",
+          ykiho: p.ykiho,
+          availableBeds: null,
+          congestion: null,
         }))
       : []),
   ].sort((a, b) => {
@@ -346,11 +369,26 @@ export default function MedicalLocatorScreen() {
         주변 의료기관
       </Text>
 
-      <FlatList
+            <FlatList
         data={visibleItems}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+                    <TouchableOpacity
+            style={styles.card}
+            activeOpacity={item.ykiho ? 0.7 : 1}
+            onPress={() => {
+              if (!item.ykiho) return; // 응급실(hpid만 있는 항목)은 상세 화면 미지원
+              navigation.navigate("HospitalDetail", {
+                ykiho: item.ykiho,
+                name: item.name,
+                address: item.address,
+                phone: item.phone,
+                distance: item.distance,
+                availableBeds: item.availableBeds,
+                congestion: item.congestion,
+              });
+            }}
+          >
             <View style={styles.row}>
               <Text style={styles.name}>
                 [{item.category}] {item.name}
@@ -370,7 +408,7 @@ export default function MedicalLocatorScreen() {
             <Text style={styles.address}>
               {item.address}
             </Text>
-          </View>
+          </TouchableOpacity>
         )}
         ListEmptyComponent={
           <Text style={styles.message}>
