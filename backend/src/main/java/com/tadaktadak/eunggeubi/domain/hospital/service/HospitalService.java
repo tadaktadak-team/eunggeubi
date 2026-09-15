@@ -3,6 +3,7 @@ package com.tadaktadak.eunggeubi.domain.hospital.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.tadaktadak.eunggeubi.domain.hospital.dto.MedicalFacilityResponse;
+import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,14 +27,12 @@ public class HospitalService {
     private final RestTemplate restTemplate;
     private final XmlMapper xmlMapper = new XmlMapper();
 
-    // URL은 병원/약국 각각 사용
     @Value("${medical_locator.hospital.url}")
     private String apiUrl;
 
     @Value("${medical_locator.pharmacy.url}")
     private String pharmacyApiUrl;
 
-    // 서비스키는 하나만 사용
     @Value("${medical_locator.secret}")
     private String serviceKey;
 
@@ -68,6 +67,7 @@ public class HospitalService {
                 "약국"
         );
     }
+
     /**
      * 병원 상세정보(진료시간, 진료과목) 조회
      */
@@ -110,7 +110,7 @@ public class HospitalService {
 
         } catch (Exception e) {
             log.error("병원 상세정보 조회 실패 (ykiho={})", ykiho, e);
-            throw new RuntimeException("병원 상세정보를 불러오지 못했습니다.");
+            throw new ExternalApiException("병원 상세정보를 불러오지 못했습니다.", e);
         }
     }
 
@@ -167,7 +167,6 @@ public class HospitalService {
             );
         }
 
-        // 전문의 수 기준 내림차순 정렬 (많은 과목이 위로)
         result.sort(Comparator.comparing(
                 HospitalDetailResponse.DepartmentInfo::getDoctorCount,
                 Comparator.nullsLast(Comparator.reverseOrder())
@@ -188,6 +187,10 @@ public class HospitalService {
         }
     }
 
+    private static final int NEARBY_RADIUS_METERS = 3000;
+    private static final int NEARBY_MAX_ROWS = 100;
+    private static final int NEARBY_RESULT_LIMIT = 20;
+
     private List<MedicalFacilityResponse> findNearby(
             String apiUrl,
             String serviceKey,
@@ -200,10 +203,10 @@ public class HospitalService {
                     .fromHttpUrl(apiUrl)
                     .queryParam("ServiceKey", serviceKey)
                     .queryParam("pageNo", 1)
-                    .queryParam("numOfRows", 20)
+                    .queryParam("numOfRows", NEARBY_MAX_ROWS)
                     .queryParam("xPos", longitude)
                     .queryParam("yPos", latitude)
-                    .queryParam("radius", 5000)
+                    .queryParam("radius", NEARBY_RADIUS_METERS)
                     .build(true)
                     .toUri();
 
@@ -216,11 +219,16 @@ public class HospitalService {
             result.sort(Comparator.comparingDouble(
                     item -> item.getDistance() == null ? Double.MAX_VALUE : item.getDistance()
             ));
+
+            if (result.size() > NEARBY_RESULT_LIMIT) {
+                result = result.subList(0, NEARBY_RESULT_LIMIT);
+            }
+
             return result;
 
         } catch (Exception e) {
             log.error("{} API 호출 실패", type, e);
-            throw new RuntimeException(type + " 정보를 불러오지 못했습니다.");
+            throw new ExternalApiException(type + " 정보를 불러오지 못했습니다.", e);
         }
     }
 
@@ -268,6 +276,7 @@ public class HospitalService {
                 ? null
                 : value.asText();
     }
+
     private Double toKm(Double meters) {
         if (meters == null) {
             return null;

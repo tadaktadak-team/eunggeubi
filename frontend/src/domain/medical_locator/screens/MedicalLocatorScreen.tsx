@@ -37,14 +37,15 @@ export default function MedicalLocatorScreen() {
     useState<Location.LocationObject | null>(null);
 
   useEffect(() => {
-    loadEmergencyBeds();
+    loadInitialData();
   }, []);
 
   useEffect(() => {
     setVisibleCount(5);
   }, [filter, searchText]);
 
-  async function loadEmergencyBeds() {
+  // 위치 확보까지만 담당. 실패하면 화면 전체를 에러로 보여줘야 하는 전제조건이라 그대로 try/catch.
+  async function loadInitialData() {
     try {
       setLoading(true);
       setError(null);
@@ -97,41 +98,65 @@ export default function MedicalLocatorScreen() {
 
       console.log("조회 지역:", stage1);
 
-      // 응급실 조회
-      const data = await getEmergencyBeds(
-        latitude,
-        longitude,
-        stage1
-      );
-     
-      setBeds(data);
+      // 여기까지 성공하면 위치는 확보된 것 -> 화면을 먼저 띄운다.
+      setLoading(false);
 
-      // 병원·약국 조회
-      const [hospitalData, pharmacyData] = await Promise.all([
-        getNearbyHospitals(latitude, longitude),
-        getNearbyPharmacies(latitude, longitude),
-      ]);
-      
-      setHospitals(hospitalData);
-      setPharmacies(pharmacyData);
+      // 응급실/병원/약국은 서로 독립적으로 실패해도 나머지는 정상 표시되게 분리
+      loadBeds(latitude, longitude, stage1);
+      loadHospitals(latitude, longitude);
+      loadPharmacies(latitude, longitude);
 
     } catch (e) {
-      console.error("응급실 조회 실패:", e);
+      console.error("위치 조회 실패:", e);
 
       if (e instanceof Error) {
         setError(e.message);
       } else {
         setError(
-          "응급실 정보를 불러오지 못했습니다."
+          "위치 정보를 불러오지 못했습니다."
         );
       }
-    } finally {
+
       setLoading(false);
     }
   }
 
-  // 필터에 따라 지도에 표시할 마커 데이터 구성
-  const markerItems: {
+  async function loadBeds(
+    latitude: number,
+    longitude: number,
+    stage1: string
+  ) {
+    try {
+      const data = await getEmergencyBeds(latitude, longitude, stage1);
+      setBeds(data);
+    } catch (e) {
+      console.error("응급실 조회 실패:", e);
+      setBeds([]);
+    }
+  }
+
+  async function loadHospitals(latitude: number, longitude: number) {
+    try {
+      const data = await getNearbyHospitals(latitude, longitude);
+      setHospitals(data);
+    } catch (e) {
+      console.error("병원 조회 실패:", e);
+      setHospitals([]);
+    }
+  }
+
+  async function loadPharmacies(latitude: number, longitude: number) {
+    try {
+      const data = await getNearbyPharmacies(latitude, longitude);
+      setPharmacies(data);
+    } catch (e) {
+      console.error("약국 조회 실패:", e);
+      setPharmacies([]);
+    }
+  }
+
+    // 필터에 따라 지도에 표시할 마커 데이터 구성
+  const allMarkerItems: {
     id: string;
     name: string;
     latitude: number | null;
@@ -166,6 +191,13 @@ export default function MedicalLocatorScreen() {
         }))
       : []),
   ];
+
+  // 검색어가 있으면 마커도 같이 필터링
+  const markerItems = searchText.trim()
+    ? allMarkerItems.filter((item) =>
+        item.name.toLowerCase().includes(searchText.trim().toLowerCase())
+      )
+    : allMarkerItems;
 
   // 필터에 따라 목록에 표시할 데이터 구성 (공통 형태로 변환)
   const listItems: {
@@ -206,11 +238,11 @@ export default function MedicalLocatorScreen() {
           category: "약국",
         }))
       : []),
-      ].sort((a, b) => {
+  ].sort((a, b) => {
     const distA = a.distance ?? Infinity;
     const distB = b.distance ?? Infinity;
     return distA - distB;
-      });
+  });
 
   // 검색어 필터링
   const filteredItems = searchText.trim()
@@ -285,7 +317,7 @@ export default function MedicalLocatorScreen() {
         />
       </View>
 
-                  {/* 지도 */}
+      {/* 지도 */}
       {location && (
         <View style={styles.map}>
           <KakaoMapView
@@ -308,7 +340,6 @@ export default function MedicalLocatorScreen() {
           />
         </View>
       )}
-      
 
       {/* 목록 */}
       <Text style={styles.sectionTitle}>

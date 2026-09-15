@@ -131,7 +131,7 @@ public class EmergencyBedService {
 
     // [수정 6] 두 API 호출의 공통 부분(요청/디코딩)을 헬퍼로 분리했습니다.
     private String fetch(URI uri, String label) {
-        log.info("{} API 요청: {}", label, uri);
+        log.info("{} API 요청: {}", label, uri.getPath());
 
         // [수정 7] String.class → byte[].class
         //  new RestTemplate()의 기본 String 변환기는 charset이 ISO-8859-1이라 한글이 깨집니다.
