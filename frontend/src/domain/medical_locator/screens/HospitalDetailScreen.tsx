@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -33,8 +35,17 @@ function formatTime(value: string | null | undefined) {
 export default function HospitalDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<HospitalDetailRouteProp>();
-  const { ykiho, name, address, phone, distance, availableBeds, congestion } =
-    route.params;
+    const {
+    ykiho,
+    name,
+    address,
+    phone,
+    distance,
+    latitude,
+    longitude,
+    availableBeds,
+    congestion,
+  } = route.params;
 
   const [detail, setDetail] = useState<HospitalDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,6 +54,28 @@ export default function HospitalDetailScreen() {
   useEffect(() => {
     loadDetail();
   }, [ykiho]);
+
+    async function openDirections() {
+    if (latitude == null || longitude == null) {
+      return;
+    }
+
+    const kakaoMapUrl = `kakaomap://look?p=${latitude},${longitude}`;
+    const kakaoWebUrl = `https://map.kakao.com/link/to/${encodeURIComponent(
+      name
+    )},${latitude},${longitude}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(kakaoMapUrl);
+      if (canOpen) {
+        await Linking.openURL(kakaoMapUrl);
+      } else {
+        await Linking.openURL(kakaoWebUrl);
+      }
+    } catch (e) {
+      console.error("길찾기 열기 실패:", e);
+    }
+  }
 
   async function loadDetail() {
     try {
@@ -70,12 +103,21 @@ export default function HospitalDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* 기본 정보 (목록에서 넘겨받은 값, 항상 표시) */}
+                {/* 기본 정보 (목록에서 넘겨받은 값, 항상 표시) */}
         <View style={styles.section}>
           <Text style={styles.address}>{address}</Text>
           <Text style={styles.phone}>{phone}</Text>
           {distance != null && (
             <Text style={styles.distance}>{distance}km</Text>
+          )}
+
+          {latitude != null && longitude != null && (
+            <TouchableOpacity
+              style={styles.directionsButton}
+              onPress={openDirections}
+            >
+              <Text style={styles.directionsButtonText}>길찾기</Text>
+            </TouchableOpacity>
           )}
         </View>
 
@@ -209,9 +251,23 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  distance: {
+    distance: {
     fontSize: 14,
     color: "#666",
+  },
+
+  directionsButton: {
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#1E88E5",
+    alignItems: "center",
+  },
+
+  directionsButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
   },
 
   bedSection: {

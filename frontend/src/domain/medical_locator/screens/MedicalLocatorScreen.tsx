@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  Linking,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -42,6 +44,15 @@ export default function MedicalLocatorScreen() {
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] =
     useState<Location.LocationObject | null>(null);
+
+  const [selectedPharmacy, setSelectedPharmacy] = useState<{
+    name: string;
+    address: string;
+    phone: string;
+    distance: number | null;
+    latitude: number | null;
+    longitude: number | null;
+  } | null>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -128,6 +139,33 @@ export default function MedicalLocatorScreen() {
     }
   }
 
+    async function openPharmacyDirections() {
+    if (
+      !selectedPharmacy ||
+      selectedPharmacy.latitude == null ||
+      selectedPharmacy.longitude == null
+    ) {
+      return;
+    }
+
+    const { latitude, longitude, name } = selectedPharmacy;
+    const kakaoMapUrl = `kakaomap://look?p=${latitude},${longitude}`;
+    const kakaoWebUrl = `https://map.kakao.com/link/to/${encodeURIComponent(
+      name
+    )},${latitude},${longitude}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(kakaoMapUrl);
+      if (canOpen) {
+        await Linking.openURL(kakaoMapUrl);
+      } else {
+        await Linking.openURL(kakaoWebUrl);
+      }
+    } catch (e) {
+      console.error("길찾기 열기 실패:", e);
+    }
+  }
+
   async function loadBeds(
     latitude: number,
     longitude: number,
@@ -207,7 +245,7 @@ export default function MedicalLocatorScreen() {
     : allMarkerItems;
 
   // 필터에 따라 목록에 표시할 데이터 구성 (공통 형태로 변환)
-  const listItems: {
+    const listItems: {
     id: string;
     name: string;
     address: string;
@@ -216,6 +254,8 @@ export default function MedicalLocatorScreen() {
     badge: string;
     category: string;
     ykiho: string | null;
+    latitude: number | null;
+    longitude: number | null;
     availableBeds: number | null;
     congestion: number | null;
   }[] = [
@@ -229,6 +269,8 @@ export default function MedicalLocatorScreen() {
           badge: `${b.availableBeds ?? "-"}병상`,
           category: "응급실",
           ykiho: null,
+          latitude: b.latitude,
+          longitude: b.longitude,
           availableBeds: b.availableBeds,
           congestion: b.congestion,
         }))
@@ -243,6 +285,8 @@ export default function MedicalLocatorScreen() {
           badge: "병원",
           category: "병원",
           ykiho: h.ykiho,
+          latitude: h.latitude,
+          longitude: h.longitude,
           availableBeds: null,
           congestion: null,
         }))
@@ -257,6 +301,8 @@ export default function MedicalLocatorScreen() {
           badge: "약국",
           category: "약국",
           ykiho: p.ykiho,
+          latitude: p.latitude,
+          longitude: p.longitude,
           availableBeds: null,
           congestion: null,
         }))
@@ -376,14 +422,29 @@ export default function MedicalLocatorScreen() {
                     <TouchableOpacity
             style={styles.card}
             activeOpacity={item.ykiho ? 0.7 : 1}
-            onPress={() => {
+                        onPress={() => {
               if (!item.ykiho) return; // 응급실(hpid만 있는 항목)은 상세 화면 미지원
+
+              if (item.category === "약국") {
+                setSelectedPharmacy({
+                  name: item.name,
+                  address: item.address,
+                  phone: item.phone,
+                  distance: item.distance,
+                  latitude: item.latitude,
+                  longitude: item.longitude,
+                });
+                return;
+              }
+
               navigation.navigate("HospitalDetail", {
                 ykiho: item.ykiho,
                 name: item.name,
                 address: item.address,
                 phone: item.phone,
                 distance: item.distance,
+                latitude: item.latitude,
+                longitude: item.longitude,
                 availableBeds: item.availableBeds,
                 congestion: item.congestion,
               });
@@ -415,7 +476,7 @@ export default function MedicalLocatorScreen() {
             주변 의료기관 정보가 없습니다.
           </Text>
         }
-        ListFooterComponent={
+                ListFooterComponent={
           hasMore ? (
             <Text
               style={styles.moreButton}
@@ -426,10 +487,53 @@ export default function MedicalLocatorScreen() {
           ) : null
         }
       />
+
+      {/* 약국 바텀시트 */}
+      <Modal
+        visible={selectedPharmacy != null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedPharmacy(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setSelectedPharmacy(null)}
+        >
+          <TouchableOpacity
+            style={styles.sheet}
+            activeOpacity={1}
+            onPress={() => {}}
+          >
+            <View style={styles.sheetHandle} />
+
+            {selectedPharmacy && (
+              <>
+                <Text style={styles.sheetTitle}>{selectedPharmacy.name}</Text>
+                <Text style={styles.sheetAddress}>
+                  {selectedPharmacy.address}
+                </Text>
+                <Text style={styles.sheetPhone}>{selectedPharmacy.phone}</Text>
+                {selectedPharmacy.distance != null && (
+                  <Text style={styles.sheetDistance}>
+                    {selectedPharmacy.distance}km
+                  </Text>
+                )}
+
+                <TouchableOpacity
+                  style={styles.directionsButton}
+                  onPress={openPharmacyDirections}
+                >
+                  <Text style={styles.directionsButtonText}>길찾기</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -558,7 +662,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  moreButton: {
+    moreButton: {
     textAlign: "center",
     paddingVertical: 14,
     marginHorizontal: 20,
@@ -567,5 +671,65 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0f0f0",
     color: "#1E88E5",
     fontWeight: "700",
+  },
+
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.4)",
+  },
+
+  sheet: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 32,
+  },
+
+  sheetHandle: {
+    alignSelf: "center",
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#ddd",
+    marginBottom: 16,
+  },
+
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+
+  sheetAddress: {
+    fontSize: 15,
+    color: "#333",
+    marginBottom: 4,
+  },
+
+  sheetPhone: {
+    fontSize: 15,
+    color: "#43A047",
+    marginBottom: 4,
+  },
+
+  sheetDistance: {
+    fontSize: 14,
+    color: "#666",
+  },
+
+  directionsButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: "#43A047",
+    alignItems: "center",
+  },
+
+  directionsButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
   },
 });
