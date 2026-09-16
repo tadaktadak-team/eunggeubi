@@ -18,6 +18,8 @@ import { HospitalDetail } from "../types/hospitalDetail";
 type HospitalDetailRouteProp = RouteProp<RootStackParamList, "HospitalDetail">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
+type TabType = "info" | "checklist";
+
 const DAY_LABELS: { key: keyof HospitalDetail; label: string; endKey: keyof HospitalDetail }[] = [
   { key: "mondayStart", endKey: "mondayEnd", label: "월요일" },
   { key: "tuesdayStart", endKey: "tuesdayEnd", label: "화요일" },
@@ -25,6 +27,13 @@ const DAY_LABELS: { key: keyof HospitalDetail; label: string; endKey: keyof Hosp
   { key: "thursdayStart", endKey: "thursdayEnd", label: "목요일" },
   { key: "fridayStart", endKey: "fridayEnd", label: "금요일" },
   { key: "saturdayStart", endKey: "saturdayEnd", label: "토요일" },
+];
+
+const CHECKLIST_ITEMS = [
+  { id: "id_card", label: "신분증" },
+  { id: "insurance", label: "건강보험증 / 진료의뢰서" },
+  { id: "medication", label: "복용 중인 약 목록" },
+  { id: "symptom_memo", label: "증상 메모 또는 사진" },
 ];
 
 function formatTime(value: string | null | undefined) {
@@ -35,7 +44,7 @@ function formatTime(value: string | null | undefined) {
 export default function HospitalDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
   const route = useRoute<HospitalDetailRouteProp>();
-    const {
+  const {
     ykiho,
     name,
     address,
@@ -47,15 +56,19 @@ export default function HospitalDetailScreen() {
     congestion,
   } = route.params;
 
+  const [activeTab, setActiveTab] = useState<TabType>("info");
   const [detail, setDetail] = useState<HospitalDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(
+    {}
+  );
 
   useEffect(() => {
     loadDetail();
   }, [ykiho]);
 
-    async function openDirections() {
+  async function openDirections() {
     if (latitude == null || longitude == null) {
       return;
     }
@@ -93,6 +106,10 @@ export default function HospitalDetailScreen() {
     }
   }
 
+  function toggleChecklistItem(id: string) {
+    setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -102,98 +119,166 @@ export default function HospitalDetailScreen() {
         <Text style={styles.title}>{name}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-                {/* 기본 정보 (목록에서 넘겨받은 값, 항상 표시) */}
-        <View style={styles.section}>
-          <Text style={styles.address}>{address}</Text>
-          <Text style={styles.phone}>{phone}</Text>
-          {distance != null && (
-            <Text style={styles.distance}>{distance}km</Text>
-          )}
+      {/* 탭 */}
+      <View style={styles.tabRow}>
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => setActiveTab("info")}
+        >
+          <Text
+            style={[
+              styles.tabLabel,
+              activeTab === "info" && styles.tabLabelActive,
+            ]}
+          >
+            기본정보
+          </Text>
+          {activeTab === "info" && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
 
-          {latitude != null && longitude != null && (
-            <TouchableOpacity
-              style={styles.directionsButton}
-              onPress={openDirections}
-            >
-              <Text style={styles.directionsButtonText}>길찾기</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <TouchableOpacity
+          style={styles.tabButton}
+          onPress={() => setActiveTab("checklist")}
+        >
+          <Text
+            style={[
+              styles.tabLabel,
+              activeTab === "checklist" && styles.tabLabelActive,
+            ]}
+          >
+            방문준비
+          </Text>
+          {activeTab === "checklist" && <View style={styles.tabIndicator} />}
+        </TouchableOpacity>
+      </View>
 
-        {/* 응급실 잔여 병상 (A안: 응급실 카테고리에서 들어온 경우에만 존재) */}
-        {availableBeds != null && (
-          <View style={styles.bedSection}>
-            <Text style={styles.bedTitle}>응급실 잔여 병상</Text>
-            <Text style={styles.bedCount}>{availableBeds}병상</Text>
-            {congestion != null && (
-              <Text style={styles.congestion}>혼잡도 {congestion}%</Text>
+      {activeTab === "info" ? (
+        <ScrollView contentContainerStyle={styles.content}>
+          {/* 기본 정보 (목록에서 넘겨받은 값, 항상 표시) */}
+          <View style={styles.section}>
+            <Text style={styles.address}>{address}</Text>
+            <Text style={styles.phone}>{phone}</Text>
+            {distance != null && (
+              <Text style={styles.distance}>{distance}km</Text>
+            )}
+
+            {latitude != null && longitude != null && (
+              <TouchableOpacity
+                style={styles.directionsButton}
+                onPress={openDirections}
+              >
+                <Text style={styles.directionsButtonText}>길찾기</Text>
+              </TouchableOpacity>
             )}
           </View>
-        )}
 
-        {/* 진료시간/진료과목 (상세 API) */}
-        {loading && (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" />
-            <Text style={styles.message}>상세정보를 불러오고 있어요...</Text>
-          </View>
-        )}
-
-        {error && (
-          <View style={styles.center}>
-            <Text style={styles.error}>{error}</Text>
-          </View>
-        )}
-
-        {detail && (
-          <>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>진료시간</Text>
-              {DAY_LABELS.map(({ key, endKey, label }) => {
-                const start = formatTime(detail[key] as string | null);
-                const end = formatTime(detail[endKey] as string | null);
-                return (
-                  <View key={label} style={styles.timeRow}>
-                    <Text style={styles.dayLabel}>{label}</Text>
-                    <Text style={styles.timeValue}>
-                      {start && end ? `${start} - ${end}` : "정보 없음"}
-                    </Text>
-                  </View>
-                );
-              })}
-              {detail.lunchTime && (
-                <Text style={styles.lunchTime}>점심시간 {detail.lunchTime}</Text>
-              )}
-              {detail.closedOnSunday && (
-                <Text style={styles.closedInfo}>
-                  일요일: {detail.closedOnSunday}
-                </Text>
-              )}
-              {detail.closedOnHoliday && (
-                <Text style={styles.closedInfo}>
-                  공휴일: {detail.closedOnHoliday}
-                </Text>
+          {/* 응급실 잔여 병상 (A안: 응급실 카테고리에서 들어온 경우에만 존재) */}
+          {availableBeds != null && (
+            <View style={styles.bedSection}>
+              <Text style={styles.bedTitle}>응급실 잔여 병상</Text>
+              <Text style={styles.bedCount}>{availableBeds}병상</Text>
+              {congestion != null && (
+                <Text style={styles.congestion}>혼잡도 {congestion}%</Text>
               )}
             </View>
+          )}
 
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>진료과목</Text>
-              {detail.departments.length === 0 ? (
-                <Text style={styles.message}>등록된 진료과목이 없습니다.</Text>
-              ) : (
-                <View style={styles.departmentWrap}>
-                  {detail.departments.map((dept) => (
-                    <View key={dept.name} style={styles.departmentChip}>
-                      <Text style={styles.departmentText}>{dept.name}</Text>
+          {/* 진료시간/진료과목 (상세 API) */}
+          {loading && (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" />
+              <Text style={styles.message}>상세정보를 불러오고 있어요...</Text>
+            </View>
+          )}
+
+          {error && (
+            <View style={styles.center}>
+              <Text style={styles.error}>{error}</Text>
+            </View>
+          )}
+
+          {detail && (
+            <>
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>진료시간</Text>
+                {DAY_LABELS.map(({ key, endKey, label }) => {
+                  const start = formatTime(detail[key] as string | null);
+                  const end = formatTime(detail[endKey] as string | null);
+                  return (
+                    <View key={label} style={styles.timeRow}>
+                      <Text style={styles.dayLabel}>{label}</Text>
+                      <Text style={styles.timeValue}>
+                        {start && end ? `${start} - ${end}` : "정보 없음"}
+                      </Text>
                     </View>
-                  ))}
-                </View>
-              )}
-            </View>
-          </>
-        )}
-      </ScrollView>
+                  );
+                })}
+                {detail.lunchTime && (
+                  <Text style={styles.lunchTime}>
+                    점심시간 {detail.lunchTime}
+                  </Text>
+                )}
+                {detail.closedOnSunday && (
+                  <Text style={styles.closedInfo}>
+                    일요일: {detail.closedOnSunday}
+                  </Text>
+                )}
+                {detail.closedOnHoliday && (
+                  <Text style={styles.closedInfo}>
+                    공휴일: {detail.closedOnHoliday}
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>진료과목</Text>
+                {detail.departments.length === 0 ? (
+                  <Text style={styles.message}>
+                    등록된 진료과목이 없습니다.
+                  </Text>
+                ) : (
+                  <View style={styles.departmentWrap}>
+                    {detail.departments.map((dept) => (
+                      <View key={dept.name} style={styles.departmentChip}>
+                        <Text style={styles.departmentText}>
+                          {dept.name}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </>
+          )}
+        </ScrollView>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>준비물 체크리스트</Text>
+
+            {CHECKLIST_ITEMS.map((item) => {
+              const checked = !!checkedItems[item.id];
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.checklistRow}
+                  onPress={() => toggleChecklistItem(item.id)}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      checked && styles.checkboxChecked,
+                    ]}
+                  >
+                    {checked && <Text style={styles.checkboxMark}>✓</Text>}
+                  </View>
+                  <Text style={styles.checklistLabel}>{item.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -221,6 +306,35 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     flex: 1,
+  },
+
+  tabRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+
+  tabButton: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+
+  tabLabel: {
+    fontSize: 15,
+    color: "#999",
+    fontWeight: "600",
+  },
+
+  tabLabelActive: {
+    color: "#1E88E5",
+  },
+
+  tabIndicator: {
+    marginTop: 8,
+    height: 2,
+    width: "60%",
+    backgroundColor: "#1E88E5",
   },
 
   content: {
@@ -251,7 +365,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-    distance: {
+  distance: {
     fontSize: 14,
     color: "#666",
   },
@@ -354,5 +468,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#1E88E5",
     fontWeight: "600",
+  },
+
+  checklistRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#ccc",
+    marginRight: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  checkboxChecked: {
+    backgroundColor: "#1E88E5",
+    borderColor: "#1E88E5",
+  },
+
+  checkboxMark: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+  checklistLabel: {
+    fontSize: 15,
   },
 });
