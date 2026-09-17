@@ -1,7 +1,8 @@
 {
   "expo": {
     "name": "frontend",
-    "slug": "frontend",
+    "slug": "eunggeubi",
+    "owner": "tadaktadak-team",
     "scheme": "eunggeubi",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -27,6 +28,17 @@
       "expo-secure-store",
       "expo-font",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "ecec4280-c6d7-456a-aa24-e867ea19915a"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ecec4280-c6d7-456a-aa24-e867ea19915a"
+    }
   }
 }

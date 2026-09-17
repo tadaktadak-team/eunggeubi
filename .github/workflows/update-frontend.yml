@@ -1,0 +1,35 @@
+name: Publish frontend update
+
+on:
+  push:
+    branches: [develop]
+    paths:                      # 프론트나 이 파일이 바뀔 때만 실행
+      - 'frontend/**'
+      - '.github/workflows/update-frontend.yml'
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Publish update to EAS
+        working-directory: frontend
+        # --auto: git 브랜치(develop)를 EAS 브랜치로, 커밋 메시지를 업데이트 메시지로 사용
+        run: eas update --auto --environment preview --non-interactive
