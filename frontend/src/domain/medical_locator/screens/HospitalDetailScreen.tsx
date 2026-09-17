@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../../../navigation/types";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getHospitalDetail } from "../api/hospitalDetail";
 import { HospitalDetail } from "../types/hospitalDetail";
 
@@ -64,9 +65,23 @@ export default function HospitalDetailScreen() {
     {}
   );
 
-  useEffect(() => {
+    useEffect(() => {
     loadDetail();
+    loadChecklist();
   }, [ykiho]);
+
+  async function loadChecklist() {
+    try {
+      const saved = await AsyncStorage.getItem(`checklist_${ykiho}`);
+      if (saved) {
+        setCheckedItems(JSON.parse(saved));
+      } else {
+        setCheckedItems({});
+      }
+    } catch (e) {
+      console.error("체크리스트 불러오기 실패:", e);
+    }
+  }
 
   async function openDirections() {
     if (latitude == null || longitude == null) {
@@ -106,8 +121,14 @@ export default function HospitalDetailScreen() {
     }
   }
 
-  function toggleChecklistItem(id: string) {
-    setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
+    function toggleChecklistItem(id: string) {
+    setCheckedItems((prev) => {
+      const updated = { ...prev, [id]: !prev[id] };
+      AsyncStorage.setItem(`checklist_${ykiho}`, JSON.stringify(updated)).catch(
+        (e) => console.error("체크리스트 저장 실패:", e)
+      );
+      return updated;
+    });
   }
 
   return (

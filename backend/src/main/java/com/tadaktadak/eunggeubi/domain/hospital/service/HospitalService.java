@@ -187,9 +187,10 @@ public class HospitalService {
         }
     }
 
-    private static final int NEARBY_RADIUS_METERS = 3000;
+    private static final int[] NEARBY_RADIUS_STEPS_METERS = {1500, 3000, 5000, 10000};
     private static final int NEARBY_MAX_ROWS = 100;
     private static final int NEARBY_RESULT_LIMIT = 20;
+    private static final int NEARBY_MIN_RESULT_COUNT = 5;
 
     private List<MedicalFacilityResponse> findNearby(
             String apiUrl,
@@ -198,38 +199,50 @@ public class HospitalService {
             double longitude,
             String type
     ) {
-        try {
-            URI uri = UriComponentsBuilder
-                    .fromHttpUrl(apiUrl)
-                    .queryParam("ServiceKey", serviceKey)
-                    .queryParam("pageNo", 1)
-                    .queryParam("numOfRows", NEARBY_MAX_ROWS)
-                    .queryParam("xPos", longitude)
-                    .queryParam("yPos", latitude)
-                    .queryParam("radius", NEARBY_RADIUS_METERS)
-                    .build(true)
-                    .toUri();
+        for (int i = 0; i < NEARBY_RADIUS_STEPS_METERS.length; i++) {
+            int radius = NEARBY_RADIUS_STEPS_METERS[i];
+            boolean isLastStep = (i == NEARBY_RADIUS_STEPS_METERS.length - 1);
 
-            byte[] responseBytes = restTemplate.getForObject(uri, byte[].class);
+            try {
+                URI uri = UriComponentsBuilder
+                        .fromHttpUrl(apiUrl)
+                        .queryParam("ServiceKey", serviceKey)
+                        .queryParam("pageNo", 1)
+                        .queryParam("numOfRows", NEARBY_MAX_ROWS)
+                        .queryParam("xPos", longitude)
+                        .queryParam("yPos", latitude)
+                        .queryParam("radius", radius)
+                        .build(true)
+                        .toUri();
 
-            String response =
-                    new String(responseBytes, StandardCharsets.UTF_8);
+                byte[] responseBytes = restTemplate.getForObject(uri, byte[].class);
 
-            List<MedicalFacilityResponse> result = parseResponse(response);
-            result.sort(Comparator.comparingDouble(
-                    item -> item.getDistance() == null ? Double.MAX_VALUE : item.getDistance()
-            ));
+                String response =
+                        new String(responseBytes, StandardCharsets.UTF_8);
 
-            if (result.size() > NEARBY_RESULT_LIMIT) {
-                result = result.subList(0, NEARBY_RESULT_LIMIT);
+                List<MedicalFacilityResponse> result = parseResponse(response);
+                result.sort(Comparator.comparingDouble(
+                        item -> item.getDistance() == null ? Double.MAX_VALUE : item.getDistance()
+                ));
+
+                // 결과가 충분하거나, 더 넓힐 반경이 없으면 이 결과를 반환
+                if (result.size() >= NEARBY_MIN_RESULT_COUNT || isLastStep) {
+                    if (result.size() > NEARBY_RESULT_LIMIT) {
+                        result = result.subList(0, NEARBY_RESULT_LIMIT);
+                    }
+                    return result;
+                }
+
+                log.info("{} 검색 결과 {}건 (반경 {}m) - 결과 부족으로 반경 확장",
+                        type, result.size(), radius);
+
+            } catch (Exception e) {
+                log.error("{} API 호출 실패 (반경={}m)", type, radius, e);
+                throw new ExternalApiException(type + " 정보를 불러오지 못했습니다.", e);
             }
-
-            return result;
-
-        } catch (Exception e) {
-            log.error("{} API 호출 실패", type, e);
-            throw new ExternalApiException(type + " 정보를 불러오지 못했습니다.", e);
         }
+
+        return new ArrayList<>();
     }
 
     private List<MedicalFacilityResponse> parseResponse(String response)
