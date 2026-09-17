@@ -97,7 +97,22 @@ export default function SignupScreen() {
       }
       navigation.navigate('SignupComplete', { email: email.trim() });
     } catch (e: any) {
-      Alert.alert('회원가입 실패', e?.message ?? '다시 시도해주세요.');
+      const msg = e?.message ?? '다시 시도해주세요.';
+
+      // 이미 가입된 이메일이면 → 로그인 / 비밀번호 찾기로 유도
+      if (msg.includes('이미 가입')) {
+        Alert.alert('이미 가입된 이메일', '이 이메일로 가입된 계정이 있어요.', [
+          { text: '로그인하기', onPress: () => navigation.navigate('Login') },
+          {
+            text: '비밀번호 찾기',
+            onPress: () => navigation.navigate('FindAccount', { tab: 'FIND_PW' }),
+          },
+          { text: '취소', style: 'cancel' },
+        ]);
+        return;
+      }
+
+      Alert.alert('회원가입 실패', msg);
     } finally {
       setSubmitting(false);
     }
