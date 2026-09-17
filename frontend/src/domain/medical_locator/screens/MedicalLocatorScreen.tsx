@@ -45,13 +45,24 @@ export default function MedicalLocatorScreen() {
   const [location, setLocation] =
     useState<Location.LocationObject | null>(null);
 
-  const [selectedPharmacy, setSelectedPharmacy] = useState<{
+    const [selectedPharmacy, setSelectedPharmacy] = useState<{
     name: string;
     address: string;
     phone: string;
     distance: number | null;
     latitude: number | null;
     longitude: number | null;
+  } | null>(null);
+
+  const [selectedEmergencyBed, setSelectedEmergencyBed] = useState<{
+    name: string;
+    address: string;
+    phone: string;
+    distance: number | null;
+    latitude: number | null;
+    longitude: number | null;
+    availableBeds: number | null;
+    congestion: number | null;
   } | null>(null);
 
   useEffect(() => {
@@ -139,7 +150,7 @@ export default function MedicalLocatorScreen() {
     }
   }
 
-    async function openPharmacyDirections() {
+      async function openPharmacyDirections() {
     if (
       !selectedPharmacy ||
       selectedPharmacy.latitude == null ||
@@ -149,6 +160,33 @@ export default function MedicalLocatorScreen() {
     }
 
     const { latitude, longitude, name } = selectedPharmacy;
+    const kakaoMapUrl = `kakaomap://look?p=${latitude},${longitude}`;
+    const kakaoWebUrl = `https://map.kakao.com/link/to/${encodeURIComponent(
+      name
+    )},${latitude},${longitude}`;
+
+    try {
+      const canOpen = await Linking.canOpenURL(kakaoMapUrl);
+      if (canOpen) {
+        await Linking.openURL(kakaoMapUrl);
+      } else {
+        await Linking.openURL(kakaoWebUrl);
+      }
+    } catch (e) {
+      console.error("길찾기 열기 실패:", e);
+    }
+  }
+
+  async function openEmergencyBedDirections() {
+    if (
+      !selectedEmergencyBed ||
+      selectedEmergencyBed.latitude == null ||
+      selectedEmergencyBed.longitude == null
+    ) {
+      return;
+    }
+
+    const { latitude, longitude, name } = selectedEmergencyBed;
     const kakaoMapUrl = `kakaomap://look?p=${latitude},${longitude}`;
     const kakaoWebUrl = `https://map.kakao.com/link/to/${encodeURIComponent(
       name
@@ -421,9 +459,23 @@ export default function MedicalLocatorScreen() {
         renderItem={({ item }) => (
                     <TouchableOpacity
             style={styles.card}
-            activeOpacity={item.ykiho ? 0.7 : 1}
-                        onPress={() => {
-              if (!item.ykiho) return; // 응급실(hpid만 있는 항목)은 상세 화면 미지원
+                        activeOpacity={0.7}
+                                    onPress={() => {
+              if (item.category === "응급실") {
+                setSelectedEmergencyBed({
+                  name: item.name,
+                  address: item.address,
+                  phone: item.phone,
+                  distance: item.distance,
+                  latitude: item.latitude,
+                  longitude: item.longitude,
+                  availableBeds: item.availableBeds,
+                  congestion: item.congestion,
+                });
+                return;
+              }
+
+              if (!item.ykiho) return;
 
               if (item.category === "약국") {
                 setSelectedPharmacy({
@@ -488,7 +540,7 @@ export default function MedicalLocatorScreen() {
         }
       />
 
-      {/* 약국 바텀시트 */}
+            {/* 약국 바텀시트 */}
       <Modal
         visible={selectedPharmacy != null}
         transparent
@@ -523,6 +575,71 @@ export default function MedicalLocatorScreen() {
                 <TouchableOpacity
                   style={styles.directionsButton}
                   onPress={openPharmacyDirections}
+                >
+                  <Text style={styles.directionsButtonText}>길찾기</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* 응급실 바텀시트 */}
+      <Modal
+        visible={selectedEmergencyBed != null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedEmergencyBed(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setSelectedEmergencyBed(null)}
+        >
+          <TouchableOpacity
+            style={styles.sheet}
+            activeOpacity={1}
+            onPress={() => {}}
+          >
+            <View style={styles.sheetHandle} />
+
+            {selectedEmergencyBed && (
+              <>
+                <Text style={styles.sheetTitle}>
+                  {selectedEmergencyBed.name}
+                </Text>
+                <Text style={styles.sheetAddress}>
+                  {selectedEmergencyBed.address}
+                </Text>
+                <Text style={styles.sheetPhone}>
+                  {selectedEmergencyBed.phone}
+                </Text>
+                {selectedEmergencyBed.distance != null && (
+                  <Text style={styles.sheetDistance}>
+                    {selectedEmergencyBed.distance}km
+                  </Text>
+                )}
+
+                {selectedEmergencyBed.availableBeds != null && (
+                  <View style={styles.bedInfoBox}>
+                    <Text style={styles.bedInfoTitle}>응급실 잔여 병상</Text>
+                    <Text style={styles.bedInfoCount}>
+                      {selectedEmergencyBed.availableBeds}병상
+                    </Text>
+                    {selectedEmergencyBed.congestion != null && (
+                      <Text style={styles.bedInfoCongestion}>
+                        혼잡도 {selectedEmergencyBed.congestion}%
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.directionsButton,
+                    { backgroundColor: FILTER_COLORS.emergency },
+                  ]}
+                  onPress={openEmergencyBedDirections}
                 >
                   <Text style={styles.directionsButtonText}>길찾기</Text>
                 </TouchableOpacity>
@@ -727,9 +844,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  directionsButtonText: {
+    directionsButtonText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 15,
+  },
+
+  bedInfoBox: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#FFEBEE",
+  },
+
+  bedInfoTitle: {
+    fontSize: 13,
+    color: "#E53935",
+    fontWeight: "600",
+  },
+
+  bedInfoCount: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#E53935",
+    marginTop: 4,
+  },
+
+  bedInfoCongestion: {
+    fontSize: 12,
+    color: "#E53935",
+    marginTop: 4,
   },
 });
