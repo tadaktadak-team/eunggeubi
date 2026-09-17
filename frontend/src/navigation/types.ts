@@ -12,10 +12,22 @@ export type RootStackParamList = {
   GuardianConsent: { userId: number; email: string };
   GuardianWaiting: { userId: number; email: string; maskedPhone: string };
 
-  EmergencyResult: {
+    EmergencyResult: {
     address: string;
     sentAt: string;
     message: string;
     guardians: GuardianResult[];
+  };
+
+   HospitalDetail: {
+    ykiho: string;
+    name: string;
+    address: string;
+    phone: string;
+    distance: number | null;
+    latitude: number | null;
+    longitude: number | null;
+    availableBeds?: number | null;
+    congestion?: number | null;
   };
 };

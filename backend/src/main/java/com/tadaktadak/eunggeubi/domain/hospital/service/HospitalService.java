@@ -3,6 +3,7 @@ package com.tadaktadak.eunggeubi.domain.hospital.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.tadaktadak.eunggeubi.domain.hospital.dto.MedicalFacilityResponse;
+import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,14 +27,12 @@ public class HospitalService {
     private final RestTemplate restTemplate;
     private final XmlMapper xmlMapper = new XmlMapper();
 
-    // URL은 병원/약국 각각 사용
     @Value("${medical_locator.hospital.url}")
     private String apiUrl;
 
     @Value("${medical_locator.pharmacy.url}")
     private String pharmacyApiUrl;
 
-    // 서비스키는 하나만 사용
     @Value("${medical_locator.secret}")
     private String serviceKey;
 
@@ -68,6 +67,7 @@ public class HospitalService {
                 "약국"
         );
     }
+
     /**
      * 병원 상세정보(진료시간, 진료과목) 조회
      */
@@ -110,7 +110,7 @@ public class HospitalService {
 
         } catch (Exception e) {
             log.error("병원 상세정보 조회 실패 (ykiho={})", ykiho, e);
-            throw new RuntimeException("병원 상세정보를 불러오지 못했습니다.");
+            throw new ExternalApiException("병원 상세정보를 불러오지 못했습니다.", e);
         }
     }
 
@@ -167,7 +167,6 @@ public class HospitalService {
             );
         }
 
-        // 전문의 수 기준 내림차순 정렬 (많은 과목이 위로)
         result.sort(Comparator.comparing(
                 HospitalDetailResponse.DepartmentInfo::getDoctorCount,
                 Comparator.nullsLast(Comparator.reverseOrder())
@@ -188,6 +187,11 @@ public class HospitalService {
         }
     }
 
+    private static final int[] NEARBY_RADIUS_STEPS_METERS = {1500, 3000, 5000, 10000};
+    private static final int NEARBY_MAX_ROWS = 100;
+    private static final int NEARBY_RESULT_LIMIT = 20;
+    private static final int NEARBY_MIN_RESULT_COUNT = 5;
+
     private List<MedicalFacilityResponse> findNearby(
             String apiUrl,
             String serviceKey,
@@ -195,29 +199,50 @@ public class HospitalService {
             double longitude,
             String type
     ) {
-        try {
-            URI uri = UriComponentsBuilder
-                    .fromHttpUrl(apiUrl)
-                    .queryParam("ServiceKey", serviceKey)
-                    .queryParam("pageNo", 1)
-                    .queryParam("numOfRows", 20)
-                    .queryParam("xPos", longitude)
-                    .queryParam("yPos", latitude)
-                    .queryParam("radius", 5000)
-                    .build(true)
-                    .toUri();
+        for (int i = 0; i < NEARBY_RADIUS_STEPS_METERS.length; i++) {
+            int radius = NEARBY_RADIUS_STEPS_METERS[i];
+            boolean isLastStep = (i == NEARBY_RADIUS_STEPS_METERS.length - 1);
 
-            byte[] responseBytes = restTemplate.getForObject(uri, byte[].class);
+            try {
+                URI uri = UriComponentsBuilder
+                        .fromHttpUrl(apiUrl)
+                        .queryParam("ServiceKey", serviceKey)
+                        .queryParam("pageNo", 1)
+                        .queryParam("numOfRows", NEARBY_MAX_ROWS)
+                        .queryParam("xPos", longitude)
+                        .queryParam("yPos", latitude)
+                        .queryParam("radius", radius)
+                        .build(true)
+                        .toUri();
 
-            String response =
-                    new String(responseBytes, StandardCharsets.UTF_8);
+                byte[] responseBytes = restTemplate.getForObject(uri, byte[].class);
 
-            return parseResponse(response);
+                String response =
+                        new String(responseBytes, StandardCharsets.UTF_8);
 
-        } catch (Exception e) {
-            log.error("{} API 호출 실패", type, e);
-            throw new RuntimeException(type + " 정보를 불러오지 못했습니다.");
+                List<MedicalFacilityResponse> result = parseResponse(response);
+                result.sort(Comparator.comparingDouble(
+                        item -> item.getDistance() == null ? Double.MAX_VALUE : item.getDistance()
+                ));
+
+                // 결과가 충분하거나, 더 넓힐 반경이 없으면 이 결과를 반환
+                if (result.size() >= NEARBY_MIN_RESULT_COUNT || isLastStep) {
+                    if (result.size() > NEARBY_RESULT_LIMIT) {
+                        result = result.subList(0, NEARBY_RESULT_LIMIT);
+                    }
+                    return result;
+                }
+
+                log.info("{} 검색 결과 {}건 (반경 {}m) - 결과 부족으로 반경 확장",
+                        type, result.size(), radius);
+
+            } catch (Exception e) {
+                log.error("{} API 호출 실패 (반경={}m)", type, radius, e);
+                throw new ExternalApiException(type + " 정보를 불러오지 못했습니다.", e);
+            }
         }
+
+        return new ArrayList<>();
     }
 
     private List<MedicalFacilityResponse> parseResponse(String response)
@@ -250,7 +275,7 @@ public class HospitalService {
                             .latitude(doubleValue(item, "YPos"))
                             .longitude(doubleValue(item, "XPos"))
                             .type(text(item, "clCdNm"))
-                            .distance(doubleValue(item, "distance"))
+                            .distance(toKm(doubleValue(item, "distance")))
                             .build()
             );
         }
@@ -263,6 +288,13 @@ public class HospitalService {
         return value.isMissingNode() || value.isNull()
                 ? null
                 : value.asText();
+    }
+
+    private Double toKm(Double meters) {
+        if (meters == null) {
+            return null;
+        }
+        return Math.round(meters / 1000 * 10) / 10.0;
     }
 
     private Double doubleValue(JsonNode node, String field) {
