@@ -1,0 +1,57 @@
+name: Deploy backend
+
+on:
+  push:
+    branches: [develop]
+    paths:                      # 백엔드나 이 파일이 바뀔 때만 실행 (프론트만 바뀌면 안 돎)
+      - 'backend/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:            # Actions 탭 수동 실행 버튼 (파일이 main 에 있어야 보임)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4   # 의존성 캐시 → 빌드 시간 단축
+
+      - name: Build jar
+        working-directory: backend
+        run: chmod +x ./gradlew && ./gradlew clean bootJar -x test
+
+      - name: Upload jar to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: backend/build/libs/eunggeubi-0.0.1-SNAPSHOT.jar
+          target: /home/ubuntu/eunggeubi/
+          strip_components: 3                  # 폴더 경로 떼고 파일만 올림
+
+      - name: Restart service and health check
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/ubuntu/eunggeubi
+            mv eunggeubi-0.0.1-SNAPSHOT.jar app.jar   # 돌고 있는 jar 를 직접 덮지 않고 교체
+            sudo systemctl restart eunggeubi
+            for i in $(seq 1 24); do
+              sleep 5
+              if curl -sf http://localhost:8080/health > /dev/null; then
+                echo "deploy OK"; exit 0
+              fi
+            done
+            echo "health check failed"
+            sudo journalctl -u eunggeubi -n 50 --no-pager
+            exit 1
