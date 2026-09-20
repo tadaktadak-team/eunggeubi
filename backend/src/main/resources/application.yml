@@ -28,8 +28,11 @@ spring:
           dimensions: 1536
     vectorstore:
       qdrant:
-        host: localhost
-        port: 6334
+        # 기본값은 로컬 Qdrant. 운영은 서버 환경변수로 Qdrant Cloud 를 가리킨다.
+        host: ${QDRANT_HOST:localhost}
+        port: ${QDRANT_PORT:6334}
+        api-key: ${QDRANT_API_KEY:}
+        use-tls: ${QDRANT_USE_TLS:false}
         collection-name: health_info
         # true면 부팅 때 Qdrant에 접속해서, 없으면 앱이 안 뜬다. 컬렉션 생성은 인덱싱 배치가 직접 한다.
         initialize-schema: false
@@ -50,6 +53,12 @@ openapi:
   pill-ident:
     url: https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03
     service-key: ${PILL_IDENT_SECRET:}
+
+# 컬렉션 초기화(QdrantCollectionResetService)가 쓰는 REST 주소. gRPC(6334)와 포트가 다르다.
+qdrant:
+  rest-base-url: ${QDRANT_REST_URL:http://localhost:6333}
+  api-key: ${QDRANT_API_KEY:}
+
 
 kdca:
   health-info:
