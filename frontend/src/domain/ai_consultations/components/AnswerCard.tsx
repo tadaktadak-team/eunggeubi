@@ -43,7 +43,7 @@ export default function AnswerCard({ message }: Props) {
             </View>
             {sources.map((source) => (
               <Text key={source.cntntsSn || `${source.disease}-${source.section}`} style={styles.sourceLine}>
-                {source.disease} · {source.section} ({source.sourceName})
+                {source.disease} · {source.section}
               </Text>
             ))}
           </View>

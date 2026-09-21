@@ -42,9 +42,20 @@ public class ChecklistService {
     private final ChecklistResponseRepository checklistResponseRepository;
     private final ChatClient chatClient;
 
-    @Transactional
+    // ponytail: 트랜잭션으로 안 감싼다 - 아래서 LLM을 최대 3회까지 재시도하는데, 그동안 DB 커넥션을
+    // 잡고 있으면 동시 요청 몇 개만으로 커넥션 풀이 고갈된다(체크리스트 저장은 Spring Data가
+    // save() 호출마다 개별 트랜잭션으로 처리하므로 그대로 안전).
     public ChecklistDto generate(Long consultationId, Long userId, String guestCode) {
         AiConsultation aiMessage = getOwnedAiMessage(consultationId, userId, guestCode);
+
+        // 이미 이 답변에 대해 만들어둔 체크리스트가 있으면 그걸 그대로 준다 - 없으면 /checklist를
+        // 부를 때마다 매번 새로 LLM을 호출해서 비용도 들고, 안 쓰는 체크리스트만 계속 쌓인다.
+        Checklist existing = checklistRepository.findTopByConsultationIdOrderByCreatedAtDesc(consultationId)
+                .orElse(null);
+        if (existing != null) {
+            return toDto(existing);
+        }
+
         String symptomText = resolveSymptomText(aiMessage);
 
         // 원본 증상 텍스트만 주면 매 요청이 사실상 동일한 입력이라 LLM이 항상 같은(뻔한) 문항을
@@ -75,6 +86,10 @@ public class ChecklistService {
                 .status(ChecklistStatus.PROPOSED)
                 .build());
 
+        return toDto(checklist);
+    }
+
+    private ChecklistDto toDto(Checklist checklist) {
         return new ChecklistDto(checklist.getId(), checklist.getTitle(), checklist.itemList(),
                 checklist.getStatus().name());
     }
@@ -85,6 +100,12 @@ public class ChecklistService {
 
         Checklist checklist = checklistRepository.findTopByConsultationIdOrderByCreatedAtDesc(consultationId)
                 .orElseThrow(() -> new IllegalArgumentException("생성된 체크리스트가 없습니다."));
+
+        // selectedItems는 프론트가 그대로 재생성 프롬프트와 이력 화면에 노출하므로, 실제 이 체크리스트에
+        // 없는 임의의 문자열이 섞여 들어오지 않도록 막는다.
+        if (!checklist.itemList().containsAll(request.selectedItems())) {
+            throw new IllegalArgumentException("체크리스트에 없는 항목이 포함되어 있습니다.");
+        }
 
         ChecklistResponse response = checklistResponseRepository.save(ChecklistResponse.builder()
                 .checklistId(checklist.getId())
@@ -118,11 +139,20 @@ public class ChecklistService {
 
     private List<String> generateItemsWithRetry(Long consultationId, String userPrompt) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            RawChecklist raw = chatClient.prompt()
-                    .system(AiConsultationPrompts.CHECKLIST_PROMPT)
-                    .user(userPrompt)
-                    .call()
-                    .entity(RawChecklist.class);
+            RawChecklist raw;
+            try {
+                raw = chatClient.prompt()
+                        .system(AiConsultationPrompts.CHECKLIST_PROMPT)
+                        .user(userPrompt)
+                        .call()
+                        .entity(RawChecklist.class);
+            } catch (Exception e) {
+                // 스키마를 벗어난 응답뿐 아니라 타임아웃/429 같은 호출 자체 실패도 재시도 대상이다 -
+                // 안 잡으면 일시적인 오류 한 번에 전체 요청이 500으로 끝난다.
+                log.warn("체크리스트 LLM 호출이 실패했습니다 (시도 {}/{}). consultationId={}",
+                        attempt, MAX_ATTEMPTS, consultationId, e);
+                continue;
+            }
 
             if (raw != null && raw.questions() != null && !raw.questions().isEmpty()) {
                 return raw.questions();

@@ -7,13 +7,16 @@ import {
   saveTokens,
 } from '../../../shared/storage/tokenStorage';
 import * as authApi from '../api/auth';
+import * as userApi from '../../user/api/user';
 
 interface AuthContextValue {
   isLoggedIn: boolean;
   userId: number | null;
   loading: boolean; // 앱 시작 시 자동 로그인 확인 중 여부
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithTokens: (res: { userId: number; accessToken: string; refreshToken: string }) => Promise<void>;
   signOut: () => Promise<void>;
+  withdraw: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -61,10 +64,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUserId(null);
     }
   };
+  const withdraw = async (password: string) => {
+    await userApi.withdraw(password);
+    await clearTokens();   // 기기 저장 토큰 삭제
+    setUserId(null);       // 로그아웃 상태로 전환
+  };
+
+  // 소셜 로그인: 이미 받은 토큰으로 바로 로그인 상태 전환
+  const signInWithTokens = async (res: {
+    userId: number;
+    accessToken: string;
+    refreshToken: string;
+  }) => {
+    await saveTokens(res.accessToken, res.refreshToken);
+    setUserId(res.userId);
+  };
+
 
   return (
     <AuthContext.Provider
-      value={{ isLoggedIn: userId !== null, userId, loading, signIn, signOut }}
+      value={{ isLoggedIn: userId !== null, userId, loading, signIn, signInWithTokens, signOut, withdraw }}
     >
       {children}
     </AuthContext.Provider>

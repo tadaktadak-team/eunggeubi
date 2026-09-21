@@ -9,9 +9,10 @@ type Props = {
   message: ChecklistChatMessage;
   onToggleItem: (itemId: string) => void;
   onSubmit: () => void;
+  onSubmitNone: () => void;
 };
 
-export default function ChecklistCard({ message, onToggleItem, onSubmit }: Props) {
+export default function ChecklistCard({ message, onToggleItem, onSubmit, onSubmitNone }: Props) {
   return (
     <View style={styles.row}>
       <AiAvatar />
@@ -33,13 +34,20 @@ export default function ChecklistCard({ message, onToggleItem, onSubmit }: Props
           </Pressable>
         ))}
 
-        <Pressable
-          style={[styles.submitBtn, message.answered && styles.submitBtnDisabled]}
-          onPress={onSubmit}
-          disabled={message.answered}
-        >
-          <Text style={styles.submitText}>{message.answered ? '답변 완료' : '답변하기'}</Text>
-        </Pressable>
+        {message.answered ? (
+          <Pressable style={[styles.submitBtn, styles.submitBtnDisabled]} disabled>
+            <Text style={styles.submitText}>답변 완료</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.buttonRow}>
+            <Pressable style={[styles.submitBtn, styles.noneBtn]} onPress={onSubmitNone}>
+              <Text style={styles.noneText}>해당사항 없음</Text>
+            </Pressable>
+            <Pressable style={[styles.submitBtn, styles.answerBtn]} onPress={onSubmit}>
+              <Text style={styles.submitText}>답변하기</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -68,7 +76,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
-  itemLabel: { fontSize: font.sub, color: colors.text },
+  itemLabel: { fontSize: font.sub, color: colors.text, flexShrink: 1 },
   submitBtn: {
     height: 44,
     borderRadius: radius.md,
@@ -79,4 +87,14 @@ const styles = StyleSheet.create({
   },
   submitBtnDisabled: { backgroundColor: colors.disabled },
   submitText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  buttonRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
+  answerBtn: { flex: 1, marginTop: 0 },
+  noneBtn: {
+    flex: 1,
+    marginTop: 0,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  noneText: { color: colors.textSub, fontSize: font.body, fontWeight: '700' },
 });

@@ -60,18 +60,25 @@ export function useSymptomChat(initialMessage?: string) {
     );
   }, []);
 
-  // 체크한 항목을 서버에 제출하고, 그 결과를 반영한 재생성 답변을 이어서 받는다.
-  const submitChecklist = useCallback(
-    async (messageId: string) => {
+  // checkedLabels를 서버에 제출하고, 그 결과를 반영한 재생성 답변을 이어서 받는다. submitChecklist(현재
+  // 체크된 항목 그대로)와 submitChecklistNone("해당사항 없음" - 체크 여부와 상관없이 빈 응답)이 공유한다.
+  const finishChecklist = useCallback(
+    async (messageId: string, checkedLabels: string[]) => {
       const target = messages.find(
         (m): m is Extract<ChatMessage, { type: 'checklist' }> => m.id === messageId && m.type === 'checklist',
       );
       if (!target || target.answered) return;
 
-      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, answered: true } : m)));
+      // 체크박스도 실제로 제출하는 값과 맞춰둔다 - "해당사항 없음"을 누르면 화면상 체크도 다 풀린다.
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId && m.type === 'checklist'
+            ? { ...m, answered: true, items: m.items.map((it) => ({ ...it, checked: checkedLabels.includes(it.label) })) }
+            : m,
+        ),
+      );
       setLoading(true);
       try {
-        const checkedLabels = target.items.filter((it) => it.checked).map((it) => it.label);
         await submitChecklistAnswers(target.consultationId, checkedLabels, sessionRef.current.guestCode);
         const regenerated = await regenerateAnswer(target.consultationId, sessionRef.current.guestCode);
         setMessages((prev) => [...prev, regenerated]);
@@ -86,5 +93,21 @@ export function useSymptomChat(initialMessage?: string) {
     [messages],
   );
 
-  return { messages, loading, sendText, toggleChecklistItem, submitChecklist };
+  const submitChecklist = useCallback(
+    (messageId: string) => {
+      const target = messages.find(
+        (m): m is Extract<ChatMessage, { type: 'checklist' }> => m.id === messageId && m.type === 'checklist',
+      );
+      if (!target) return;
+      return finishChecklist(messageId, target.items.filter((it) => it.checked).map((it) => it.label));
+    },
+    [messages, finishChecklist],
+  );
+
+  const submitChecklistNone = useCallback(
+    (messageId: string) => finishChecklist(messageId, []),
+    [finishChecklist],
+  );
+
+  return { messages, loading, sendText, toggleChecklistItem, submitChecklist, submitChecklistNone };
 }

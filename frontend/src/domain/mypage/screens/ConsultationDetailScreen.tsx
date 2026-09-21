@@ -38,6 +38,7 @@ function MessageBubble({ message }: { message: ConsultationMessage }) {
             </View>
           )}
           <Text style={styles.aiText}>{message.content}</Text>
+          {!!message.disclaimer && <Text style={styles.disclaimerText}>{message.disclaimer}</Text>}
         </View>
       </View>
 
@@ -104,12 +105,6 @@ export default function ConsultationDetailScreen() {
         ) : (
           messages.map((m) => <MessageBubble key={m.id} message={m} />)
         )}
-
-        <View style={styles.note}>
-          <Text style={styles.noteText}>
-            이 정보는 참고용이며 진단이 아닙니다. 증상이 지속되면 의료진과 상담하세요.
-          </Text>
-        </View>
       </ScrollView>
     </View>
   );
@@ -160,6 +155,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   aiText: { color: colors.text, fontSize: font.body, lineHeight: 21 },
+  disclaimerText: { fontSize: font.caption, color: colors.placeholder, fontStyle: 'italic' },
   regenChip: {
     alignSelf: 'flex-start',
     backgroundColor: colors.inputBg,
@@ -169,7 +165,5 @@ const styles = StyleSheet.create({
   },
   regenChipText: { fontSize: font.caption, color: colors.textSub, fontWeight: '600' },
 
-  note: { backgroundColor: colors.inputBg, borderRadius: radius.md, padding: spacing.lg },
-  noteText: { fontSize: font.caption, color: colors.textSub, lineHeight: 18 },
   checkedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.xs },
 });

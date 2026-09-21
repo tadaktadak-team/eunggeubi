@@ -7,14 +7,20 @@ import AiConsultationNavigator from '../domain/ai_consultations/screens/AiConsul
 import { useAuth } from '../domain/auth/hooks/useAuth';
 import LoginRequiredSheet from '../domain/auth/components/LoginRequiredSheet';
 import FindAccountScreen from '../domain/auth/screens/FindAccountScreen';
+import GuardianConsentScreen from '../domain/auth/screens/GuardianConsentScreen';
+import GuardianWaitingScreen from '../domain/auth/screens/GuardianWaitingScreen';
 import LoginScreen from '../domain/auth/screens/LoginScreen';
 import SignupCompleteScreen from '../domain/auth/screens/SignupCompleteScreen';
 import SignupScreen from '../domain/auth/screens/SignupScreen';
+import SocialConsentScreen from '../domain/auth/screens/SocialConsentScreen';
+import SocialExtraInfoScreen from '../domain/auth/screens/SocialExtraInfoScreen';
 import SplashScreen from '../domain/auth/screens/SplashScreen';
 import DrugNavigator from '../domain/drug/screens/DrugNavigator';
 import EmergencyResultScreen from '../domain/emergency/screens/EmergencyResultScreen';
+import HospitalDetailScreen from '../domain/medical_locator/screens/HospitalDetailScreen';
 import MedicalLocatorScreen from '../domain/medical_locator/screens/MedicalLocatorScreen';
 import MyPageNavigator from '../domain/mypage/screens/MyPageNavigator';
+import EditProfileScreen from '../domain/user/screens/EditProfileScreen';
 import TabBar from '../shared/components/TabBar';
 import LegalScreen from '../shared/screens/LegalScreen';
 import { RootStackParamList } from './types';
@@ -54,16 +60,23 @@ export default function RootNavigator() {
               <Stack.Screen name="Login" component={LoginScreen} />
               <Stack.Screen name="Signup" component={SignupScreen} />
               <Stack.Screen name="SignupComplete" component={SignupCompleteScreen} />
+              <Stack.Screen name="GuardianConsent" component={GuardianConsentScreen} />
+              <Stack.Screen name="GuardianWaiting" component={GuardianWaitingScreen} />
+              <Stack.Screen name="SocialConsent" component={SocialConsentScreen} />
+              <Stack.Screen name="SocialExtraInfo" component={SocialExtraInfoScreen} />
               <Stack.Screen name="FindAccount" component={FindAccountScreen} />
-              <Stack.Screen name="Tabs" component={TabsNavigator} />
+                            <Stack.Screen name="Tabs" component={TabsNavigator} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
               <Stack.Screen name="Legal" component={LegalScreen} />
+              <Stack.Screen name="HospitalDetail" component={HospitalDetailScreen} />
             </>
           ) : (
             <>
               <Stack.Screen name="Tabs" component={TabsNavigator} />
+              <Stack.Screen name="EditProfile" component={EditProfileScreen} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
               <Stack.Screen name="Legal" component={LegalScreen} />
+              <Stack.Screen name="HospitalDetail" component={HospitalDetailScreen} />
             </>
           )}
         </Stack.Navigator>

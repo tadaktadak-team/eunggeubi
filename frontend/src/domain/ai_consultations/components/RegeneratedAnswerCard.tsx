@@ -39,13 +39,11 @@ export default function RegeneratedAnswerCard({ message }: Props) {
             </View>
             {sources.map((source) => (
               <Text key={source.referenceSourceId} style={styles.sourceLine}>
-                {source.title} ({source.urlOrOrg})
+                {source.title}
               </Text>
             ))}
           </View>
         )}
-
-        {!!message.disclaimer && <Text style={styles.disclaimer}>{message.disclaimer}</Text>}
       </View>
     </View>
   );
@@ -73,10 +71,4 @@ const styles = StyleSheet.create({
   sourceHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.xs },
   sourceHeaderText: { fontSize: font.caption, color: colors.placeholder, fontWeight: '700' },
   sourceLine: { fontSize: font.caption, color: colors.placeholder, lineHeight: 16 },
-  disclaimer: {
-    fontSize: font.caption,
-    color: colors.placeholder,
-    marginTop: spacing.md,
-    fontStyle: 'italic',
-  },
 });

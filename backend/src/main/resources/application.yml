@@ -14,6 +14,13 @@ spring:
     openai:
       # 키가 없어도 앱은 뜨게 한다. 빈 문자열이면 자동설정이 기동을 막으므로 더미값을 기본으로 둔다.
       api-key: ${OPENAI_API_KEY:dummy}
+      chat:
+        options:
+          # 모델/temperature를 안 정해두면 spring-ai 기본값을 그대로 쓰게 되는데, 라이브러리
+          # 버전이 올라가면 그 기본값이 조용히 바뀔 수 있다. 의료정보 안내라 환각(지어내기) 위험을
+          # 낮추는 게 중요해서 temperature도 낮게 고정한다.
+          model: gpt-4o-mini
+          temperature: 0.2
       embedding:
         options:
           # Qdrant 컬렉션이 1536차원으로 고정돼 있어서 large 출력(3072)을 잘라서 쓴다.
@@ -21,8 +28,11 @@ spring:
           dimensions: 1536
     vectorstore:
       qdrant:
-        host: localhost
-        port: 6334
+        # 기본값은 로컬 Qdrant. 운영은 서버 환경변수로 Qdrant Cloud 를 가리킨다.
+        host: ${QDRANT_HOST:localhost}
+        port: ${QDRANT_PORT:6334}
+        api-key: ${QDRANT_API_KEY:}
+        use-tls: ${QDRANT_USE_TLS:false}
         collection-name: health_info
         # true면 부팅 때 Qdrant에 접속해서, 없으면 앱이 안 뜬다. 컬렉션 생성은 인덱싱 배치가 직접 한다.
         initialize-schema: false
@@ -44,17 +54,28 @@ openapi:
     url: https://apis.data.go.kr/1471000/MdcinGrnIdntfcInfoService03/getMdcinGrnIdntfcInfoList03
     service-key: ${PILL_IDENT_SECRET:}
 
+# 컬렉션 초기화(QdrantCollectionResetService)가 쓰는 REST 주소. gRPC(6334)와 포트가 다르다.
+qdrant:
+  rest-base-url: ${QDRANT_REST_URL:http://localhost:6333}
+  api-key: ${QDRANT_API_KEY:}
+
+
 kdca:
   health-info:
     base-url: https://api.kdca.go.kr/api/provide/healthInfo
     token: ${KDCA_TOKEN:}
 
+app:
+  rate-limit:
+    # nginx/ALB 등 X-Forwarded-For를 덮어써주는 신뢰된 프록시 뒤에 배포했을 때만 true로.
+    trust-proxy: ${RATE_LIMIT_TRUST_PROXY:false}
+
 medical_locator:
   secret: ${MEDICAL_LOCATOR_SECRET:}
   hospital:
-    url: http://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList
+    url: https://apis.data.go.kr/B551182/hospInfoServicev2/getHospBasisList
   pharmacy:
-    url: http://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList
+    url: https://apis.data.go.kr/B551182/pharmacyInfoService/getParmacyBasisList
   detail:
     url: https://apis.data.go.kr/B551182/MadmDtlInfoService2.8/getDtlInfo2.8
   subject:
@@ -64,6 +85,40 @@ emergency_bed:
   secret: ${EMERGENCY_BED_SECRET:}
   url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEmrrmRltmUsefulSckbdInfoInqire
   hospital-url: https://apis.data.go.kr/B552657/ErmctInfoInqireService/getEgytListInfoInqire
+
+solapi:
+  api-key: ${SOLAPI_API_KEY:}
+  api-secret: ${SOLAPI_API_SECRET:}
+  from: ${SOLAPI_FROM:}
+
+
+# 네이버 소셜 로그인 설정.
+# client-id / client-secret 은 비밀값이라 여기엔 빈 기본값만 두고,
+# 로컬은 application-local.yml, 운영은 환경변수(NAVER_CLIENT_ID 등)로 주입한다.
+# redirect-uri 는 네이버 개발자센터에 등록한 Callback URL 과 문자 하나까지 똑같아야 한다.
+oauth:
+  naver:
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}
+    redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:8080/api/auth/social/naver/callback}
+    authorize-uri: https://nid.naver.com/oauth2.0/authorize
+    token-uri: https://nid.naver.com/oauth2.0/token
+    userinfo-uri: https://openapi.naver.com/v1/nid/me
+  kakao:
+    client-id: ${KAKAO_CLIENT_ID:}
+    client-secret: ${KAKAO_CLIENT_SECRET:}
+    redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8080/api/auth/social/kakao/callback}
+    authorize-uri: https://kauth.kakao.com/oauth/authorize
+    token-uri: https://kauth.kakao.com/oauth/token
+    userinfo-uri: https://kapi.kakao.com/v2/user/me
+  google:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/api/auth/social/google/callback}
+    authorize-uri: https://accounts.google.com/o/oauth2/v2/auth
+    token-uri: https://oauth2.googleapis.com/token
+    userinfo-uri: https://www.googleapis.com/oauth2/v3/userinfo
+    scope: openid email profile
 
 ---
 spring:
@@ -81,6 +136,8 @@ spring:
     show-sql: true
     open-in-view: false
 
+
+
 ---
 # AI 인덱싱/리허설/검색점검 배치를 돌릴 때만 Qdrant 컬렉션 자동 생성을 켠다.
 # (일반 실행에서는 꺼둬야 Qdrant 없이도 서버가 기동된다)
@@ -92,3 +149,32 @@ spring:
     vectorstore:
       qdrant:
         initialize-schema: true
+
+
+
+---
+# 운영(EC2) 프로필. 서버에서 SPRING_PROFILES_ACTIVE=prod 로 실행한다.
+# 비밀값은 전부 서버의 환경변수 파일에서 주입한다. (application-local.yml 은 서버에 없음)
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/eunggeubi?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+
+app:
+  # 보호자 동의 SMS 링크 등에 쓰는 서버 공개 주소
+  base-url: ${APP_BASE_URL:https://eunggeubi.duckdns.org}
+  rate-limit:
+    # Caddy(리버스 프록시) 뒤에 있으므로 X-Forwarded-For 를 신뢰한다
+    trust-proxy: true

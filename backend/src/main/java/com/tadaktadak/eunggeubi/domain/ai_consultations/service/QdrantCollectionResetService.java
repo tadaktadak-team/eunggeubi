@@ -19,9 +19,15 @@ public class QdrantCollectionResetService {
     public QdrantCollectionResetService(
             RestClient.Builder restClientBuilder,
             @Value("${qdrant.rest-base-url:http://localhost:6333}") String restBaseUrl,
+            @Value("${qdrant.api-key:}") String apiKey,
             @Value("${spring.ai.vectorstore.qdrant.collection-name}") String collectionName,
             @Value("${spring.ai.openai.embedding.options.dimensions}") int dimensions) {
-        this.restClient = restClientBuilder.baseUrl(restBaseUrl).build();
+        RestClient.Builder builder = restClientBuilder.baseUrl(restBaseUrl);
+        // Qdrant Cloud 는 api-key 헤더가 필수. 로컬 Qdrant 는 인증이 없어서 키가 비어 있으면 안 붙인다.
+        if (!apiKey.isBlank()) {
+            builder.defaultHeader("api-key", apiKey);
+        }
+        this.restClient = builder.build();
         this.collectionName = collectionName;
         this.dimensions = dimensions;
     }
@@ -43,4 +49,5 @@ public class QdrantCollectionResetService {
                 .retrieve()
                 .toBodilessEntity();
     }
+
 }

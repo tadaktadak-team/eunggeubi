@@ -16,12 +16,14 @@ export interface UserChatMessage {
 // 문장(segment) 단위로 근거 자료 번호(sourceIndexes)를 갖고 있어서, 문장별로 인용 배지를 붙일 수 있다.
 // consultationId는 이 답변이 저장된 상담 id - 뒤이어 자동으로 붙는 체크리스트 생성/제출에 쓰인다.
 // 네트워크 에러를 로컬에서 흉내낸 메시지에는 실제 상담 id가 없어서 없을 수 있다.
+// disclaimer는 RegeneratedAnswerChatMessage와 같은 자리 - 예전엔 segments 안에 문장으로 섞여왔다.
 export interface AnswerChatMessage {
   id: string;
   type: 'answer';
   consultationId?: number;
   segments: AnswerSegment[];
   sources: AnswerSource[];
+  disclaimer?: string;
 }
 
 // 체크리스트 결과를 반영해 다시 생성한 답변(POST /{id}/regenerate). 문장별 인용이 아니라

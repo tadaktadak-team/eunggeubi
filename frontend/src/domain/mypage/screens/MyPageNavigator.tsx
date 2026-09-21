@@ -10,6 +10,7 @@ import AccountEditScreen from './AccountEditScreen';
 import WithdrawScreen from './WithdrawScreen';
 import ConsultationHistoryScreen from './ConsultationHistoryScreen';
 import ConsultationDetailScreen from './ConsultationDetailScreen';
+import SupportScreen from './SupportScreen';
 
 
 const Stack = createNativeStackNavigator<MyPageStackParamList>();
@@ -26,6 +27,7 @@ export default function MyPageNavigator() {
       <Stack.Screen name="Withdraw" component={WithdrawScreen} />
       <Stack.Screen name="ConsultationHistory" component={ConsultationHistoryScreen} />
       <Stack.Screen name="ConsultationDetail" component={ConsultationDetailScreen} />
+      <Stack.Screen name="Support" component={SupportScreen} />
     </Stack.Navigator>
   );
 }

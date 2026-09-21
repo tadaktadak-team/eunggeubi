@@ -46,7 +46,7 @@ export default function SignupScreen() {
     try {
       await authApi.sendPhoneCode(phone.trim(), 'SIGNUP');
       setCodeSent(true);
-      Alert.alert('인증번호 발송', '인증번호를 발송했어요.\n(개발 중: 서버 콘솔에서 확인)');
+      Alert.alert('인증번호 발송', '인증번호를 발송했어요. 문자를 확인해주세요.');
     } catch (e: any) {
       Alert.alert('발송 실패', e?.message ?? '다시 시도해주세요.');
     }
@@ -92,11 +92,27 @@ export default function SignupScreen() {
         agreeSensitiveInfo: agreeSensitive,
       });
       if (res.guardianConsentRequired) {
-        Alert.alert('보호자 동의 필요', '만 14세 미만은 보호자 동의가 필요해요.\n(보호자 동의 기능은 곧 추가돼요)');
+        navigation.navigate('GuardianConsent', { userId: res.userId, email: email.trim() });
+        return;
       }
       navigation.navigate('SignupComplete', { email: email.trim() });
     } catch (e: any) {
-      Alert.alert('회원가입 실패', e?.message ?? '다시 시도해주세요.');
+      const msg = e?.message ?? '다시 시도해주세요.';
+
+      // 이미 가입된 이메일이면 → 로그인 / 비밀번호 찾기로 유도
+      if (msg.includes('이미 가입')) {
+        Alert.alert('이미 가입된 이메일', '이 이메일로 가입된 계정이 있어요.', [
+          { text: '로그인하기', onPress: () => navigation.navigate('Login') },
+          {
+            text: '비밀번호 찾기',
+            onPress: () => navigation.navigate('FindAccount', { tab: 'FIND_PW' }),
+          },
+          { text: '취소', style: 'cancel' },
+        ]);
+        return;
+      }
+
+      Alert.alert('회원가입 실패', msg);
     } finally {
       setSubmitting(false);
     }
