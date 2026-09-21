@@ -19,10 +19,15 @@ const DrugHomeScreen = ({ navigation }: any) => {
     { id: '2', name: '아스피린', dosage: '100mg', category: '항혈소판제' },
   ];
 
+  // 검색창 -> 검색 결과 화면으로 이동 (입력된 검색어를 함께 전달)
+  const handleGoToSearch = () => {
+    navigation.navigate('DrugSearch', { initialKeyword: searchQuery });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        
+
         {/* 1. 상단 타이틀 */}
         <Text style={styles.headerTitle}>약물정보</Text>
 
@@ -33,9 +38,13 @@ const DrugHomeScreen = ({ navigation }: any) => {
             placeholder="약 이름으로 검색"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            onSubmitEditing={handleGoToSearch}
+            returnKeyType="search"
             placeholderTextColor="#A0A0A0"
           />
-          <Feather name="search" size={18} color="#A0A0A0" />
+          <TouchableOpacity onPress={handleGoToSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Feather name="search" size={18} color="#A0A0A0" />
+          </TouchableOpacity>
         </View>
 
         {/* 3. 중앙 기능 버튼 (낱알 특징 / 상호작용) */}
