@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-  SafeAreaView,
   View,
   Text,
   TextInput,
@@ -11,6 +10,9 @@ import {
   Image,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
+
+import AppHeader from '../../../shared/components/AppHeader';
+import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchDrugsByName, DrugInfoResponse } from '../api/drug';
 
 const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
@@ -39,6 +41,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
   // 홈 화면에서 넘어온 검색어가 있으면 진입 시 한 번만 자동 검색
   useEffect(() => {
     if (initialKeyword.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 진입 시 1회만 자동 검색, 무한루프/렌더링 문제 없음
       runSearch(initialKeyword);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,22 +50,16 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
   const handleSearch = () => runSearch(keyword);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={22} color="#111111" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>약품명 검색</Text>
-        <View style={{ width: 22 }} />
-      </View>
+    <View style={styles.container}>
+      <AppHeader title="약품명 검색" />
 
       <View style={styles.searchContainer}>
         <View style={styles.searchRow}>
-          <Feather name="search" size={18} color="#A0A0A0" style={styles.searchIcon} />
+          <Feather name="search" size={18} color={colors.placeholder} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="약 이름을 입력하세요"
-            placeholderTextColor="#A0A0A0"
+            placeholderTextColor={colors.placeholder}
             value={keyword}
             onChangeText={setKeyword}
             onSubmitEditing={handleSearch}
@@ -70,7 +67,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
           />
           {keyword.length > 0 && (
             <TouchableOpacity onPress={() => setKeyword('')}>
-              <Ionicons name="close-circle" size={18} color="#A0A0A0" />
+              <Ionicons name="close-circle" size={18} color={colors.placeholder} />
             </TouchableOpacity>
           )}
         </View>
@@ -81,7 +78,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
 
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#0066FF" />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>약 정보를 불러오는 중...</Text>
         </View>
       ) : (
@@ -96,7 +93,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
               </View>
             ) : (
               <View style={styles.centerContainer}>
-                <Feather name="search" size={32} color="#D0D0D0" />
+                <Feather name="search" size={32} color={colors.border} />
                 <Text style={styles.guideText}>궁금한 약의 이름을 검색해 보세요.</Text>
               </View>
             )
@@ -110,17 +107,21 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
                 <Image source={{ uri: item.itemImage }} style={styles.drugImage} />
               ) : (
                 <View style={styles.noImage}>
-                  <Feather name="image" size={22} color="#C0C0C0" />
+                  <Feather name="image" size={22} color={colors.placeholder} />
                 </View>
               )}
               <View style={styles.cardInfo}>
-                <Text style={styles.itemName} numberOfLines={1}>{item.itemName}</Text>
-                {item.entpName && (
-                  <Text style={styles.entpName} numberOfLines={1}>{item.entpName}</Text>
+                <Text style={styles.itemName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                {item.drugType && (
+                  <Text style={styles.drugType} numberOfLines={1}>
+                    {item.drugType}
+                  </Text>
                 )}
-                {item.efcyQesitm && (
+                {item.efficacy && (
                   <Text style={styles.efcyText} numberOfLines={2}>
-                    {item.efcyQesitm.replace(/<[^>]*>?/g, '')}
+                    {item.efficacy.replace(/<[^>]*>?/g, '')}
                   </Text>
                 )}
               </View>
@@ -128,48 +129,66 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
           )}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+  container: { flex: 1, backgroundColor: colors.bg },
+  searchContainer: {
+    flexDirection: 'row',
+    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.sm,
   },
-  backButton: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#111111' },
-  searchContainer: { flexDirection: 'row', padding: 16, alignItems: 'center', gap: 8 },
   searchRow: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F5F5F5', borderRadius: 12, paddingHorizontal: 12, height: 46,
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    height: 46,
   },
-  searchIcon: { marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 15, color: '#111111' },
+  searchIcon: { marginRight: spacing.sm },
+  searchInput: { flex: 1, fontSize: font.body, color: colors.text },
   searchBtn: {
-    backgroundColor: '#0066FF', borderRadius: 12, height: 46,
-    paddingHorizontal: 16, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    height: 46,
+    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  searchBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 15 },
-  listContent: { paddingHorizontal: 16, paddingBottom: 20 },
+  searchBtnText: { color: colors.white, fontWeight: 'bold', fontSize: font.body },
+  listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
   centerContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  loadingText: { marginTop: 12, fontSize: 14, color: '#666' },
-  emptyText: { fontSize: 15, color: '#888' },
-  guideText: { marginTop: 12, fontSize: 15, color: '#A0A0A0' },
+  loadingText: { marginTop: spacing.md, fontSize: font.sub, color: colors.textSub },
+  emptyText: { fontSize: font.body, color: colors.textSub },
+  guideText: { marginTop: spacing.md, fontSize: font.body, color: colors.placeholder },
   card: {
-    flexDirection: 'row', padding: 14, borderRadius: 12,
-    backgroundColor: '#FAFAFA', marginBottom: 12, borderWidth: 1, borderColor: '#EEEEEE',
+    flexDirection: 'row',
+    padding: spacing.md + 2,
+    borderRadius: radius.md,
+    backgroundColor: colors.inputBg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  drugImage: { width: 70, height: 70, borderRadius: 8, marginRight: 12 },
+  drugImage: { width: 70, height: 70, borderRadius: radius.sm, marginRight: spacing.md },
   noImage: {
-    width: 70, height: 70, borderRadius: 8, backgroundColor: '#EAEAEA',
-    justifyContent: 'center', alignItems: 'center', marginRight: 12,
+    width: 70,
+    height: 70,
+    borderRadius: radius.sm,
+    backgroundColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
   },
   cardInfo: { flex: 1, justifyContent: 'center' },
-  itemName: { fontSize: 16, fontWeight: 'bold', color: '#111111', marginBottom: 2 },
-  entpName: { fontSize: 13, color: '#0066FF', marginBottom: 4 },
-  efcyText: { fontSize: 13, color: '#666666', lineHeight: 18 },
+  itemName: { fontSize: font.body + 1, fontWeight: 'bold', color: colors.text, marginBottom: 2 },
+  drugType: { fontSize: font.sub, color: colors.primaryDark, marginBottom: spacing.xs },
+  efcyText: { fontSize: font.sub, color: colors.textSub, lineHeight: 18 },
 });
 
 export default DrugSearchScreen;

@@ -1,25 +1,66 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { getDrugDetail, DrugInfoResponse } from '../api/drug';
+
+// 값이 있는 항목만 화면에 표시 (없는 걸 빈 줄로 보여주면 오히려 오해를 줌)
+function buildAppearanceRows(drug: DrugInfoResponse): { label: string; value: string }[] {
+  const rows: { label: string; value: string }[] = [];
+  if (drug.shape) rows.push({ label: '모양', value: drug.shape });
+  if (drug.color) rows.push({ label: '색상', value: drug.color });
+  if (drug.imprint) rows.push({ label: '식별문자', value: drug.imprint });
+  return rows;
+}
 
 const DrugDetailScreen = ({ route }: any) => {
-  // 이전 화면에서 전달받은 약물 ID (추후 API 연동 시 사용)
-  const { drugId } = route.params || {};
+  const { itemSeq } = route.params || {};
 
-  // 더미 상세 데이터 (추후 백엔드 API 데이터로 대체)
-  const drugData = {
-    name: '타이레놀정 500mg',
-    company: '한국얀센',
-    category: '해열·진통제',
-    ingredient: '아세트아미노펜 500mg',
-    appearance: '하얀색의 장방형 첩제',
-    effect: '감기로 인한 발열 및 통증, 두통, 신경통, 근육통, 월경통, 치통 완화',
-    usage: '성인 및 12세 이상 어린이: 1회 1~2정씩 1일 3~4회 필요시 복용 (4시간 이상 간격)',
-    caution: '하루 최대 4,000mg을 초과하여 복용하지 마시오. 매일 세 잔 이상 정기적으로 술을 마시는 사람이 이 약을 복용해야 할 경우 의사 또는 약사와 상의해야 합니다.',
-  };
+  const [drug, setDrug] = useState<DrugInfoResponse | null>(null);
+  const [loading, setLoading] = useState(!!itemSeq);
+  const [error, setError] = useState(!itemSeq);
+
+  useEffect(() => {
+    if (!itemSeq) return; // itemSeq 없으면 초기 state(error=true)로 이미 처리됨
+
+    (async () => {
+      try {
+        const data = await getDrugDetail(itemSeq);
+        setDrug(data);
+        setError(false);
+      } catch (e) {
+        console.error('약품 상세 조회 오류:', e);
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [itemSeq]);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <AppHeader title="약물 상세 정보" />
+        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+      </View>
+    );
+  }
+
+  if (error || !drug) {
+    return (
+      <View style={styles.container}>
+        <AppHeader title="약물 상세 정보" />
+        <View style={styles.centerContainer}>
+          <Feather name="alert-circle" size={28} color={colors.placeholder} />
+          <Text style={styles.errorText}>약물 정보를 불러오지 못했어요.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const appearanceRows = buildAppearanceRows(drug);
 
   return (
     <View style={styles.container}>
@@ -31,43 +72,50 @@ const DrugDetailScreen = ({ route }: any) => {
           <View style={styles.iconContainer}>
             <MaterialCommunityIcons name="pill" size={32} color={colors.primary} />
           </View>
-          <Text style={styles.companyText}>{drugData.company}</Text>
-          <Text style={styles.drugName}>{drugData.name}</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{drugData.category}</Text>
-          </View>
+          <Text style={styles.drugName}>{drug.name}</Text>
+          {drug.drugType && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{drug.drugType}</Text>
+            </View>
+          )}
         </View>
 
-        {/* 상세 정보 섹션들 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>주성분 및 제형</Text>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>성분명</Text>
-            <Text style={styles.infoValue}>{drugData.ingredient}</Text>
+        {/* 외형 정보 */}
+        {appearanceRows.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>외형 정보</Text>
+            {appearanceRows.map((row) => (
+              <View key={row.label} style={styles.infoRow}>
+                <Text style={styles.infoLabel}>{row.label}</Text>
+                <Text style={styles.infoValue}>{row.value}</Text>
+              </View>
+            ))}
           </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>외형</Text>
-            <Text style={styles.infoValue}>{drugData.appearance}</Text>
+        )}
+
+        {drug.efficacy && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>효능 · 효과</Text>
+            <Text style={styles.bodyText}>{drug.efficacy}</Text>
           </View>
-        </View>
+        )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>효능 · 효과</Text>
-          <Text style={styles.bodyText}>{drugData.effect}</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>용법 · 용량</Text>
-          <Text style={styles.bodyText}>{drugData.usage}</Text>
-        </View>
-
-        <View style={[styles.section, styles.cautionSection]}>
-          <View style={styles.cautionHeader}>
-            <Feather name="alert-triangle" size={18} color={colors.danger} style={{ marginRight: spacing.xs }} />
-            <Text style={styles.cautionTitle}>주의사항</Text>
+        {drug.useInfo && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>용법 · 용량</Text>
+            <Text style={styles.bodyText}>{drug.useInfo}</Text>
           </View>
-          <Text style={styles.cautionText}>{drugData.caution}</Text>
-        </View>
+        )}
+
+        {drug.caution && (
+          <View style={[styles.section, styles.cautionSection]}>
+            <View style={styles.cautionHeader}>
+              <Feather name="alert-triangle" size={18} color={colors.danger} style={{ marginRight: spacing.xs }} />
+              <Text style={styles.cautionTitle}>주의사항</Text>
+            </View>
+            <Text style={styles.cautionText}>{drug.caution}</Text>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -77,6 +125,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xl,
+  },
+  errorText: {
+    fontSize: font.body,
+    color: colors.textSub,
   },
   scrollContent: {
     padding: spacing.xl,
@@ -97,11 +156,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.md,
-  },
-  companyText: {
-    fontSize: font.sub,
-    color: colors.textSub,
-    marginBottom: spacing.xs,
   },
   drugName: {
     fontSize: font.h2,
