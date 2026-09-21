@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 
+import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+
 interface DrugCardProps {
   name: string;        // 예: 타이레놀정
   dosage: string;      // 예: 500mg
@@ -13,16 +15,16 @@ const DrugCard = ({ name, dosage, category, onPress }: DrugCardProps) => {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.iconContainer}>
-        <MaterialCommunityIcons name="pill" size={24} color="#E53935" />
+        <MaterialCommunityIcons name="pill" size={24} color={colors.primary} />
       </View>
-      
+
       <View style={styles.infoContainer}>
         <Text style={styles.nameText}>{name}</Text>
         <Text style={styles.dosageText}>{dosage}</Text>
         <Text style={styles.categoryText}>{category}</Text>
       </View>
-      
-      <Feather name="chevron-right" size={20} color="#A0A0A0" />
+
+      <Feather name="chevron-right" size={20} color={colors.placeholder} />
     </TouchableOpacity>
   );
 };
@@ -31,38 +33,38 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
   },
   iconContainer: {
     width: 48,
     height: 48,
-    borderRadius: 14,
-    backgroundColor: '#FFF0F0',
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: spacing.lg,
   },
   infoContainer: {
     flex: 1,
   },
   nameText: {
-    fontSize: 16,
+    fontSize: font.body,
     fontWeight: 'bold',
-    color: '#111111',
+    color: colors.text,
   },
   dosageText: {
-    fontSize: 15,
+    fontSize: font.body,
     fontWeight: 'bold',
-    color: '#111111',
+    color: colors.text,
     marginTop: 2,
   },
   categoryText: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginTop: 4,
+    fontSize: font.caption,
+    color: colors.textSub,
+    marginTop: spacing.xs,
   },
 });
 

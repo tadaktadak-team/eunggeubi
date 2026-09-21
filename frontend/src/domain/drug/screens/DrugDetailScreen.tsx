@@ -1,15 +1,11 @@
 import React from 'react';
-import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const DrugDetailScreen = ({ route, navigation }: any) => {
+import AppHeader from '../../../shared/components/AppHeader';
+import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+
+const DrugDetailScreen = ({ route }: any) => {
   // 이전 화면에서 전달받은 약물 ID (추후 API 연동 시 사용)
   const { drugId } = route.params || {};
 
@@ -26,21 +22,14 @@ const DrugDetailScreen = ({ route, navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* 상단 헤더 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#111111" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>약물 상세 정보</Text>
-        <View style={{ width: 24 }} /> {/* 중앙 정렬용 빈 공간 */}
-      </View>
+    <View style={styles.container}>
+      <AppHeader title="약물 상세 정보" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 약물 요약 카드 */}
         <View style={styles.summaryCard}>
           <View style={styles.iconContainer}>
-            <MaterialCommunityIcons name="pill" size={32} color="#E53935" />
+            <MaterialCommunityIcons name="pill" size={32} color={colors.primary} />
           </View>
           <Text style={styles.companyText}>{drugData.company}</Text>
           <Text style={styles.drugName}>{drugData.name}</Text>
@@ -74,134 +63,117 @@ const DrugDetailScreen = ({ route, navigation }: any) => {
 
         <View style={[styles.section, styles.cautionSection]}>
           <View style={styles.cautionHeader}>
-            <Feather name="alert-triangle" size={18} color="#D32F2F" style={{ marginRight: 6 }} />
+            <Feather name="alert-triangle" size={18} color={colors.danger} style={{ marginRight: spacing.xs }} />
             <Text style={styles.cautionTitle}>주의사항</Text>
           </View>
           <Text style={styles.cautionText}>{drugData.caution}</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111111',
+    backgroundColor: colors.bg,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl + spacing.md,
   },
   summaryCard: {
-    backgroundColor: '#F9F9F9',
-    borderRadius: 20,
-    padding: 24,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.lg + 4,
+    padding: spacing.xl,
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   iconContainer: {
     width: 64,
     height: 64,
-    borderRadius: 20,
-    backgroundColor: '#FFF0F0',
+    borderRadius: radius.lg,
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: spacing.md,
   },
   companyText: {
-    fontSize: 13,
-    color: '#8E8E93',
-    marginBottom: 4,
+    fontSize: font.sub,
+    color: colors.textSub,
+    marginBottom: spacing.xs,
   },
   drugName: {
-    fontSize: 20,
+    fontSize: font.h2,
     fontWeight: 'bold',
-    color: '#111111',
-    marginBottom: 10,
+    color: colors.text,
+    marginBottom: spacing.sm + 2,
     textAlign: 'center',
   },
   badge: {
-    backgroundColor: '#EBF3FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.md,
   },
   badgeText: {
-    fontSize: 12,
+    fontSize: font.caption,
     fontWeight: 'bold',
-    color: '#0066FF',
+    color: colors.primaryDark,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: font.h3,
     fontWeight: 'bold',
-    color: '#111111',
-    marginBottom: 10,
+    color: colors.text,
+    marginBottom: spacing.sm + 2,
   },
   infoRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   infoLabel: {
     width: 70,
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: font.body,
+    color: colors.textSub,
   },
   infoValue: {
     flex: 1,
-    fontSize: 14,
-    color: '#333333',
+    fontSize: font.body,
+    color: colors.text,
     fontWeight: '500',
   },
   bodyText: {
-    fontSize: 14,
+    fontSize: font.body,
     lineHeight: 22,
-    color: '#444444',
-    backgroundColor: '#FAFAFA',
-    padding: 14,
-    borderRadius: 12,
+    color: colors.text,
+    backgroundColor: colors.inputBg,
+    padding: spacing.md + 2,
+    borderRadius: radius.md,
   },
   cautionSection: {
-    backgroundColor: '#FFF8F8',
-    padding: 16,
-    borderRadius: 14,
+    backgroundColor: colors.primaryLight,
+    padding: spacing.lg,
+    borderRadius: radius.lg - 2,
     borderWidth: 1,
-    borderColor: '#FFEBEE',
+    borderColor: colors.primaryLight,
   },
   cautionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   cautionTitle: {
-    fontSize: 15,
+    fontSize: font.body + 1,
     fontWeight: 'bold',
-    color: '#D32F2F',
+    color: colors.danger,
   },
   cautionText: {
-    fontSize: 13,
+    fontSize: font.sub,
     lineHeight: 20,
-    color: '#555555',
+    color: colors.text,
   },
 });
 

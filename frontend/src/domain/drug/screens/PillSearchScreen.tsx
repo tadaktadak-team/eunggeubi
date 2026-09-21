@@ -1,16 +1,11 @@
 import React, { useState } from 'react';
-import {
-  SafeAreaView,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-const PillSearchScreen = ({ navigation }: any) => {
+import AppHeader from '../../../shared/components/AppHeader';
+import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+
+const PillSearchScreen = () => {
   const [printText, setPrintText] = useState('');
   const [selectedShape, setSelectedShape] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
@@ -18,7 +13,7 @@ const PillSearchScreen = ({ navigation }: any) => {
 
   // 필터 옵션 데이터
   const shapes = ['원형', '타원형', '장방형', '삼각형', '사각형', '기타'];
-  const colors = ['하양', '노랑', '주황', '분홍', '빨강', '갈색', '연두', '초록', '파랑'];
+  const colorOptions = ['하양', '노랑', '주황', '분홍', '빨강', '갈색', '연두', '초록', '파랑'];
   const forms = ['정제', '경질캡슐', '연질캡슐'];
 
   const handleReset = () => {
@@ -29,20 +24,17 @@ const PillSearchScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* 상단 헤더 (뒤로가기 버튼) */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#111111" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>낱알 특징 검색</Text>
-        <TouchableOpacity onPress={handleReset}>
-          <Text style={styles.resetText}>초기화</Text>
-        </TouchableOpacity>
-      </View>
+    <View style={styles.container}>
+      <AppHeader title="낱알 특징 검색" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* 1. 식별문자 입력 */}
+        <View style={styles.resetRow}>
+          <TouchableOpacity onPress={handleReset} hitSlop={8}>
+            <Text style={styles.resetText}>초기화</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 식별문자 입력 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>식별문자</Text>
           <TextInput
@@ -50,29 +42,21 @@ const PillSearchScreen = ({ navigation }: any) => {
             placeholder="알약에 적힌 글자 (예: TY, 500)"
             value={printText}
             onChangeText={setPrintText}
-            placeholderTextColor="#A0A0A0"
+            placeholderTextColor={colors.placeholder}
           />
         </View>
 
-        {/* 2. 모양 선택 */}
+        {/* 모양 선택 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>모양</Text>
           <View style={styles.chipContainer}>
             {shapes.map((shape) => (
               <TouchableOpacity
                 key={shape}
-                style={[
-                  styles.chip,
-                  selectedShape === shape && styles.chipSelected,
-                ]}
+                style={[styles.chip, selectedShape === shape && styles.chipSelected]}
                 onPress={() => setSelectedShape(selectedShape === shape ? '' : shape)}
               >
-                <Text
-                  style={[
-                    styles.chipText,
-                    selectedShape === shape && styles.chipTextSelected,
-                  ]}
-                >
+                <Text style={[styles.chipText, selectedShape === shape && styles.chipTextSelected]}>
                   {shape}
                 </Text>
               </TouchableOpacity>
@@ -80,25 +64,17 @@ const PillSearchScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* 3. 색상 선택 */}
+        {/* 색상 선택 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>색상</Text>
           <View style={styles.chipContainer}>
-            {colors.map((color) => (
+            {colorOptions.map((color) => (
               <TouchableOpacity
                 key={color}
-                style={[
-                  styles.chip,
-                  selectedColor === color && styles.chipSelected,
-                ]}
+                style={[styles.chip, selectedColor === color && styles.chipSelected]}
                 onPress={() => setSelectedColor(selectedColor === color ? '' : color)}
               >
-                <Text
-                  style={[
-                    styles.chipText,
-                    selectedColor === color && styles.chipTextSelected,
-                  ]}
-                >
+                <Text style={[styles.chipText, selectedColor === color && styles.chipTextSelected]}>
                   {color}
                 </Text>
               </TouchableOpacity>
@@ -106,25 +82,17 @@ const PillSearchScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* 4. 제형 선택 */}
+        {/* 제형 선택 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>제형</Text>
           <View style={styles.chipContainer}>
             {forms.map((form) => (
               <TouchableOpacity
                 key={form}
-                style={[
-                  styles.chip,
-                  selectedForm === form && styles.chipSelected,
-                ]}
+                style={[styles.chip, selectedForm === form && styles.chipSelected]}
                 onPress={() => setSelectedForm(selectedForm === form ? '' : form)}
               >
-                <Text
-                  style={[
-                    styles.chipText,
-                    selectedForm === form && styles.chipTextSelected,
-                  ]}
-                >
+                <Text style={[styles.chipText, selectedForm === form && styles.chipTextSelected]}>
                   {form}
                 </Text>
               </TouchableOpacity>
@@ -136,103 +104,92 @@ const PillSearchScreen = ({ navigation }: any) => {
       {/* 하단 검색하기 버튼 */}
       <View style={styles.bottomContainer}>
         <TouchableOpacity style={styles.searchButton} activeOpacity={0.8}>
-          <Ionicons name="search" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
+          <Ionicons name="search" size={20} color={colors.white} style={{ marginRight: spacing.sm }} />
           <Text style={styles.searchButtonText}>조건으로 약물 검색</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.bg,
   },
-  header: {
+  resetRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111111',
+    justifyContent: 'flex-end',
+    marginBottom: spacing.md,
   },
   resetText: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: font.sub,
+    color: colors.textSub,
+    fontWeight: '600',
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: spacing.xl,
+    paddingBottom: spacing.xxl + spacing.md,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   sectionTitle: {
-    fontSize: 15,
+    fontSize: font.body,
     fontWeight: 'bold',
-    color: '#111111',
-    marginBottom: 12,
+    color: colors.text,
+    marginBottom: spacing.md,
   },
   textInput: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
     height: 48,
-    fontSize: 15,
-    color: '#111111',
+    fontSize: font.body,
+    color: colors.text,
   },
   chipContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: spacing.sm,
   },
   chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: 'transparent',
   },
   chipSelected: {
-    backgroundColor: '#EBF3FF',
-    borderColor: '#0066FF',
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primary,
   },
   chipText: {
-    fontSize: 14,
-    color: '#555555',
+    fontSize: font.sub,
+    color: colors.textSub,
   },
   chipTextSelected: {
-    color: '#0066FF',
+    color: colors.primaryDark,
     fontWeight: 'bold',
   },
   bottomContainer: {
-    padding: 16,
+    padding: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: colors.border,
+    backgroundColor: colors.white,
   },
   searchButton: {
-    backgroundColor: '#111111',
-    borderRadius: 14,
+    backgroundColor: colors.black,
+    borderRadius: radius.md,
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   searchButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: colors.white,
+    fontSize: font.body,
     fontWeight: 'bold',
   },
 });

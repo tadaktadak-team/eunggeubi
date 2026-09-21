@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
-import {
-  SafeAreaView,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+
+import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import DrugCard from '../components/DrugCard';
 
 const DrugHomeScreen = ({ navigation }: any) => {
+  const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
 
   const recentDrugs = [
@@ -25,13 +21,13 @@ const DrugHomeScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-
-        {/* 1. 상단 타이틀 */}
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.md }]}>
         <Text style={styles.headerTitle}>약물정보</Text>
+      </View>
 
-        {/* 2. 검색창 (우측 돋보기 아이콘) */}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* 검색창 */}
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
@@ -40,14 +36,14 @@ const DrugHomeScreen = ({ navigation }: any) => {
             onChangeText={setSearchQuery}
             onSubmitEditing={handleGoToSearch}
             returnKeyType="search"
-            placeholderTextColor="#A0A0A0"
+            placeholderTextColor={colors.placeholder}
           />
           <TouchableOpacity onPress={handleGoToSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Feather name="search" size={18} color="#A0A0A0" />
+            <Feather name="search" size={18} color={colors.placeholder} />
           </TouchableOpacity>
         </View>
 
-        {/* 3. 중앙 기능 버튼 (낱알 특징 / 상호작용) */}
+        {/* 중앙 기능 버튼 (낱알 특징 / 상호작용) */}
         <View style={styles.actionGrid}>
           <TouchableOpacity
             style={styles.actionCard}
@@ -55,7 +51,7 @@ const DrugHomeScreen = ({ navigation }: any) => {
             activeOpacity={0.7}
           >
             <View style={styles.actionIconBg}>
-              <MaterialCommunityIcons name="pill" size={26} color="#555555" />
+              <MaterialCommunityIcons name="pill" size={26} color={colors.primary} />
             </View>
             <Text style={styles.actionTitle}>낱알 특징</Text>
           </TouchableOpacity>
@@ -66,16 +62,15 @@ const DrugHomeScreen = ({ navigation }: any) => {
             activeOpacity={0.7}
           >
             <View style={styles.actionIconBg}>
-              <Ionicons name="pulse-outline" size={26} color="#555555" />
+              <Ionicons name="pulse-outline" size={26} color={colors.primary} />
             </View>
             <Text style={styles.actionTitle}>상호작용</Text>
           </TouchableOpacity>
         </View>
 
-        {/* 4. 구분선 */}
         <View style={styles.divider} />
 
-        {/* 5. 최근 검색 목록 */}
+        {/* 최근 검색 목록 */}
         <View style={styles.recentSection}>
           <Text style={styles.sectionTitle}>최근 검색</Text>
           {recentDrugs.map((drug) => (
@@ -88,82 +83,83 @@ const DrugHomeScreen = ({ navigation }: any) => {
             />
           ))}
         </View>
-
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.bg,
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
+  header: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111111',
-    marginBottom: 16,
+    fontSize: font.h1,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  scrollContent: {
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.xl,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
     height: 48,
-    marginBottom: 16,
+    marginBottom: spacing.lg,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
-    color: '#111111',
+    fontSize: font.body,
+    color: colors.text,
   },
   actionGrid: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
+    gap: spacing.md,
+    marginBottom: spacing.xl,
   },
   actionCard: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 16,
-    paddingVertical: 18,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.lg + 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionIconBg: {
     width: 48,
     height: 48,
-    borderRadius: 14,
-    backgroundColor: '#E8E8E8',
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   actionTitle: {
-    fontSize: 15,
+    fontSize: font.body,
     fontWeight: 'bold',
-    color: '#111111',
+    color: colors.text,
   },
   divider: {
     height: 1,
-    backgroundColor: '#EEEEEE',
-    marginBottom: 16,
+    backgroundColor: colors.border,
+    marginBottom: spacing.lg,
   },
   recentSection: {
     marginTop: 0,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8E8E93',
-    marginBottom: 12,
+    fontSize: font.sub,
+    fontWeight: '700',
+    color: colors.textSub,
+    marginBottom: spacing.md,
   },
 });
 

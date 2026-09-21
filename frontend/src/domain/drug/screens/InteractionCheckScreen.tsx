@@ -1,16 +1,11 @@
 import React, { useState } from 'react';
-import {
-  SafeAreaView,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
-const InteractionCheckScreen = ({ navigation }: any) => {
+import AppHeader from '../../../shared/components/AppHeader';
+import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+
+const InteractionCheckScreen = () => {
   const [inputText, setInputText] = useState('');
   const [selectedDrugs, setSelectedDrugs] = useState<string[]>([
     '타이레놀정 500mg',
@@ -44,15 +39,8 @@ const InteractionCheckScreen = ({ navigation }: any) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* 상단 헤더 */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Feather name="arrow-left" size={24} color="#111111" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>상호작용 체크</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <View style={styles.container}>
+      <AppHeader title="상호작용 체크" />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 설명 안내 */}
@@ -68,10 +56,10 @@ const InteractionCheckScreen = ({ navigation }: any) => {
             value={inputText}
             onChangeText={setInputText}
             onSubmitEditing={handleAddDrug}
-            placeholderTextColor="#A0A0A0"
+            placeholderTextColor={colors.placeholder}
           />
           <TouchableOpacity style={styles.addButton} onPress={handleAddDrug}>
-            <Feather name="plus" size={20} color="#FFFFFF" />
+            <Feather name="plus" size={20} color={colors.white} />
           </TouchableOpacity>
         </View>
 
@@ -81,10 +69,15 @@ const InteractionCheckScreen = ({ navigation }: any) => {
           <View style={styles.chipWrapper}>
             {selectedDrugs.map((drug, index) => (
               <View key={index} style={styles.drugChip}>
-                <MaterialCommunityIcons name="pill" size={16} color="#E53935" style={{ marginRight: 6 }} />
+                <MaterialCommunityIcons
+                  name="pill"
+                  size={16}
+                  color={colors.primary}
+                  style={{ marginRight: spacing.xs }}
+                />
                 <Text style={styles.chipText}>{drug}</Text>
                 <TouchableOpacity onPress={() => handleRemoveDrug(index)} style={styles.removeIcon}>
-                  <Feather name="x" size={16} color="#8E8E93" />
+                  <Feather name="x" size={16} color={colors.placeholder} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -95,11 +88,13 @@ const InteractionCheckScreen = ({ navigation }: any) => {
         {hasChecked && (
           <View style={styles.resultSection}>
             <View style={styles.resultHeader}>
-              <Ionicons name="warning-outline" size={22} color="#D32F2F" />
+              <Ionicons name="warning-outline" size={22} color={colors.danger} />
               <Text style={styles.resultTitle}>병용 주의 필요</Text>
             </View>
             <Text style={styles.resultDesc}>
-              <Text style={styles.boldText}>'타이레놀정'</Text>과 <Text style={styles.boldText}>'아스피린정'</Text>을 함께 복용 시 위장관 출혈 위험이 증가할 수 있습니다. 전문가(의사/약사)와 상의 후 복용을 권장합니다.
+              <Text style={styles.boldText}>&lsquo;타이레놀정&rsquo;</Text>과{' '}
+              <Text style={styles.boldText}>&lsquo;아스피린정&rsquo;</Text>을 함께 복용 시 위장관 출혈 위험이 증가할 수
+              있습니다. 전문가(의사/약사)와 상의 후 복용을 권장합니다.
             </Text>
           </View>
         )}
@@ -108,142 +103,125 @@ const InteractionCheckScreen = ({ navigation }: any) => {
       {/* 하단 검사하기 버튼 */}
       <View style={styles.bottomContainer}>
         <TouchableOpacity style={styles.checkButton} onPress={handleCheck} activeOpacity={0.8}>
-          <Ionicons name="pulse-outline" size={20} color="#FFFFFF" style={{ marginRight: 6 }} />
+          <Ionicons name="pulse-outline" size={20} color={colors.white} style={{ marginRight: spacing.sm }} />
           <Text style={styles.checkButtonText}>상호작용 확인하기</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111111',
+    backgroundColor: colors.bg,
   },
   scrollContent: {
-    padding: 20,
+    padding: spacing.xl,
   },
   subTitle: {
-    fontSize: 14,
-    color: '#666666',
-    marginBottom: 20,
+    fontSize: font.body,
+    color: colors.textSub,
+    marginBottom: spacing.xl,
     lineHeight: 20,
   },
   inputContainer: {
     flexDirection: 'row',
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   input: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
     height: 48,
-    fontSize: 15,
-    color: '#111111',
-    marginRight: 8,
+    fontSize: font.body,
+    color: colors.text,
+    marginRight: spacing.sm,
   },
   addButton: {
     width: 48,
     height: 48,
-    backgroundColor: '#111111',
-    borderRadius: 12,
+    backgroundColor: colors.black,
+    borderRadius: radius.md,
     justifyContent: 'center',
     alignItems: 'center',
   },
   drugListSection: {
-    marginBottom: 24,
+    marginBottom: spacing.xl,
   },
   sectionLabel: {
-    fontSize: 14,
+    fontSize: font.body,
     fontWeight: 'bold',
-    color: '#8E8E93',
-    marginBottom: 12,
+    color: colors.textSub,
+    marginBottom: spacing.md,
   },
   chipWrapper: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: spacing.sm,
   },
   drugChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: colors.inputBg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
   },
   chipText: {
-    fontSize: 14,
-    color: '#111111',
+    fontSize: font.sub,
+    color: colors.text,
     fontWeight: '500',
   },
   removeIcon: {
-    marginLeft: 6,
+    marginLeft: spacing.sm - 2,
     padding: 2,
   },
   resultSection: {
-    backgroundColor: '#FFF8F8',
-    padding: 16,
-    borderRadius: 16,
+    backgroundColor: colors.primaryLight,
+    padding: spacing.lg,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: '#FFEBEE',
+    borderColor: colors.primaryLight,
   },
   resultHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    gap: 6,
+    marginBottom: spacing.sm + 2,
+    gap: spacing.xs + 2,
   },
   resultTitle: {
-    fontSize: 16,
+    fontSize: font.body,
     fontWeight: 'bold',
-    color: '#D32F2F',
+    color: colors.danger,
   },
   resultDesc: {
-    fontSize: 14,
+    fontSize: font.body,
     lineHeight: 22,
-    color: '#444444',
+    color: colors.text,
   },
   boldText: {
     fontWeight: 'bold',
-    color: '#111111',
+    color: colors.text,
   },
   bottomContainer: {
-    padding: 16,
+    padding: spacing.lg,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    backgroundColor: '#FFFFFF',
+    borderTopColor: colors.border,
+    backgroundColor: colors.white,
   },
   checkButton: {
-    backgroundColor: '#111111',
-    borderRadius: 14,
+    backgroundColor: colors.black,
+    borderRadius: radius.md,
     height: 52,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: colors.white,
+    fontSize: font.body,
     fontWeight: 'bold',
   },
 });
