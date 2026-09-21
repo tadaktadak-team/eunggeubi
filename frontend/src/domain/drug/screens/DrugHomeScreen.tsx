@@ -1,19 +1,24 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import DrugCard from '../components/DrugCard';
+import { getRecentSearches, RecentDrug } from '../storage/recentSearches';
 
 const DrugHomeScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
+  const [recentDrugs, setRecentDrugs] = useState<RecentDrug[]>([]);
 
-  const recentDrugs = [
-    { id: '1', name: '타이레놀정', dosage: '500mg', category: '해열·진통제' },
-    { id: '2', name: '아스피린', dosage: '100mg', category: '항혈소판제' },
-  ];
+  // 검색 후 상세 봤다가 돌아왔을 때 최신 목록으로 갱신되도록 포커스마다 다시 불러옴
+  useFocusEffect(
+    useCallback(() => {
+      getRecentSearches().then(setRecentDrugs);
+    }, []),
+  );
 
   // 검색창 -> 검색 결과 화면으로 이동 (입력된 검색어를 함께 전달)
   const handleGoToSearch = () => {
@@ -73,15 +78,18 @@ const DrugHomeScreen = ({ navigation }: any) => {
         {/* 최근 검색 목록 */}
         <View style={styles.recentSection}>
           <Text style={styles.sectionTitle}>최근 검색</Text>
-          {recentDrugs.map((drug) => (
-            <DrugCard
-              key={drug.id}
-              name={drug.name}
-              dosage={drug.dosage}
-              category={drug.category}
-              onPress={() => navigation.navigate('DrugDetail', { drugId: drug.id })}
-            />
-          ))}
+          {recentDrugs.length > 0 ? (
+            recentDrugs.map((drug) => (
+              <DrugCard
+                key={drug.itemSeq}
+                name={drug.name}
+                drugType={drug.drugType}
+                onPress={() => navigation.navigate('DrugDetail', { itemSeq: drug.itemSeq })}
+              />
+            ))
+          ) : (
+            <Text style={styles.emptyText}>검색한 약이 여기에 표시돼요.</Text>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -160,6 +168,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textSub,
     marginBottom: spacing.md,
+  },
+  emptyText: {
+    fontSize: font.sub,
+    color: colors.placeholder,
   },
 });
 

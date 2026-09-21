@@ -14,6 +14,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchDrugsByName, DrugInfoResponse } from '../api/drug';
+import { addRecentSearch } from '../storage/recentSearches';
 
 const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const initialKeyword: string = route?.params?.initialKeyword ?? '';
@@ -101,7 +102,10 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
-              onPress={() => navigation.navigate('DrugDetail', { itemSeq: item.itemSeq })}
+              onPress={() => {
+                addRecentSearch({ itemSeq: item.itemSeq, name: item.name, drugType: item.drugType });
+                navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
+              }}
             >
               {item.itemImage ? (
                 <Image source={{ uri: item.itemImage }} style={styles.drugImage} />

@@ -5,13 +5,12 @@ import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 
 interface DrugCardProps {
-  name: string;        // 예: 타이레놀정
-  dosage: string;      // 예: 500mg
-  category: string;    // 예: 해열·진통제
+  name: string;         // 예: 타이레놀정500밀리그람
+  drugType?: string;    // 예: 일반의약품
   onPress?: () => void;
 }
 
-const DrugCard = ({ name, dosage, category, onPress }: DrugCardProps) => {
+const DrugCard = ({ name, drugType, onPress }: DrugCardProps) => {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.iconContainer}>
@@ -19,9 +18,10 @@ const DrugCard = ({ name, dosage, category, onPress }: DrugCardProps) => {
       </View>
 
       <View style={styles.infoContainer}>
-        <Text style={styles.nameText}>{name}</Text>
-        <Text style={styles.dosageText}>{dosage}</Text>
-        <Text style={styles.categoryText}>{category}</Text>
+        <Text style={styles.nameText} numberOfLines={1}>
+          {name}
+        </Text>
+        {drugType && <Text style={styles.drugTypeText}>{drugType}</Text>}
       </View>
 
       <Feather name="chevron-right" size={20} color={colors.placeholder} />
@@ -55,13 +55,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text,
   },
-  dosageText: {
-    fontSize: font.body,
-    fontWeight: 'bold',
-    color: colors.text,
-    marginTop: 2,
-  },
-  categoryText: {
+  drugTypeText: {
     fontSize: font.caption,
     color: colors.textSub,
     marginTop: spacing.xs,
