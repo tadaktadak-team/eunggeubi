@@ -3,7 +3,6 @@ package com.tadaktadak.eunggeubi.domain.ai_consultations.service;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.ConsultationRequest;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.ConsultationResponse;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawAnswer;
-import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawSearchQuery;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.AiConsultation;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.ReferenceSource;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.SenderType;
@@ -34,13 +33,17 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AiConsultationService {
 
-    // 모델이 119 안내 규칙(AiConsultationPrompts.CONSULT_PROMPT 5번)을 놓쳐도, 사용자 입력에 명백한
+    // 모델이 119 안내 규칙(AiConsultationPrompts.CONSULT_PROMPT 6번)을 놓쳐도, 사용자 입력에 명백한
     // 응급 징후(EmergencySignalGuard)가 있으면 이 문장을 코드가 강제로 답변 맨 앞에 붙인다.
     private static final ConsultationResponse.AnswerSegment FORCED_EMERGENCY_NOTICE =
             new ConsultationResponse.AnswerSegment("지금 말씀하신 증상은 응급 상황일 수 있습니다. 즉시 119에 신고해주세요.", List.of());
 
     // 후속 질문에 맥락을 얼마나 태울지 - 프롬프트 길이/비용을 생각해서 최근 몇 개(=몇 턴)로 제한한다.
     private static final int MAX_HISTORY_MESSAGES = 6;
+
+    // ChecklistService.generateItemsWithRetry와 같은 이유 - 타임아웃/429 같은 호출 자체 실패도
+    // 재시도 대상이다. 안 잡으면 일시적인 오류 한 번에 전체 요청이 500으로 끝난다.
+    private static final int MAX_ATTEMPTS = 3;
 
     private final RagRetrievalService ragRetrievalService;
     private final ChatClient chatClient;
@@ -76,14 +79,17 @@ public class AiConsultationService {
                 .regenerated(false)
                 .build());
 
-        String searchQuery = buildSearchQuery(priorTurns, rewriteQueryForSearch(request.query()));
-        List<Document> docs = ragRetrievalService.retrieve(searchQuery);
+        String searchQuery = buildSearchQuery(priorTurns, ragRetrievalService.rewriteForSearch(request.query()));
+        List<List<Document>> docGroups = ragRetrievalService.retrieveGrouped(searchQuery);
+        List<Document> docs = docGroups.stream().flatMap(List::stream).toList();
         // 검색어에는 안 넣는다 - "복통, 고혈압" 같은 병명이 섞이면 지금 증상과 무관한 문서를 끌어올 수
         // 있다. 프롬프트에만 참고 정보로 얹어서, 관련 있을 때만 모델이 알아서 반영하게 한다.
         String healthProfileSummary = buildHealthProfileSummary(userId);
         GenerationResult result = docs.isEmpty()
                 ? GenerationResult.noResult()
-                : generate(request.query(), docs, buildConversationHistory(priorTurns), healthProfileSummary);
+                : ensureMultiInterpretationCoverage(
+                        generate(request.query(), docs, buildConversationHistory(priorTurns), healthProfileSummary),
+                        docGroups, docs);
 
         AiConsultation aiMessage = aiConsultationRepository.save(AiConsultation.builder()
                 .userId(userId)
@@ -120,7 +126,7 @@ public class AiConsultationService {
             return segments;
         }
 
-        // 마지막 방어선 실제 발동 - 모델이 119 규칙(CONSULT_PROMPT 5번)을 놓쳤다.
+        // 마지막 방어선 실제 발동 - 모델이 119 규칙(CONSULT_PROMPT 6번)을 놓쳤다.
         log.warn("응급 징후 감지했으나 모델 응답에 119 안내가 없어 코드가 강제로 추가했습니다. query=\"{}\"", query);
         return Stream.concat(Stream.of(FORCED_EMERGENCY_NOTICE), segments.stream()).toList();
     }
@@ -135,34 +141,14 @@ public class AiConsultationService {
     }
 
     // 후속 질문만 그대로 벡터 검색하면 증상 키워드가 없어서 엉뚱한 문서가 걸린다. 이전 사용자
-    // 발화들을 검색어에 같이 넣어서 보정한다. currentQuery는 이미 rewriteQueryForSearch를 거친
-    // 검색용 문구다.
+    // 발화들을 검색어에 같이 넣어서 보정한다. currentQuery는 이미 ragRetrievalService.rewriteForSearch를
+    // 거친 검색용 문구다.
     private String buildSearchQuery(List<AiConsultation> priorTurns, String currentQuery) {
         String priorUserText = priorTurns.stream()
                 .filter(m -> m.getSenderType() == SenderType.USER)
                 .map(AiConsultation::getContent)
                 .collect(Collectors.joining(" "));
         return priorUserText.isBlank() ? currentQuery : priorUserText + " " + currentQuery;
-    }
-
-    // 사용자의 일상어 증상 표현을 검색용 의학 용어로 바꾼다(예: "발이 부어요" -> "부종 다리 발목 붓기") -
-    // 실제로 이렇게 안 바꾸면 "부종" 문서가 top 5는커녕 top 20 밖으로 밀려서 검색이 아예 안 됐다.
-    // 최종 답변 생성 프롬프트의 [질문]에는 원래 사용자 문장을 그대로 쓴다 - 검색에만 쓰는 용도다.
-    // LLM 호출이라 실패할 수 있어서, 실패하면 원래 질문 그대로 검색하도록 폴백한다.
-    private String rewriteQueryForSearch(String query) {
-        try {
-            RawSearchQuery raw = chatClient.prompt()
-                    .system(AiConsultationPrompts.QUERY_REWRITE_PROMPT)
-                    .user(query)
-                    .call()
-                    .entity(RawSearchQuery.class);
-            if (raw != null && raw.searchTerms() != null && !raw.searchTerms().isBlank()) {
-                return raw.searchTerms();
-            }
-        } catch (Exception e) {
-            log.warn("검색어 재작성 호출이 실패했습니다. 원래 질문으로 검색합니다. query=\"{}\"", query, e);
-        }
-        return query;
     }
 
     // 모델이 후속 질문에 자연스럽게 이어 답하도록 최근 대화를 프롬프트에 텍스트로 준다.
@@ -198,6 +184,55 @@ public class AiConsultationService {
         return s != null && !s.isBlank();
     }
 
+    // RagRetrievalService.retrieveGrouped가 "|"로 해석을 나눈 경우(예: "목"→목뼈 계통/인후 계통),
+    // CONSULT_PROMPT(규칙 10)에 "두 계통 다 언급하라"고 지시해뒀지만 LLM이 실제로 따르는 건
+    // 확률적이다(실측 3회 중 1회만 반영). 그래서 모델이 한쪽 계통을 answer에서 아예 안 다뤘으면
+    // 코드가 문장을 강제로 덧붙인다. 해석이 하나뿐이거나(docGroups.size() <= 1), 애초에 아무것도
+    // 인용 안 된 답변(noResult/생성실패/진단가드 폴백)이면 건드리지 않는다 - 안전 문구에 억지로
+    // 질병명을 덧붙이면 오히려 혼란을 준다.
+    private GenerationResult ensureMultiInterpretationCoverage(
+            GenerationResult result, List<List<Document>> docGroups, List<Document> docs) {
+        if (docGroups.size() <= 1 || result.citedSources().isEmpty()) {
+            return result;
+        }
+
+        Set<String> citedDiseases = result.citedSources().stream()
+                .map(ConsultationResponse.Source::disease)
+                .collect(Collectors.toSet());
+
+        List<ConsultationResponse.AnswerSegment> extraSegments = new ArrayList<>();
+        List<ConsultationResponse.Source> extraSources = new ArrayList<>();
+        for (List<Document> group : docGroups) {
+            if (group.isEmpty()) {
+                continue;
+            }
+            Document top = group.get(0); // 그룹 안에서 가장 점수 높은 문서 - search()가 이미 점수순으로 준다.
+            String disease = (String) top.getMetadata().get("disease");
+            if (citedDiseases.contains(disease)) {
+                continue; // 모델이 이미 이 계통을 언급함
+            }
+            int index = docs.indexOf(top) + 1; // buildContext의 [번호]와 맞춘다(1-based)
+            extraSegments.add(new ConsultationResponse.AnswerSegment(
+                    "%s이(가) 원인일 가능성도 있습니다. 증상이 이어지거나 다른 양상이면 병원에서 감별 진료를 받아보세요."
+                            .formatted(disease),
+                    List.of(index)));
+            extraSources.add(toSource(index, top));
+        }
+
+        if (extraSegments.isEmpty()) {
+            return result;
+        }
+
+        List<ConsultationResponse.AnswerSegment> segments =
+                Stream.concat(result.segments().stream(), extraSegments.stream()).toList();
+        List<ConsultationResponse.Source> citedSources =
+                Stream.concat(result.citedSources().stream(), extraSources.stream()).toList();
+        String plainText = segments.stream()
+                .map(ConsultationResponse.AnswerSegment::text)
+                .collect(Collectors.joining(" "));
+        return new GenerationResult(segments, citedSources, plainText, result.symptomKeyword());
+    }
+
     private GenerationResult generate(
             String query, List<Document> docs, String conversationHistory, String healthProfileSummary) {
         StringBuilder userPrompt = new StringBuilder();
@@ -210,16 +245,8 @@ public class AiConsultationService {
         userPrompt.append("[참고자료]\n").append(ragRetrievalService.buildContext(docs))
                 .append("\n\n[질문]\n").append(query);
 
-        RawAnswer raw = chatClient.prompt()
-                .system(AiConsultationPrompts.CONSULT_PROMPT)
-                .user(userPrompt.toString())
-                .call()
-                .entity(RawAnswer.class);
-
-        // 모델이 스키마를 벗어난 JSON(예: segments 누락)을 내놓는 경우가 실제로 있었다 -
-        // LLM 출력은 신뢰할 수 없는 입력이므로 여기서 막지 않으면 NPE로 그대로 500이 난다.
-        if (raw == null || raw.segments() == null) {
-            log.warn("LLM 구조화 출력이 예상 스키마를 벗어났습니다. query=\"{}\", raw={}", query, raw);
+        RawAnswer raw = generateRawAnswer(query, userPrompt.toString());
+        if (raw == null) {
             return GenerationResult.generationFailed();
         }
 
@@ -232,10 +259,16 @@ public class AiConsultationService {
 
         // 모델이 규칙을 어기고 존재하지 않는 번호를 인용해도(환각) 조용히 걸러낸다 -
         // 최악의 경우 "근거 없는 문장"이 될 뿐, 잘못된 출처가 붙는 일은 없다.
+        // segments 배열 자체는 위에서 확인했지만, 개별 원소는 LLM이 스키마를 어기고 text/sourceIndexes를
+        // null로 줄 수 있다 - text가 없으면 보여줄 내용이 없으니 걸러내고, sourceIndexes가 없으면
+        // (그대로 .stream() 호출 시 NPE) 인용 없는 문장으로 취급한다.
         List<ConsultationResponse.AnswerSegment> segments = raw.segments().stream()
+                .filter(segment -> segment != null && segment.text() != null && !segment.text().isBlank())
                 .map(segment -> new ConsultationResponse.AnswerSegment(
                         segment.text(),
-                        segment.sourceIndexes().stream().filter(validIndexes::contains).toList()))
+                        segment.sourceIndexes() == null
+                                ? List.of()
+                                : segment.sourceIndexes().stream().filter(validIndexes::contains).toList()))
                 .toList();
 
         // 검색은 됐지만 실제 답변 문장에서 한 번도 인용되지 않은 문서는 "출처"로 보여주지 않는다.
@@ -266,6 +299,31 @@ public class AiConsultationService {
                 : citedSources.get(0).disease();
 
         return new GenerationResult(segments, citedSources, plainText, symptomKeyword);
+    }
+
+    // LLM 호출 자체가 실패(타임아웃/429/네트워크 오류)하거나 스키마를 벗어난 JSON(예: segments 누락)을
+    // 내놓는 경우가 실제로 있었다 - 둘 다 재시도 대상으로 묶는다(ChecklistService.generateItemsWithRetry
+    // 와 같은 구조). 모두 실패하면 null을 돌려주고, 호출부가 GenerationResult.generationFailed()로 처리한다.
+    private RawAnswer generateRawAnswer(String query, String userPrompt) {
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            RawAnswer raw;
+            try {
+                raw = chatClient.prompt()
+                        .system(AiConsultationPrompts.CONSULT_PROMPT)
+                        .user(userPrompt)
+                        .call()
+                        .entity(RawAnswer.class);
+            } catch (Exception e) {
+                log.warn("1차 답변 LLM 호출이 실패했습니다 (시도 {}/{}). query=\"{}\"", attempt, MAX_ATTEMPTS, query, e);
+                continue;
+            }
+            if (raw != null && raw.segments() != null) {
+                return raw;
+            }
+            log.warn("1차 답변 LLM 구조화 출력이 예상 스키마를 벗어났습니다 (시도 {}/{}). query=\"{}\", raw={}",
+                    attempt, MAX_ATTEMPTS, query, raw);
+        }
+        return null;
     }
 
     private void saveReferenceSources(Long consultationId, List<ConsultationResponse.Source> sources) {

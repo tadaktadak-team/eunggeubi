@@ -10,6 +10,7 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.AiConsultatio
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ChecklistRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ChecklistResponseRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ReferenceSourceRepository;
+import com.tadaktadak.eunggeubi.domain.first_aid.service.FirstAidGuideService;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -32,12 +33,17 @@ public class ConsultationRegenerationService {
             "죄송합니다, 안내 문구를 다시 정리하는 중 문제가 발생했습니다. 제공된 참고자료로는 확정적인 안내가 어려우니, "
                     + "증상이 지속되거나 심해지면 병원 진료를 받아보세요.";
 
+    // AiConsultationService.MAX_ATTEMPTS와 같은 이유 - LLM 호출 자체 실패(타임아웃/429/네트워크 오류)도
+    // 재시도 대상이다. 안 잡으면 일시적인 오류 한 번에 전체 요청이 500으로 끝난다.
+    private static final int MAX_ATTEMPTS = 3;
+
     private final AiConsultationRepository aiConsultationRepository;
     private final ChecklistRepository checklistRepository;
     private final ChecklistResponseRepository checklistResponseRepository;
     private final ReferenceSourceRepository referenceSourceRepository;
     private final RagRetrievalService ragRetrievalService;
     private final ChatClient chatClient;
+    private final FirstAidGuideService firstAidGuideService;
 
     // ponytail: 트랜잭션으로 안 감싼다 - RAG 검색+LLM 호출 동안 DB 커넥션을 잡고 있으면 동시 요청
     // 몇 개만으로 커넥션 풀이 고갈된다(저장은 Spring Data가 save() 호출마다 개별 트랜잭션으로 처리).
@@ -49,30 +55,26 @@ public class ConsultationRegenerationService {
         String combinedQuery = checkedItems.isEmpty()
                 ? symptomText
                 : "%s (%s 있음)".formatted(symptomText, String.join(", ", checkedItems));
+        RegenerateResponse.RelatedAidGuide relatedAidGuide = findRelatedAidGuide(combinedQuery);
 
         List<Document> docs = ragRetrievalService.retrieve(combinedQuery);
         if (docs.isEmpty()) {
-            return persistAndBuild(baseMessage, NO_MATCH_MESSAGE, List.of());
+            return persistAndBuild(baseMessage, NO_MATCH_MESSAGE, List.of(), relatedAidGuide);
         }
 
-        RawRegeneratedAnswer raw = chatClient.prompt()
-                .system(AiConsultationPrompts.REGENERATE_PROMPT)
-                .user("[참고자료]\n%s\n\n[증상]\n%s\n\n[체크리스트에서 해당한다고 응답한 항목]\n%s".formatted(
-                        ragRetrievalService.buildContext(docs), symptomText,
-                        checkedItems.isEmpty() ? "없음" : String.join("\n", checkedItems)))
-                .call()
-                .entity(RawRegeneratedAnswer.class);
-
-        if (raw == null || raw.message() == null || raw.message().isBlank()) {
-            log.warn("재생성 LLM 구조화 출력이 예상 스키마를 벗어났습니다. consultationId={}, raw={}", consultationId, raw);
-            return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of());
+        String userPrompt = "[참고자료]\n%s\n\n[증상]\n%s\n\n[체크리스트에서 해당한다고 응답한 항목]\n%s".formatted(
+                ragRetrievalService.buildContext(docs), symptomText,
+                checkedItems.isEmpty() ? "없음" : String.join("\n", checkedItems));
+        RawRegeneratedAnswer raw = generateRawAnswer(consultationId, userPrompt);
+        if (raw == null) {
+            return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of(), relatedAidGuide);
         }
 
         // 마지막 방어선: 프롬프트로 진단하지 말라고 지시해도 모델이 어길 수 있다. 걸리면 부분 수정 대신
         // 통째로 안전한 문구로 교체한다 (부분 수정은 문장을 어색하게 만들 위험이 크다).
         if (DiagnosisLanguageGuard.containsDiagnosticLanguage(raw.message())) {
             log.warn("재생성 응답에서 진단형 표현이 감지되어 폴백 문구로 대체합니다. consultationId={}", consultationId);
-            return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of());
+            return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of(), relatedAidGuide);
         }
 
         List<ConsultationSource> sources = IntStream.rangeClosed(1, docs.size())
@@ -86,11 +88,49 @@ public class ConsultationRegenerationService {
                 .filter(source -> citedIndexes.contains(source.index()))
                 .toList();
 
-        return persistAndBuild(baseMessage, raw.message(), citedSources);
+        return persistAndBuild(baseMessage, raw.message(), citedSources, relatedAidGuide);
+    }
+
+    // LLM 호출 자체가 실패하거나 스키마를 벗어난 응답(message 누락/빈 문자열)을 내놓는 경우를 모두
+    // 재시도 대상으로 묶는다(ChecklistService.generateItemsWithRetry와 같은 구조). 모두 실패하면 null을
+    // 돌려주고, 호출부가 DIAGNOSTIC_LANGUAGE_FALLBACK으로 처리한다.
+    private RawRegeneratedAnswer generateRawAnswer(Long consultationId, String userPrompt) {
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            RawRegeneratedAnswer raw;
+            try {
+                raw = chatClient.prompt()
+                        .system(AiConsultationPrompts.REGENERATE_PROMPT)
+                        .user(userPrompt)
+                        .call()
+                        .entity(RawRegeneratedAnswer.class);
+            } catch (Exception e) {
+                log.warn("재생성 LLM 호출이 실패했습니다 (시도 {}/{}). consultationId={}", attempt, MAX_ATTEMPTS, consultationId, e);
+                continue;
+            }
+            if (raw != null && raw.message() != null && !raw.message().isBlank()) {
+                return raw;
+            }
+            log.warn("재생성 LLM 구조화 출력이 예상 스키마를 벗어났습니다 (시도 {}/{}). consultationId={}, raw={}",
+                    attempt, MAX_ATTEMPTS, consultationId, raw);
+        }
+        return null;
+    }
+
+    // 화상/코피/골절/기도막힘 4개로 한정하지 않고 health_info 컬렉션 전체를 대상으로 찾는다 -
+    // FirstAidGuideService.search()가 실제 현장 응급처치 콘텐츠가 있는 주제만 걸러서 돌려주므로
+    // (없으면 Optional.empty()) 이 체크만으로 "관련 응급처치가 실제로 존재하는지"까지 확인된다.
+    // ponytail: search()가 여기서 한 번, 사용자가 배너를 눌러 FirstAidGuide 화면에 들어갈 때 한 번 더
+    // 호출돼서 같은 내용을 두 번 생성한다(캐싱 없음) - 재생성은 체크리스트 제출당 1회뿐이라 감내 가능한
+    // 비용이지만, 호출 빈도가 늘면 캐싱을 고려해야 한다.
+    private RegenerateResponse.RelatedAidGuide findRelatedAidGuide(String combinedQuery) {
+        return firstAidGuideService.search(combinedQuery)
+                .map(guide -> new RegenerateResponse.RelatedAidGuide(guide.situation(), guide.title()))
+                .orElse(null);
     }
 
     private RegenerateResponse persistAndBuild(AiConsultation baseMessage, String message,
-                                                List<ConsultationSource> citedSources) {
+                                                List<ConsultationSource> citedSources,
+                                                RegenerateResponse.RelatedAidGuide relatedAidGuide) {
         AiConsultation regenerated = aiConsultationRepository.save(AiConsultation.builder()
                 .userId(baseMessage.getUserId())
                 .sessionId(baseMessage.getSessionId())
@@ -116,7 +156,7 @@ public class ConsultationRegenerationService {
                 })
                 .toList();
 
-        return new RegenerateResponse(message, false, sourceDtos, ConsultationDisclaimer.TEXT);
+        return new RegenerateResponse(message, false, sourceDtos, ConsultationDisclaimer.TEXT, relatedAidGuide);
     }
 
     private AiConsultation getOwnedAiMessage(Long consultationId, Long userId, String guestCode) {

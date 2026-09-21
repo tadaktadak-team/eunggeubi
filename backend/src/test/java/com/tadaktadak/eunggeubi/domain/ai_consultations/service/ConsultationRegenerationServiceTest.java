@@ -20,6 +20,7 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.AiConsultatio
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ChecklistRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ChecklistResponseRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ReferenceSourceRepository;
+import com.tadaktadak.eunggeubi.domain.first_aid.service.FirstAidGuideService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,11 +39,12 @@ class ConsultationRegenerationServiceTest {
     private final ReferenceSourceRepository referenceSourceRepository = mock(ReferenceSourceRepository.class);
     private final RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
     private final ChatClient chatClient = mock(ChatClient.class);
+    private final FirstAidGuideService firstAidGuideService = mock(FirstAidGuideService.class);
     private final AtomicLong idSequence = new AtomicLong(1000);
 
     private final ConsultationRegenerationService service = new ConsultationRegenerationService(
             aiConsultationRepository, checklistRepository, checklistResponseRepository,
-            referenceSourceRepository, ragRetrievalService, chatClient);
+            referenceSourceRepository, ragRetrievalService, chatClient, firstAidGuideService);
 
     @Test
     void 본인_상담이_아니면_예외() {
