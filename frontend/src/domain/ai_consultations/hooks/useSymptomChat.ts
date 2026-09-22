@@ -85,7 +85,12 @@ export function useSymptomChat(initialMessage?: string) {
       } catch (e) {
         console.error(e);
         const message = e instanceof Error ? e.message : '요청 중 오류가 발생했습니다.';
-        setMessages((prev) => [...prev, { id: nextChatMessageId(), type: 'regenerated', message, sources: [], disclaimer: '' }]);
+        // answered를 다시 false로 되돌려서 재시도(다시 "답변하기")할 수 있게 한다 - 안 그러면
+        // 실패한 채로 체크리스트가 영구히 잠긴다. 체크된 항목은 이미 시도한 값과 같으니 그대로 둔다.
+        setMessages((prev) => [
+          ...prev.map((m) => (m.id === messageId && m.type === 'checklist' ? { ...m, answered: false } : m)),
+          { id: nextChatMessageId(), type: 'regenerated', message, sources: [], disclaimer: '' },
+        ]);
       } finally {
         setLoading(false);
       }

@@ -7,6 +7,7 @@ import {
   ChecklistItem,
   RegeneratedAnswerChatMessage,
   RegeneratedSource,
+  RelatedAidGuide,
 } from '../types';
 
 interface ConsultationResponseDto {
@@ -30,6 +31,7 @@ interface RegenerateResponseDto {
   isDiagnosis: boolean;
   sources: RegeneratedSource[];
   disclaimer: string;
+  relatedAidGuide: RelatedAidGuide | null;
 }
 
 let idSeq = 0;
@@ -121,6 +123,7 @@ export async function regenerateAnswer(
     message: response.message,
     sources: response.sources,
     disclaimer: response.disclaimer,
+    relatedAidGuide: response.relatedAidGuide,
   };
 }
 

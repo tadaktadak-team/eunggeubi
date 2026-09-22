@@ -32,6 +32,9 @@ export default function FirstAidGuideScreen() {
       setGuide(result);
     } catch (e) {
       console.error(e);
+      // 이전 상황의 스텝이 남아있으면 지금 선택된 칩/situation과 내용이 안 맞게 보인다 - 비워서
+      // "이 상황은 못 불러왔다"를 명확히 한다.
+      setGuide(null);
       Alert.alert('오류', '응급처치 정보를 불러오지 못했어요.');
     } finally {
       setLoading(false);
@@ -107,7 +110,12 @@ export default function FirstAidGuideScreen() {
           </View>
 
           {loading ? (
-              <ActivityIndicator color={colors.primary} style={styles.loading} />
+              <View style={styles.loadingBox}>
+                <ActivityIndicator color={colors.primary} />
+                {/* 처음 조회하는 상황은 서버가 LLM으로 가이드를 새로 만드느라 몇 초 걸릴 수 있다 -
+                    스피너만 있으면 멈춘 것처럼 보일 수 있어 안내 문구를 더한다. */}
+                <Text style={styles.loadingText}>맞춤 응급처치 가이드를 만들고 있어요...</Text>
+              </View>
           ) : (
               guide && (
                   <View style={styles.card}>
@@ -159,7 +167,8 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: font.body, color: colors.text },
   chipRow: { flexDirection: 'row', gap: spacing.sm },
-  loading: { marginVertical: spacing.xl },
+  loadingBox: { alignItems: 'center', gap: spacing.sm, marginVertical: spacing.xl },
+  loadingText: { fontSize: font.sub, color: colors.placeholder },
   card: {
     backgroundColor: colors.white,
     borderWidth: 1,

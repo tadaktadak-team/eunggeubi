@@ -30,7 +30,8 @@ export default function SymptomChatScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   const onSend = () => {
-    if (!inputText.trim()) return;
+    // 응답 오는 중에 연타하면 sessionRef 갱신 순서가 응답 도착 순서에 의존하게 된다 - 로딩 중엔 막는다.
+    if (!inputText.trim() || loading) return;
     sendText(inputText);
     setInputText('');
   };
@@ -78,7 +79,13 @@ export default function SymptomChatScreen() {
               return <AnswerCard key={message.id} message={message} />;
             }
             if (message.type === 'regenerated') {
-              return <RegeneratedAnswerCard key={message.id} message={message} />;
+              return (
+                  <RegeneratedAnswerCard
+                      key={message.id}
+                      message={message}
+                      onPressAidGuide={(situation) => navigation.navigate('FirstAidGuide', { situation })}
+                  />
+              );
             }
             return (
                 <ChecklistCard
@@ -109,7 +116,12 @@ export default function SymptomChatScreen() {
               onSubmitEditing={onSend}
               returnKeyType="send"
           />
-          <Pressable style={styles.sendBtn} onPress={onSend} hitSlop={8}>
+          <Pressable
+              style={[styles.sendBtn, loading && styles.sendBtnDisabled]}
+              onPress={onSend}
+              disabled={loading}
+              hitSlop={8}
+          >
             <Ionicons name="arrow-forward" size={18} color={colors.white} />
           </Pressable>
         </View>
@@ -166,4 +178,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  sendBtnDisabled: { backgroundColor: colors.disabled },
 });

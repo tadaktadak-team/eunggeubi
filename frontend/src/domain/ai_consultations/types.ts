@@ -26,6 +26,14 @@ export interface AnswerChatMessage {
   disclaimer?: string;
 }
 
+// 체크리스트까지 반영한 증상 원문이 health_info 컬렉션에 실제 현장 응급처치 콘텐츠가 있는 상황과
+// 관련 있을 때만(4개로 한정하지 않음 - FirstAidGuideService.search 참고) 백엔드가 채워준다 - 최초
+// 답변이 아니라 체크리스트 제출 후 재생성된 답변(RegeneratedAnswerChatMessage)에만 붙는다.
+export interface RelatedAidGuide {
+  situation: FirstAidSituation;
+  title: string;
+}
+
 // 체크리스트 결과를 반영해 다시 생성한 답변(POST /{id}/regenerate). 문장별 인용이 아니라
 // 메시지 전체에 대한 flat 출처 목록 - 백엔드 스키마가 그렇게 되어 있다(AiConsultationController 참고).
 export interface RegeneratedAnswerChatMessage {
@@ -34,6 +42,7 @@ export interface RegeneratedAnswerChatMessage {
   message: string;
   sources: RegeneratedSource[];
   disclaimer: string;
+  relatedAidGuide?: RelatedAidGuide | null;
 }
 
 export interface RegeneratedSource {
@@ -82,9 +91,11 @@ export interface ChecklistItem {
 export const QUICK_SYMPTOMS = ['두통', '복통', '발열', '어지럼'] as const;
 export type QuickSymptom = (typeof QUICK_SYMPTOMS)[number];
 
-// 응급처치 안내 화면의 상황 선택 칩
+// 응급처치 안내 화면의 "빠른 선택" 칩 - 백엔드는 이 4개로 제한하지 않고 health_info 컬렉션에 있는
+// 어떤 상황이든 검색/조회할 수 있어서(FirstAidGuideService), situation은 고정 유니온이 아니라
+// 일반 문자열이다. 이 목록은 화면에 기본으로 보여줄 추천 칩일 뿐이다.
 export const FIRST_AID_SITUATIONS = ['화상', '코피', '골절', '기도막힘'] as const;
-export type FirstAidSituation = (typeof FIRST_AID_SITUATIONS)[number];
+export type FirstAidSituation = string;
 
 // AI상담 탭 내부 네비게이션
 export type AiConsultationStackParamList = {
