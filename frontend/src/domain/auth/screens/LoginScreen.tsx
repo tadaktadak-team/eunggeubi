@@ -18,12 +18,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../hooks/useAuth';
+import { SocialLoginResult, startKakaoLogin, startNaverLogin, startGoogleLogin } from '../api/social';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export default function LoginScreen() {
   const navigation = useNavigation<Nav>();
-  const { signIn } = useAuth();
+  const { signIn, signInWithTokens } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -46,7 +47,31 @@ export default function LoginScreen() {
     }
   };
 
-  const notReady = () => Alert.alert('준비 중', '다음 단계에서 만들 거예요!');
+  const handleSocial = async (start: () => Promise<SocialLoginResult>, label: string) => {
+    try {
+      const result = await start();
+      if (result.type === 'cancel') {
+        return;
+      }
+      if (result.type === 'signup') {
+        // 신규 → 정보 부족(카카오)이면 추가정보 화면, 아니면 약관만
+        if (result.needInfo) {
+          navigation.navigate('SocialExtraInfo', { ticket: result.ticket });
+        } else {
+          navigation.navigate('SocialConsent', { ticket: result.ticket });
+        }
+        return;
+      }
+      // result.type === 'login' → 이미 토큰 받음 → 바로 로그인 상태 전환
+      await signInWithTokens(result);
+    } catch (e: any) {
+      Alert.alert(`${label} 로그인 실패`, e?.message ?? '다시 시도해주세요.');
+    }
+  };
+
+  const onNaverLogin = () => handleSocial(startNaverLogin, '네이버');
+  const onKakaoLogin = () => handleSocial(startKakaoLogin, '카카오');
+  const onGoogleLogin = () => handleSocial(startGoogleLogin, '구글');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -119,15 +144,21 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={[styles.socialBtn, { backgroundColor: colors.kakao }]}
-            onPress={notReady}
+            onPress={onKakaoLogin}
           >
             <Text style={[styles.socialText, { color: colors.kakaoText }]}>카카오로 시작하기</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.socialBtn, { backgroundColor: colors.naver }]}
-            onPress={notReady}
+            onPress={onNaverLogin}
           >
             <Text style={[styles.socialText, { color: colors.white }]}>네이버로 시작하기</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.socialBtn, { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border }]}
+            onPress={onGoogleLogin}
+          >
+            <Text style={[styles.socialText, { color: colors.text }]}>Google로 시작하기</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.guest} onPress={() => navigation.navigate('Tabs')}>

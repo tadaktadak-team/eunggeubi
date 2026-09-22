@@ -11,6 +11,8 @@ export type RootStackParamList = {
   EditProfile: undefined;
   GuardianConsent: { userId: number; email: string };
   GuardianWaiting: { userId: number; email: string; maskedPhone: string };
+  SocialConsent: { ticket: string };
+  SocialExtraInfo: { ticket: string };
 
     EmergencyResult: {
     address: string;
