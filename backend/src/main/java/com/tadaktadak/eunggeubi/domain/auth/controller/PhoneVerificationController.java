@@ -20,9 +20,10 @@ public class PhoneVerificationController {
 
     @PostMapping("/send")
     public ResponseEntity<Void> send(@Valid @RequestBody SendCodeRequest request) {
-        phoneVerificationService.sendCode(request.phone(), request.purpose());
+        phoneVerificationService.sendCode(request.phone(), request.purpose(), request.email());
         return ResponseEntity.ok().build();
     }
+
 
     @PostMapping("/verify")
     public ResponseEntity<Void> verify(@Valid @RequestBody VerifyCodeRequest request) {

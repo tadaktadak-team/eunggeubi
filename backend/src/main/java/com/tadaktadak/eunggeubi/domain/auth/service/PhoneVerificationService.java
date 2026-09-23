@@ -4,6 +4,8 @@ import com.tadaktadak.eunggeubi.domain.auth.entity.PhoneVerification;
 import com.tadaktadak.eunggeubi.domain.auth.entity.Purpose;
 import com.tadaktadak.eunggeubi.domain.auth.entity.VerificationStatus;
 import com.tadaktadak.eunggeubi.domain.auth.repository.PhoneVerificationRepository;
+import com.tadaktadak.eunggeubi.domain.user.entity.User;
+import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.common.MessageType;
 import com.tadaktadak.eunggeubi.global.sms.SmsSender;
 import java.security.SecureRandom;
@@ -21,11 +23,18 @@ public class PhoneVerificationService {
 
     private final PhoneVerificationRepository phoneVerificationRepository;
     private final SmsSender smsSender;
+    private final UserRepository userRepository;
     private final SecureRandom random = new SecureRandom();
 
     // 인증번호 발급 + 발송
     @Transactional
-    public void sendCode(String phone, Purpose purpose) {
+    public void sendCode(String phone, Purpose purpose, String email) {
+        // 비밀번호 찾기는 "그 이메일의 주인"에게만 코드를 보낸다 - 이메일+전화가 같은 회원인지 먼저
+        // 확인하고, 아니면 코드 자체를 발송하지 않는다(임의 번호로 SMS를 유발하는 것도 막힌다).
+        if (purpose == Purpose.FIND_PW) {
+            verifyEmailOwnsPhone(email, phone);
+        }
+
         String code = String.format("%06d", random.nextInt(1_000_000)); // 000000~999999
         LocalDateTime now = LocalDateTime.now();
 
@@ -42,6 +51,19 @@ public class PhoneVerificationService {
         phoneVerificationRepository.save(verification);
 
         smsSender.send(phone, "[응급이] 인증번호 [" + code + "]를 입력해주세요.");
+    }
+
+    // 이메일 주인과 입력한 전화번호가 같은 회원인지 확인한다. 어느 쪽이 틀렸는지는 구분해서 알려주지
+    // 않는다(이메일 존재 여부가 노출되면 계정 탐색에 악용될 수 있어 메시지를 하나로 통일 - resetPassword와 동일).
+    private void verifyEmailOwnsPhone(String email, String phone) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("가입한 이메일을 입력해주세요.");
+        }
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalArgumentException("일치하는 회원 정보가 없습니다."));
+        if (!phone.equals(user.getPhone())) {
+            throw new IllegalArgumentException("일치하는 회원 정보가 없습니다.");
+        }
     }
 
     // 인증번호 검증
@@ -67,6 +89,7 @@ public class PhoneVerificationService {
 
         verification.markVerified(LocalDateTime.now());
     }
+
     // 가입/비번찾기 전, 해당 번호가 인증 완료 상태인지 확인 (아니면 예외)
     @Transactional(readOnly = true)
     public void ensureVerified(String phone, Purpose purpose) {
