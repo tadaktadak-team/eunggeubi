@@ -24,13 +24,21 @@ public class SolapiSmsSender implements SmsSender {
                 apiKey, apiSecret, "https://api.solapi.com");
         this.from = from;
     }
-
+    
     @Override
     public void send(String to, String text) {
+        send(to, null, text);
+    }
+
+    @Override
+    public void send(String to, String subject, String text) {
         Message message = new Message();
         message.setFrom(from);
         message.setTo(to);
         message.setText(text);
+        if (subject != null) {
+            message.setSubject(subject);
+        }
 
         try {
             SingleMessageSentResponse response =
