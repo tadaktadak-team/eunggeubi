@@ -101,7 +101,7 @@ public class AuthService {
     @Transactional
     public LoginResponse reissue(String refreshToken) {
         // 1. 토큰 자체 유효성 (서명·만료)
-        if (!jwtProvider.validateToken(refreshToken)) {
+        if (!jwtProvider.isRefreshToken(refreshToken)) {
             throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다.");
         }
 

@@ -6,8 +6,11 @@ import com.tadaktadak.eunggeubi.domain.user.entity.Guardian;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
 import com.tadaktadak.eunggeubi.domain.user.repository.GuardianRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
-import com.tadaktadak.eunggeubi.global.sms.SmsSender;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,7 +21,11 @@ public class EmergencyService {
 
     private final UserRepository userRepository;
     private final GuardianRepository guardianRepository;
-    private final SmsSender smsSender;
+    private final EmergencyAlertNotifier notifier;
+
+    private static final DateTimeFormatter SENT_AT_FORMAT =
+            DateTimeFormatter.ofPattern("M월 d일 HH:mm");
+    private static final String SMS_SUBJECT = "[응급이] 응급 상황 알림";
 
     public EmergencyAlertResponse sendAlert(Long userId, EmergencyAlertRequest request) {
         User user = userRepository.findById(userId)
@@ -26,32 +33,38 @@ public class EmergencyService {
 
         List<Guardian> guardians = guardianRepository.findByUserIdAndNotifyEnabledTrue(userId);
 
-        String mapLink = "https://map.kakao.com/link/map/현재위치,"
-                + request.latitude() + "," + request.longitude();
-        String message = user.getName()
-                + " 님이 응급 상황으로 서비스 이용 중, 현재 위치: " + mapLink;
+        LocalDateTime sentAt = LocalDateTime.now();
+        String mapLink = "https://map.kakao.com/link/map/"
+                + URLEncoder.encode(user.getName() + "님 위치", StandardCharsets.UTF_8).replace("+", "%20")
+                + "," + request.latitude() + "," + request.longitude();
+
+        String where = (request.address() == null || request.address().isBlank())
+                ? "위치: " + mapLink
+                : "위치: " + request.address() + "\n지도: " + mapLink;
+
+        String message = user.getName() + " 님이 긴급 호출을 눌렀습니다.\n"
+                + "119 연결과 함께 보호자에게 위치를 보냅니다.\n\n"
+                + "시각: " + sentAt.format(SENT_AT_FORMAT) + "\n"
+                + where;
+
+        for (Guardian guardian : guardians) {
+            notifier.notifyGuardian(guardian.getPhone(), SMS_SUBJECT, message);
+        }
 
         List<EmergencyAlertResponse.GuardianResult> results = guardians.stream()
-                .map(guardian -> sendToGuardian(guardian, message))
+                .map(this::toSendingResult)
                 .toList();
 
-        return new EmergencyAlertResponse(LocalDateTime.now(), message, results);
+        return new EmergencyAlertResponse(sentAt, message, results);
     }
 
-    // 보호자 개별 전송
-    private EmergencyAlertResponse.GuardianResult sendToGuardian(Guardian guardian, String message) {
-        String status;
-        try {
-            smsSender.send(guardian.getPhone(), message);
-            status = "SENT";
-        } catch (Exception e) {
-            status = "FAILED";
-        }
+    // 발송은 비동기라 응답 시점에는 결과를 알 수 없다. 접수 사실만 돌려준다.
+    private EmergencyAlertResponse.GuardianResult toSendingResult(Guardian guardian) {
         return new EmergencyAlertResponse.GuardianResult(
                 guardian.getName(),
                 guardian.getPhone(),
                 guardian.getRelationship(),
-                status
+                "SENDING"
         );
     }
 }
