@@ -22,7 +22,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
 
         // 토큰이 있고 유효하면 → "이 사람은 로그인된 회원"이라고 등록
-        if (token != null && jwtProvider.validateToken(token)) {
+        if (token != null && jwtProvider.isAccessToken(token)) {
             Long userId = jwtProvider.getUserId(token);
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(userId, null, List.of());
