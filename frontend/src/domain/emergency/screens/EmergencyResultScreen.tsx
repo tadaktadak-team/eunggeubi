@@ -17,10 +17,9 @@ const RELATIONSHIP_LABEL: Record<Relationship, string> = {
 
 type ResultRoute = RouteProp<RootStackParamList, 'EmergencyResult'>;
 
-// 발송 결과를 그대로 반영한다. 실제로 못 갔는데 갔다고 보이면 사용자가 도움을 기다리게 된다.
+// 문자 발송이 비동기라 응답 시점에는 접수 여부까지만 알 수 있다. 갔다고 단정하지 않는다.
 function buildSummary(guardians: GuardianResult[]) {
-  const sent = guardians.filter((g) => g.status === 'SENT').length;
-  const failed = guardians.length - sent;
+  const failed = guardians.filter((g) => g.status === 'FAILED').length;
 
   if (guardians.length === 0) {
     return {
@@ -30,7 +29,7 @@ function buildSummary(guardians: GuardianResult[]) {
       sub: '마이페이지 > 보호자 관리에서 보호자를 등록해주세요.',
     };
   }
-  if (sent === 0) {
+  if (failed === guardians.length) {
     return {
       ok: false,
       icon: 'close-circle' as const,
@@ -38,15 +37,12 @@ function buildSummary(guardians: GuardianResult[]) {
       sub: '직접 연락하시거나 119로 전화해주세요.',
     };
   }
-  if (failed > 0) {
-    return {
-      ok: false,
-      icon: 'alert-circle' as const,
-      title: `보호자 ${sent}명에게 알림 발송됨`,
-      sub: `${failed}명은 전송에 실패했어요. 직접 연락이 필요해요.`,
-    };
-  }
-  return { ok: true, icon: 'checkmark' as const, title: '보호자에게 알림 발송됨', sub: null };
+  return {
+    ok: true,
+    icon: 'checkmark' as const,
+    title: `보호자 ${guardians.length - failed}명에게 알림 발송 중`,
+    sub: '문자가 도착하기까지 몇 초 걸릴 수 있어요.',
+  };
 }
 
 export default function EmergencyResultScreen() {
@@ -98,10 +94,10 @@ export default function EmergencyResultScreen() {
             <Text style={styles.guardianName}>
               {g.name} ({RELATIONSHIP_LABEL[g.relationship]})
             </Text>
-            {g.status === 'SENT' ? (
-              <Text style={styles.sent}>전송됨 ✓</Text>
-            ) : (
+            {g.status === 'FAILED' ? (
               <Text style={styles.failed}>전송 실패</Text>
+            ) : (
+              <Text style={styles.sent}>발송 중</Text>
             )}
           </View>
         ))}

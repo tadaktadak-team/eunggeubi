@@ -6,7 +6,6 @@ import com.tadaktadak.eunggeubi.domain.user.entity.Guardian;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
 import com.tadaktadak.eunggeubi.domain.user.repository.GuardianRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
-import com.tadaktadak.eunggeubi.global.sms.SmsSender;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +21,7 @@ public class EmergencyService {
 
     private final UserRepository userRepository;
     private final GuardianRepository guardianRepository;
-    private final SmsSender smsSender;
+    private final EmergencyAlertNotifier notifier;
 
     private static final DateTimeFormatter SENT_AT_FORMAT =
             DateTimeFormatter.ofPattern("M월 d일 HH:mm");
@@ -48,27 +47,24 @@ public class EmergencyService {
                 + "시각: " + sentAt.format(SENT_AT_FORMAT) + "\n"
                 + where;
 
+        for (Guardian guardian : guardians) {
+            notifier.notifyGuardian(guardian.getPhone(), SMS_SUBJECT, message);
+        }
+
         List<EmergencyAlertResponse.GuardianResult> results = guardians.stream()
-                .map(guardian -> sendToGuardian(guardian, message))
+                .map(this::toSendingResult)
                 .toList();
 
         return new EmergencyAlertResponse(sentAt, message, results);
     }
 
-    // 보호자 개별 전송
-    private EmergencyAlertResponse.GuardianResult sendToGuardian(Guardian guardian, String message) {
-        String status;
-        try {
-            smsSender.send(guardian.getPhone(), SMS_SUBJECT, message);
-            status = "SENT";
-        } catch (Exception e) {
-            status = "FAILED";
-        }
+    // 발송은 비동기라 응답 시점에는 결과를 알 수 없다. 접수 사실만 돌려준다.
+    private EmergencyAlertResponse.GuardianResult toSendingResult(Guardian guardian) {
         return new EmergencyAlertResponse.GuardianResult(
                 guardian.getName(),
                 guardian.getPhone(),
                 guardian.getRelationship(),
-                status
+                "SENDING"
         );
     }
 }
