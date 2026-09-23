@@ -3,6 +3,7 @@ import { RouteProp, useRoute } from '@react-navigation/native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import AppHeader from '../../../shared/components/AppHeader';
+import EmergencyMapView from '../components/EmergencyMapView';
 import { RootStackParamList } from '../../../navigation/types';
 import { GuardianResult, Relationship } from '../types';
 import { colors } from '../../../shared/theme/theme';
@@ -50,7 +51,14 @@ function buildSummary(guardians: GuardianResult[]) {
 
 export default function EmergencyResultScreen() {
   const { params } = useRoute<ResultRoute>();
-  const { address, message, guardians } = params;
+  const { address, message, guardians, latitude, longitude } = params;
+
+  // 문자 원문에서 링크 줄은 뺀다 (위치는 지도로 직접 보여준다)
+  const messagePreview = message
+    .split('\n')
+    .filter((line) => !line.includes('http'))
+    .join('\n')
+    .trim();
 
   const summary = buildSummary(guardians);
   const accent = summary.ok ? colors.success : colors.danger;
@@ -65,9 +73,12 @@ export default function EmergencyResultScreen() {
         <Text style={styles.title}>{summary.title}</Text>
         {summary.sub && <Text style={styles.subtitle}>{summary.sub}</Text>}
 
-        <View style={styles.locationBadge}>
-          <Ionicons name="location" size={14} color={colors.white} />
-          <Text style={styles.locationBadgeText}>현재 위치</Text>
+        <View style={styles.mapCard}>
+          <EmergencyMapView latitude={latitude} longitude={longitude} />
+          <View style={styles.locationBadge}>
+            <Ionicons name="location" size={14} color={colors.white} />
+            <Text style={styles.locationBadgeText}>현재 위치</Text>
+          </View>
         </View>
         <Text style={styles.address}>{address}</Text>
 
@@ -77,7 +88,7 @@ export default function EmergencyResultScreen() {
               <Ionicons name="notifications-outline" size={16} color={colors.textSub} />
               <Text style={styles.cardHeaderText}>발송 메시지</Text>
             </View>
-            <Text style={styles.message}>“{message}”</Text>
+            <Text style={styles.message}>{messagePreview}</Text>
           </View>
         )}
 
@@ -119,7 +130,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
+  mapCard: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 20,
+    backgroundColor: colors.inputBg,
+  },
   locationBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
@@ -127,7 +149,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     gap: 4,
-    marginTop: 20,
   },
   locationBadgeText: { color: colors.white, fontWeight: 'bold', fontSize: 13 },
   address: { marginTop: 10, marginBottom: 20, fontSize: 15, color: colors.text },

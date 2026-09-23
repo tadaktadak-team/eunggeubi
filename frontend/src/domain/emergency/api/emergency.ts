@@ -7,10 +7,10 @@ export interface SendAlertResponse {
   guardians: GuardianResult[];
 }
 
-export function sendEmergencyAlert(latitude: number, longitude: number) {
+export function sendEmergencyAlert(latitude: number, longitude: number, address?: string) {
   return api.post<SendAlertResponse>(
     '/api/emergency/alert',
-    { latitude, longitude },
-    { auth: true }, // accessToken 자동 첨부
+    { latitude, longitude, address },
+    { auth: true },
   );
 }

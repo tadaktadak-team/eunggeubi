@@ -39,10 +39,14 @@ public class EmergencyService {
                 + URLEncoder.encode(user.getName() + "님 위치", StandardCharsets.UTF_8).replace("+", "%20")
                 + "," + request.latitude() + "," + request.longitude();
 
+        String where = (request.address() == null || request.address().isBlank())
+                ? "위치: " + mapLink
+                : "위치: " + request.address() + "\n지도: " + mapLink;
+
         String message = user.getName() + " 님이 긴급 호출을 눌렀습니다.\n"
                 + "119 연결과 함께 보호자에게 위치를 보냅니다.\n\n"
                 + "시각: " + sentAt.format(SENT_AT_FORMAT) + "\n"
-                + "위치: " + mapLink;
+                + where;
 
         List<EmergencyAlertResponse.GuardianResult> results = guardians.stream()
                 .map(guardian -> sendToGuardian(guardian, message))

@@ -24,7 +24,7 @@ public class SolapiSmsSender implements SmsSender {
                 apiKey, apiSecret, "https://api.solapi.com");
         this.from = from;
     }
-    
+
     @Override
     public void send(String to, String text) {
         send(to, null, text);

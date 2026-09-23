@@ -46,20 +46,20 @@ export function useEmergency() {
         (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
       const { latitude, longitude } = pos.coords;
 
-      // 알림 전송과 주소 변환을 동시에 진행
-      const [result, geo] = await Promise.all([
-        sendEmergencyAlert(latitude, longitude),
-        Location.reverseGeocodeAsync({ latitude, longitude }).catch(() => []),
-      ]);
-
+      // 문자에 주소를 함께 담기 위해 좌표를 먼저 주소로 변환한다
+      const geo = await Location.reverseGeocodeAsync({ latitude, longitude }).catch(() => []);
       let address = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
       if (geo.length > 0) {
         const g = geo[0];
         address = [g.city, g.district, g.street, g.name].filter(Boolean).join(' ');
       }
 
+      const result = await sendEmergencyAlert(latitude, longitude, address);
+
       navigation.navigate('EmergencyResult', {
         address,
+        latitude,
+        longitude,
         sentAt: result.sentAt,
         message: result.message,
         guardians: result.guardians,
