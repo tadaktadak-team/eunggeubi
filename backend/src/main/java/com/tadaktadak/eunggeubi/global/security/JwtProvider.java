@@ -66,20 +66,19 @@ public class JwtProvider {
         return expiration.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
     }
 
-    // 토큰이 유효한지 검사 (위조·만료면 false)
-    public boolean validateToken(String token) {
+    // access 토큰인지 검사 (서명·만료·종류)
+    public boolean isAccessToken(String token) {
         try {
-            parseClaims(token);
-            return true;
+            return TYPE_ACCESS.equals(parseClaims(token).get(CLAIM_TYPE, String.class));
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
 
-    // access 토큰인지 검사 (서명·만료·종류)
-    public boolean isAccessToken(String token) {
+    // refresh 토큰인지 검사 (서명·만료·종류)
+    public boolean isRefreshToken(String token) {
         try {
-            return TYPE_ACCESS.equals(parseClaims(token).get(CLAIM_TYPE, String.class));
+            return TYPE_REFRESH.equals(parseClaims(token).get(CLAIM_TYPE, String.class));
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
