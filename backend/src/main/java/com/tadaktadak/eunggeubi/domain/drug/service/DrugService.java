@@ -72,7 +72,7 @@ public class DrugService {
     }
 
     /**
-     * 2. 약품 상세 조회 API 연동 (itemSeq/약품명 기반 조회)
+     * 2. 약품 상세 조회 API 연동 (itemSeq 기반 조회)
      */
     public DrugInfoResponse getDrugDetail(String itemSeq) {
         String responseString;
@@ -83,7 +83,7 @@ public class DrugService {
 
             URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
                     .queryParam("serviceKey", serviceKey)
-                    .queryParam("itemName", encodedItemSeq)
+                    .queryParam("itemSeq", encodedItemSeq)
                     .queryParam("type", "json")
                     .queryParam("numOfRows", 1)
                     .build(true)

@@ -1,29 +1,29 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AiConsultationNavigator from '../domain/ai_consultations/screens/AiConsultationNavigator';
-import FindAccountScreen from '../domain/auth/screens/FindAccountScreen';
 import { useAuth } from '../domain/auth/hooks/useAuth';
+import LoginRequiredSheet from '../domain/auth/components/LoginRequiredSheet';
+import FindAccountScreen from '../domain/auth/screens/FindAccountScreen';
+import GuardianConsentScreen from '../domain/auth/screens/GuardianConsentScreen';
+import GuardianWaitingScreen from '../domain/auth/screens/GuardianWaitingScreen';
 import LoginScreen from '../domain/auth/screens/LoginScreen';
 import SignupCompleteScreen from '../domain/auth/screens/SignupCompleteScreen';
 import SignupScreen from '../domain/auth/screens/SignupScreen';
-import SplashScreen from '../domain/auth/screens/SplashScreen';
-import EditProfileScreen from '../domain/user/screens/EditProfileScreen';
-import GuardianConsentScreen from '../domain/auth/screens/GuardianConsentScreen';
-import GuardianWaitingScreen from '../domain/auth/screens/GuardianWaitingScreen';
 import SocialConsentScreen from '../domain/auth/screens/SocialConsentScreen';
 import SocialExtraInfoScreen from '../domain/auth/screens/SocialExtraInfoScreen';
+import SplashScreen from '../domain/auth/screens/SplashScreen';
+import DrugNavigator from '../domain/drug/screens/DrugNavigator';
 import EmergencyResultScreen from '../domain/emergency/screens/EmergencyResultScreen';
-import PlaceholderScreen from '../shared/components/PlaceholderScreen';
-import LegalScreen from '../shared/screens/LegalScreen';
-import TabBar from '../shared/components/TabBar';
-import { RootStackParamList } from './types';
-import { useState } from 'react';
-import LoginRequiredSheet from '../domain/auth/screens/../components/LoginRequiredSheet';
-import MyPageNavigator from '../domain/mypage/screens/MyPageNavigator';
-import MedicalLocatorScreen from '../domain/medical_locator/screens/MedicalLocatorScreen';
 import HospitalDetailScreen from '../domain/medical_locator/screens/HospitalDetailScreen';
+import MedicalLocatorScreen from '../domain/medical_locator/screens/MedicalLocatorScreen';
+import MyPageNavigator from '../domain/mypage/screens/MyPageNavigator';
+import EditProfileScreen from '../domain/user/screens/EditProfileScreen';
+import TabBar from '../shared/components/TabBar';
+import LegalScreen from '../shared/screens/LegalScreen';
+import { RootStackParamList } from './types';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -37,9 +37,7 @@ function TabsNavigator() {
       <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
         <Tab.Screen name="AiChat" component={AiConsultationNavigator} options={{ title: 'AI상담' }} />
         <Tab.Screen name="Hospital" component={MedicalLocatorScreen} options={{ title: '병원찾기' }} />
-        <Tab.Screen name="Medicine" options={{ title: '약물정보' }}>
-          {() => <PlaceholderScreen name="약물정보" />}
-        </Tab.Screen>
+        <Tab.Screen name="Medicine" component={DrugNavigator} options={{ title: '약물정보' }} />
         <Tab.Screen name="My" component={MyPageNavigator} options={{ title: '마이' }} />
       </Tab.Navigator>
 
