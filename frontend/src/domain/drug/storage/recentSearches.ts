@@ -7,6 +7,7 @@ export interface RecentDrug {
   itemSeq: string;
   name: string;
   drugType?: string;
+  itemImage?: string;
 }
 
 export async function getRecentSearches(): Promise<RecentDrug[]> {

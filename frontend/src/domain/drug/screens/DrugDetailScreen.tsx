@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { getDrugDetail, DrugInfoResponse } from '../api/drug';
+import { stripHtmlTags } from '../../../shared/utils/html';
+import { getDrugFormIconName } from '../utils/drugIcon';
 
 // 값이 있는 항목만 화면에 표시 (없는 걸 빈 줄로 보여주면 오히려 오해를 줌)
 function buildAppearanceRows(drug: DrugInfoResponse): { label: string; value: string }[] {
@@ -70,7 +72,11 @@ const DrugDetailScreen = ({ route }: any) => {
         {/* 약물 요약 카드 */}
         <View style={styles.summaryCard}>
           <View style={styles.iconContainer}>
-            <MaterialCommunityIcons name="pill" size={32} color={colors.primary} />
+            {drug.itemImage ? (
+              <Image source={{ uri: drug.itemImage }} style={styles.drugImage} />
+            ) : (
+              <MaterialCommunityIcons name={getDrugFormIconName(drug.name)} size={32} color={colors.primary} />
+            )}
           </View>
           <Text style={styles.drugName}>{drug.name}</Text>
           {drug.drugType && (
@@ -96,14 +102,14 @@ const DrugDetailScreen = ({ route }: any) => {
         {drug.efficacy && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>효능 · 효과</Text>
-            <Text style={styles.bodyText}>{drug.efficacy}</Text>
+            <Text style={styles.bodyText}>{stripHtmlTags(drug.efficacy)}</Text>
           </View>
         )}
 
         {drug.useInfo && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>용법 · 용량</Text>
-            <Text style={styles.bodyText}>{drug.useInfo}</Text>
+            <Text style={styles.bodyText}>{stripHtmlTags(drug.useInfo)}</Text>
           </View>
         )}
 
@@ -113,7 +119,7 @@ const DrugDetailScreen = ({ route }: any) => {
               <Feather name="alert-triangle" size={18} color={colors.danger} style={{ marginRight: spacing.xs }} />
               <Text style={styles.cautionTitle}>주의사항</Text>
             </View>
-            <Text style={styles.cautionText}>{drug.caution}</Text>
+            <Text style={styles.cautionText}>{stripHtmlTags(drug.caution)}</Text>
           </View>
         )}
       </ScrollView>
@@ -156,6 +162,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.md,
+    overflow: 'hidden',
+  },
+  drugImage: {
+    width: 64,
+    height: 64,
   },
   drugName: {
     fontSize: font.h2,

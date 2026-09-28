@@ -23,27 +23,18 @@ async function send(method: Method, path: string, body: unknown, token: string |
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  // ▼▼▼ 여기 2줄 추가 ▼▼▼
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 35000);
-  // ▲▲▲ 여기까지 추가 ▲▲▲
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  // ▼ 이 1줄 추가
-  console.log('[api] 요청 시작:', `${API_BASE_URL}${path}`);
-
-  // ▼ 원래는 이 자리에 그냥 "return fetch(...)"가 있었음
-  //   그걸 try/finally로 감싸는 것으로 변경
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: controller.signal, // ← fetch 옵션 안에 이 줄 추가
+      signal: controller.signal,
     });
-    console.log('[api] 응답 받음:', response.status); // ← 이 1줄 추가
     return response;
   } finally {
-    // ▼ 이 블록 추가
     clearTimeout(timeoutId);
   }
 }

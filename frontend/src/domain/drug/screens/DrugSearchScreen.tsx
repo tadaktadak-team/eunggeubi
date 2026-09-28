@@ -8,34 +8,66 @@ import {
   ActivityIndicator,
   StyleSheet,
   Image,
+  Alert,
 } from 'react-native';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchDrugsByName, DrugInfoResponse } from '../api/drug';
 import { addRecentSearch } from '../storage/recentSearches';
+import { stripHtmlTags } from '../../../shared/utils/html';
+import { getDrugFormIconName } from '../utils/drugIcon';
+
+const NUM_OF_ROWS = 10;
 
 const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const initialKeyword: string = route?.params?.initialKeyword ?? '';
 
   const [keyword, setKeyword] = useState(initialKeyword);
+  const [searchedKeyword, setSearchedKeyword] = useState('');
   const [drugs, setDrugs] = useState<DrugInfoResponse[]>([]);
+  const [pageNo, setPageNo] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
 
+  // 새 검색어로 첫 페이지부터 다시 검색
   const runSearch = async (kw: string) => {
     if (!kw.trim()) return;
     try {
       setLoading(true);
       setSearched(true);
-      const results = await searchDrugsByName(kw.trim());
-      setDrugs(results);
+      setSearchedKeyword(kw.trim());
+      const result = await searchDrugsByName(kw.trim(), 1, NUM_OF_ROWS);
+      setDrugs(result.items);
+      setPageNo(1);
+      setTotalCount(result.totalCount);
     } catch (error) {
       console.error('약품 검색 오류:', error);
-      alert('검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
+      Alert.alert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 스크롤이 끝에 닿으면 다음 페이지를 이어붙임
+  const loadMore = async () => {
+    if (loading || loadingMore) return;
+    if (drugs.length >= totalCount) return;
+
+    const nextPage = pageNo + 1;
+    try {
+      setLoadingMore(true);
+      const result = await searchDrugsByName(searchedKeyword, nextPage, NUM_OF_ROWS);
+      setDrugs((prev) => [...prev, ...result.items]);
+      setPageNo(nextPage);
+      setTotalCount(result.totalCount);
+    } catch (error) {
+      console.error('약품 검색 추가 로딩 오류:', error);
+    } finally {
+      setLoadingMore(false);
     }
   };
 
@@ -87,6 +119,13 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
           data={drugs}
           keyExtractor={(item) => item.itemSeq}
           contentContainerStyle={styles.listContent}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator size="small" color={colors.primary} style={styles.footerLoading} />
+            ) : null
+          }
           ListEmptyComponent={
             searched ? (
               <View style={styles.centerContainer}>
@@ -103,7 +142,12 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
             <TouchableOpacity
               style={styles.card}
               onPress={() => {
-                addRecentSearch({ itemSeq: item.itemSeq, name: item.name, drugType: item.drugType });
+                addRecentSearch({
+                  itemSeq: item.itemSeq,
+                  name: item.name,
+                  drugType: item.drugType,
+                  itemImage: item.itemImage,
+                });
                 navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
               }}
             >
@@ -111,7 +155,11 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
                 <Image source={{ uri: item.itemImage }} style={styles.drugImage} />
               ) : (
                 <View style={styles.noImage}>
-                  <Feather name="image" size={22} color={colors.placeholder} />
+                  <MaterialCommunityIcons
+                    name={getDrugFormIconName(item.name)}
+                    size={28}
+                    color={colors.placeholder}
+                  />
                 </View>
               )}
               <View style={styles.cardInfo}>
@@ -125,7 +173,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
                 )}
                 {item.efficacy && (
                   <Text style={styles.efcyText} numberOfLines={2}>
-                    {item.efficacy.replace(/<[^>]*>?/g, '')}
+                    {stripHtmlTags(item.efficacy)}
                   </Text>
                 )}
               </View>
@@ -166,6 +214,7 @@ const styles = StyleSheet.create({
   },
   searchBtnText: { color: colors.white, fontWeight: 'bold', fontSize: font.body },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  footerLoading: { marginVertical: spacing.lg },
   centerContainer: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   loadingText: { marginTop: spacing.md, fontSize: font.sub, color: colors.textSub },
   emptyText: { fontSize: font.body, color: colors.textSub },

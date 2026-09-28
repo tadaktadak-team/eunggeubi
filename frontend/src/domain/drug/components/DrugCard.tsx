@@ -1,20 +1,26 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { getDrugFormIconName } from '../utils/drugIcon';
 
 interface DrugCardProps {
   name: string;         // 예: 타이레놀정500밀리그람
   drugType?: string;    // 예: 일반의약품
+  itemImage?: string;   // 알약 이미지 URL (없으면 제형 추정 아이콘으로 대체)
   onPress?: () => void;
 }
 
-const DrugCard = ({ name, drugType, onPress }: DrugCardProps) => {
+const DrugCard = ({ name, drugType, itemImage, onPress }: DrugCardProps) => {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.iconContainer}>
-        <MaterialCommunityIcons name="pill" size={24} color={colors.primary} />
+        {itemImage ? (
+          <Image source={{ uri: itemImage }} style={styles.image} />
+        ) : (
+          <MaterialCommunityIcons name={getDrugFormIconName(name)} size={24} color={colors.primary} />
+        )}
       </View>
 
       <View style={styles.infoContainer}>
@@ -46,6 +52,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.lg,
+    overflow: 'hidden',
+  },
+  image: {
+    width: 48,
+    height: 48,
   },
   infoContainer: {
     flex: 1,

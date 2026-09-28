@@ -84,6 +84,7 @@ const DrugHomeScreen = ({ navigation }: any) => {
                 key={drug.itemSeq}
                 name={drug.name}
                 drugType={drug.drugType}
+                itemImage={drug.itemImage}
                 onPress={() => navigation.navigate('DrugDetail', { itemSeq: drug.itemSeq })}
               />
             ))

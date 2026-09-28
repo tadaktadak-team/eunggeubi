@@ -14,13 +14,24 @@ export interface DrugInfoResponse {
   itemImage?: string;    // 알약 이미지 URL
 }
 
+export interface DrugSearchPageResponse {
+  items: DrugInfoResponse[];
+  pageNo: number;
+  numOfRows: number;
+  totalCount: number;
+}
+
 /*
-1. 약품명 키워드 검색 API
-백엔드 엔드포인트: GET /api/drugs/search?keyword={keyword}
+1. 약품명 키워드 검색 API (페이지네이션)
+백엔드 엔드포인트: GET /api/drugs/search?keyword={keyword}&pageNo={pageNo}&numOfRows={numOfRows}
 */
-export const searchDrugsByName = async (keyword: string): Promise<DrugInfoResponse[]> => {
-  return api.get<DrugInfoResponse[]>(
-    `/api/drugs/search?keyword=${encodeURIComponent(keyword)}`,
+export const searchDrugsByName = async (
+  keyword: string,
+  pageNo: number = 1,
+  numOfRows: number = 10,
+): Promise<DrugSearchPageResponse> => {
+  return api.get<DrugSearchPageResponse>(
+    `/api/drugs/search?keyword=${encodeURIComponent(keyword)}&pageNo=${pageNo}&numOfRows=${numOfRows}`,
   );
 };
 
