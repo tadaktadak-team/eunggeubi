@@ -14,8 +14,10 @@ export type RootStackParamList = {
   SocialConsent: { ticket: string };
   SocialExtraInfo: { ticket: string };
 
-    EmergencyResult: {
+  EmergencyResult: {
     address: string;
+    latitude: number;
+    longitude: number;
     sentAt: string;
     message: string;
     guardians: GuardianResult[];

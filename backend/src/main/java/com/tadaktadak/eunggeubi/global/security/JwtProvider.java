@@ -15,6 +15,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwtProvider {
 
+    private static final String CLAIM_TYPE = "tokenType";
+    private static final String TYPE_ACCESS = "access";
+    private static final String TYPE_REFRESH = "refresh";
+
     private final SecretKey key;
     private final long accessTokenValidityMs;
     private final long refreshTokenValidityMs;
@@ -30,20 +34,21 @@ public class JwtProvider {
 
     // access 토큰 생성
     public String createAccessToken(Long userId) {
-        return createToken(userId, accessTokenValidityMs);
+        return createToken(userId, accessTokenValidityMs, TYPE_ACCESS);
     }
 
     // refresh 토큰 생성
     public String createRefreshToken(Long userId) {
-        return createToken(userId, refreshTokenValidityMs);
+        return createToken(userId, refreshTokenValidityMs, TYPE_REFRESH);
     }
 
-    private String createToken(Long userId, long validityMs) {
+    private String createToken(Long userId, long validityMs, String tokenType) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + validityMs);
         return Jwts.builder()
                 .id(java.util.UUID.randomUUID().toString()) // 매번 고유(jti) → 같은 초에 만들어도 토큰이 달라짐
                 .subject(String.valueOf(userId)) // 토큰 주인 = 회원 id
+                .claim(CLAIM_TYPE, tokenType) //access/refresh 구분
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
@@ -61,11 +66,19 @@ public class JwtProvider {
         return expiration.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
     }
 
-    // 토큰이 유효한지 검사 (위조·만료면 false)
-    public boolean validateToken(String token) {
+    // access 토큰인지 검사 (서명·만료·종류)
+    public boolean isAccessToken(String token) {
         try {
-            parseClaims(token);
-            return true;
+            return TYPE_ACCESS.equals(parseClaims(token).get(CLAIM_TYPE, String.class));
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    // refresh 토큰인지 검사 (서명·만료·종류)
+    public boolean isRefreshToken(String token) {
+        try {
+            return TYPE_REFRESH.equals(parseClaims(token).get(CLAIM_TYPE, String.class));
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
