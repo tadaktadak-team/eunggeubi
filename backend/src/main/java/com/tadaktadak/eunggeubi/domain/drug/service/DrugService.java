@@ -3,6 +3,7 @@ package com.tadaktadak.eunggeubi.domain.drug.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tadaktadak.eunggeubi.domain.drug.dto.DrugInfoResponse;
+import com.tadaktadak.eunggeubi.domain.drug.dto.DrugSearchPageResponse;
 import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,19 +33,29 @@ public class DrugService {
     private String serviceKey;
 
     /**
-     * 1. 약품명 키워드 검색 API 연동
+     * 1. 약품명 키워드 검색 API 연동 (페이지네이션)
      */
-    public List<DrugInfoResponse> searchDrugsByName(String keyword) {
+    public DrugSearchPageResponse searchDrugsByName(String keyword, int pageNo, int numOfRows) {
         List<DrugInfoResponse> resultList = new ArrayList<>();
+        int totalCount = 0;
 
         try {
-            String encodedKeyword = URLEncoder.encode(keyword, StandardCharsets.UTF_8.toString());
+            // e약은요 API의 itemName은 등록된 약품명 문자열과의 부분일치 검색이라 공백까지 그대로 비교한다.
+            // 그런데 실제 약품명(예: "어린이타이레놀산...")에는 공백이 없어서, 사용자가 "어린이 타이레놀"처럼
+            // 띄어 검색하면 아예 매칭되지 않는다. 검색어의 공백을 제거해 실제 약품명 표기와 맞춰준다.
+            String sanitizedKeyword = keyword.replaceAll("\\s+", "");
+
+            // URLEncoder는 공백을 '+'로 인코딩하는데, build(true)는 이미 인코딩된 값으로 보고 그대로 전송한다.
+            // 혹시 모를 공백이 남더라도 '+'가 아니라 '%20'으로 전달되도록 방어적으로 치환한다.
+            String encodedKeyword = URLEncoder.encode(sanitizedKeyword, StandardCharsets.UTF_8.toString())
+                    .replace("+", "%20");
 
             URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
                     .queryParam("serviceKey", serviceKey)
                     .queryParam("itemName", encodedKeyword)
                     .queryParam("type", "json")
-                    .queryParam("numOfRows", 10)
+                    .queryParam("pageNo", pageNo)
+                    .queryParam("numOfRows", numOfRows)
                     .build(true)
                     .toUri();
 
@@ -54,7 +65,9 @@ public class DrugService {
             // 💡 추가된 부분: 본문을 열어보기 전에 게이트웨이/서비스 에러 검증
             validateApiResponse(rootNode);
 
-            JsonNode itemsNode = rootNode.path("body").path("items");
+            JsonNode bodyNode = rootNode.path("body");
+            totalCount = bodyNode.path("totalCount").asInt(0);
+            JsonNode itemsNode = bodyNode.path("items");
 
             if (itemsNode.isArray()) {
                 for (JsonNode item : itemsNode) {
@@ -68,11 +81,16 @@ public class DrugService {
             throw new ExternalApiException("e약은요 API 연동 중 오류가 발생했습니다.", e);
         }
 
-        return resultList;
+        return DrugSearchPageResponse.builder()
+                .items(resultList)
+                .pageNo(pageNo)
+                .numOfRows(numOfRows)
+                .totalCount(totalCount)
+                .build();
     }
 
     /**
-     * 2. 약품 상세 조회 API 연동 (itemSeq/약품명 기반 조회)
+     * 2. 약품 상세 조회 API 연동 (itemSeq 기반 조회)
      */
     public DrugInfoResponse getDrugDetail(String itemSeq) {
         String responseString;
@@ -83,14 +101,14 @@ public class DrugService {
 
             URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
                     .queryParam("serviceKey", serviceKey)
-                    .queryParam("itemName", encodedItemSeq)
+                    .queryParam("itemSeq", encodedItemSeq)
                     .queryParam("type", "json")
                     .queryParam("numOfRows", 1)
                     .build(true)
                     .toUri();
 
             responseString = restTemplate.getForObject(uri, String.class);
-            log.info("e약은요 API 상세조회 응답: {}", responseString);
+            log.debug("e약은요 API 상세조회 응답: {}", responseString);
 
         } catch (Exception e) {
             log.error("e약은요 Open API 상세조회 통신 실패: {}", e.getMessage(), e);
@@ -151,7 +169,9 @@ public class DrugService {
                 .useInfo(getTextOrNull(item, "useMethodQesitm"))
                 .caution(getTextOrNull(item, "atpnQesitm"))
                 .itemImage(getTextOrNull(item, "itemImage"))
-                .drugType("일반의약품")
+                // e약은요(DrbEasyDrugInfoService) 응답에는 전문/일반의약품 구분 필드가 없어서
+                // "일반의약품"으로 고정 표시하면 전문의약품(예: 크라비트점안액)도 일반의약품으로 오인될 수 있다.
+                // 정확한 값을 모를 땐 표시하지 않는 편이 안전하므로 채우지 않는다.
                 .build();
     }
 
