@@ -40,10 +40,14 @@ public class DrugService {
         int totalCount = 0;
 
         try {
+            // e약은요 API의 itemName은 등록된 약품명 문자열과의 부분일치 검색이라 공백까지 그대로 비교한다.
+            // 그런데 실제 약품명(예: "어린이타이레놀산...")에는 공백이 없어서, 사용자가 "어린이 타이레놀"처럼
+            // 띄어 검색하면 아예 매칭되지 않는다. 검색어의 공백을 제거해 실제 약품명 표기와 맞춰준다.
+            String sanitizedKeyword = keyword.replaceAll("\\s+", "");
+
             // URLEncoder는 공백을 '+'로 인코딩하는데, build(true)는 이미 인코딩된 값으로 보고 그대로 전송한다.
-            // 외부 API는 '+'를 공백으로 해석하지 않으므로 "어린이 타이레놀"처럼 중간에 공백이 있는 검색어가 실패한다.
-            // '+'를 '%20'으로 바꿔줘야 공백이 제대로 전달된다.
-            String encodedKeyword = URLEncoder.encode(keyword, StandardCharsets.UTF_8.toString())
+            // 혹시 모를 공백이 남더라도 '+'가 아니라 '%20'으로 전달되도록 방어적으로 치환한다.
+            String encodedKeyword = URLEncoder.encode(sanitizedKeyword, StandardCharsets.UTF_8.toString())
                     .replace("+", "%20");
 
             URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
