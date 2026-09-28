@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,17 @@ import { getDrugFormIconName } from '../utils/drugIcon';
 
 const NUM_OF_ROWS = 10;
 
+// 스크롤 중 같은 페이지가 두 번 붙거나 페이지 경계에서 같은 약이 겹쳐 내려와도
+// FlatList key(itemSeq)가 중복되지 않도록 itemSeq 기준으로 걸러낸다
+const dedupeByItemSeq = (items: DrugInfoResponse[]) => {
+  const seen = new Set<string>();
+  return items.filter((d) => {
+    if (seen.has(d.itemSeq)) return false;
+    seen.add(d.itemSeq);
+    return true;
+  });
+};
+
 const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const initialKeyword: string = route?.params?.initialKeyword ?? '';
 
@@ -33,15 +44,21 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
   const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
 
+  // state는 비동기로 갱신돼서 onEndReached가 연달아 호출되면 loadingMore 검사를 둘 다 통과한다.
+  // ref로 즉시 잠가서 같은 페이지를 두 번 요청하지 않게 하고, 새 검색이 시작되면 이전 요청 결과는 버린다.
+  const fetchingMoreRef = useRef(false);
+  const requestIdRef = useRef(0);
+
   // 새 검색어로 첫 페이지부터 다시 검색
   const runSearch = async (kw: string) => {
     if (!kw.trim()) return;
+    requestIdRef.current += 1;
     try {
       setLoading(true);
       setSearched(true);
       setSearchedKeyword(kw.trim());
       const result = await searchDrugsByName(kw.trim(), 1, NUM_OF_ROWS);
-      setDrugs(result.items);
+      setDrugs(dedupeByItemSeq(result.items));
       setPageNo(1);
       setTotalCount(result.totalCount);
     } catch (error) {
@@ -54,19 +71,24 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
 
   // 스크롤이 끝에 닿으면 다음 페이지를 이어붙임
   const loadMore = async () => {
-    if (loading || loadingMore) return;
-    if (drugs.length >= totalCount) return;
+    if (loading || fetchingMoreRef.current) return;
+    // 중복 제거로 목록 길이가 줄 수 있어서 길이가 아니라 페이지 수로 끝을 판단한다
+    if (pageNo * NUM_OF_ROWS >= totalCount) return;
 
+    const requestId = requestIdRef.current;
     const nextPage = pageNo + 1;
+    fetchingMoreRef.current = true;
     try {
       setLoadingMore(true);
       const result = await searchDrugsByName(searchedKeyword, nextPage, NUM_OF_ROWS);
-      setDrugs((prev) => [...prev, ...result.items]);
+      if (requestId !== requestIdRef.current) return;
+      setDrugs((prev) => dedupeByItemSeq([...prev, ...result.items]));
       setPageNo(nextPage);
       setTotalCount(result.totalCount);
     } catch (error) {
       console.error('약품 검색 추가 로딩 오류:', error);
     } finally {
+      fetchingMoreRef.current = false;
       setLoadingMore(false);
     }
   };
