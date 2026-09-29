@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 
 @Getter
-@Builder
+@Builder(toBuilder = true)
 public class DrugInfoResponse {
 
     private String itemSeq;   // 약품 코드

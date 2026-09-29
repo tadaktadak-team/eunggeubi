@@ -61,7 +61,7 @@ public class PillService {
             String responseString = restTemplate.getForObject(uri, String.class);
             JsonNode rootNode = objectMapper.readTree(responseString);
 
-            // 💡 추가: body 파싱 전에 게이트웨이 / 서비스 에러 검증
+            //body 파싱 전에 게이트웨이 / 서비스 에러 검증
             validateApiResponse(rootNode);
 
             JsonNode itemsNode = rootNode.path("body").path("items");
@@ -72,7 +72,7 @@ public class PillService {
                 }
             }
         } catch (ExternalApiException e) {
-            throw e; // 💡 검증 로직에서 직접 던진 예외는 그대로 전달
+            throw e; //검증 로직에서 직접 던진 예외는 그대로 전달
         } catch (Exception e) {
             log.error("낱알식별 Open API 검색 실패: {}", e.getMessage(), e);
             throw new ExternalApiException("낱알식별 API 연동 중 오류가 발생했습니다.", e);
@@ -81,7 +81,43 @@ public class PillService {
         return resultList;
     }
 
-    // 💡 추가: 공통 API 응답 에러 검증 메서드
+    /**
+     * item_seq(소문자)로 특정 약의 외형 정보를 단건 조회
+     * 약물 상세화면에서 e약은요 API 결과에 모양/색상/각인/전문·일반 구분을 덧붙이기 위해 씀
+     * 이 API는 DRUG_SHAPE 같은 검색 필터는 대문자인데, 단건조회 파라미터만 소문자 item_seq
+     * 대문자 ITEM_SEQ로 넣으면 필터로 인식되지 않고 조건 없이 전체 목록이 돌아옴
+     */
+    public PillSearchResponse getPillByItemSeq(String itemSeq) {
+        try {
+            String encodedItemSeq = URLEncoder.encode(itemSeq, StandardCharsets.UTF_8.toString());
+
+            URI uri = UriComponentsBuilder.fromUriString(apiUrl)
+                    .queryParam("serviceKey", serviceKey)
+                    .queryParam("type", "json")
+                    .queryParam("item_seq", encodedItemSeq)
+                    .build(true)
+                    .toUri();
+
+            String responseString = restTemplate.getForObject(uri, String.class);
+            JsonNode rootNode = objectMapper.readTree(responseString);
+
+            validateApiResponse(rootNode);
+
+            JsonNode itemsNode = rootNode.path("body").path("items");
+            if (itemsNode.isArray() && !itemsNode.isEmpty()) {
+                return mapToPillSearchResponse(itemsNode.get(0));
+            }
+            // 낱알식별 DB에 없는 약(액상/시럽 등)일 수 있어서 결과 없음은 에러가 아니라 정상 케이스
+            return null;
+        } catch (ExternalApiException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("낱알식별 Open API 단건조회 실패: {}", e.getMessage(), e);
+            throw new ExternalApiException("낱알식별 API 연동 중 오류가 발생했습니다.", e);
+        }
+    }
+
+    //공통 API 응답 에러 검증 메서드
     private void validateApiResponse(JsonNode rootNode) {
         // 1. 공공데이터포털 게이트웨이 에러 검사
         if (rootNode.has("OpenAPI_ServiceResponse")) {
@@ -114,6 +150,7 @@ public class PillService {
                 .colorClass(getTextOrNull(item, "COLOR_CLASS1"))
                 .printFront(getTextOrNull(item, "PRINT_FRONT"))
                 .printBack(getTextOrNull(item, "PRINT_BACK"))
+                .etcOtcName(getTextOrNull(item, "ETC_OTC_NAME"))
                 .build();
     }
 

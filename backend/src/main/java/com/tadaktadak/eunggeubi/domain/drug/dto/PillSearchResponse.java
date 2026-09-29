@@ -14,4 +14,5 @@ public class PillSearchResponse {
     private String colorClass;  // 색상
     private String printFront;  // 각인 앞
     private String printBack;   // 각인 뒤
+    private String etcOtcName;  // 전문의약품/일반의약품 구분
 }
