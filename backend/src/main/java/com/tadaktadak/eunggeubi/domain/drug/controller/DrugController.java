@@ -1,12 +1,11 @@
 package com.tadaktadak.eunggeubi.domain.drug.controller;
 
 import com.tadaktadak.eunggeubi.domain.drug.dto.DrugInfoResponse;
+import com.tadaktadak.eunggeubi.domain.drug.dto.DrugSearchPageResponse;
 import com.tadaktadak.eunggeubi.domain.drug.service.DrugService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/drugs")
@@ -15,12 +14,14 @@ public class DrugController {
 
     private final DrugService drugService;
 
-    // 약품명 검색 API(http://localhost:8080/api/drugs/search?keyword=타이레놀)
+    // 약품명 검색 API(http://localhost:8080/api/drugs/search?keyword=타이레놀&pageNo=1&numOfRows=10)
     @GetMapping("/search")
-    public ResponseEntity<List<DrugInfoResponse>> searchDrugs(@RequestParam("keyword") String keyword) {
+    public ResponseEntity<DrugSearchPageResponse> searchDrugs(
+            @RequestParam("keyword") String keyword,
+            @RequestParam(value = "pageNo", defaultValue = "1") int pageNo,
+            @RequestParam(value = "numOfRows", defaultValue = "10") int numOfRows) {
 
-        // 이 키워드로 약 좀 찾아줘
-        List<DrugInfoResponse> results = drugService.searchDrugsByName(keyword);
+        DrugSearchPageResponse results = drugService.searchDrugsByName(keyword, pageNo, numOfRows);
         return ResponseEntity.ok(results);
     }
     @GetMapping("/{itemSeq}")

@@ -9,10 +9,16 @@ const { spawn } = require('child_process');
 
 const BACKEND_PORT = process.env.BACKEND_PORT || '8080';
 
+// VMware/VirtualBox/Hyper-V 등 가상 어댑터는 폰이 접속할 수 없는 사설망이라
+// 후보에서 아예 제외한다. 그대로 두면 이 어댑터가 목록 앞쪽에 잡혀서 엉뚱한
+// IP가 선택되는 경우가 있다(예: 실제 Wi-Fi보다 VMnet이 먼저 나오는 경우).
+const VIRTUAL_ADAPTER_PATTERN = /vmware|virtualbox|vbox|hyper-v|vethernet|docker|wsl/i;
+
 function findLanIp() {
   const nets = networkInterfaces();
   const candidates = [];
   for (const [name, addrs] of Object.entries(nets)) {
+    if (VIRTUAL_ADAPTER_PATTERN.test(name)) continue;
     for (const addr of addrs || []) {
       if (addr.family === 'IPv4' && !addr.internal) {
         candidates.push({ name, address: addr.address });
@@ -20,8 +26,8 @@ function findLanIp() {
     }
   }
   if (candidates.length === 0) return null;
-  // en0(Mac Wi-Fi)처럼 흔한 유선/무선 인터페이스 이름을 우선한다.
-  const preferred = candidates.find((c) => /^(en0|en1|wlan0|eth0)$/.test(c.name));
+  // en0(Mac Wi-Fi), Wi-Fi/Ethernet(Windows)처럼 흔한 유·무선 인터페이스 이름을 우선한다.
+  const preferred = candidates.find((c) => /^(en0|en1|wlan0|eth0|wi-?fi|ethernet)$/i.test(c.name));
   return (preferred || candidates[0]).address;
 }
 

@@ -32,6 +32,8 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // CorsConfig에 등록된 CorsConfigurationSource 빈을 사용해 CORS 허용
+                .cors(cors -> {})
                 // JWT 방식이라 세션/CSRF/기본로그인폼 다 끔
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(basic -> basic.disable())
