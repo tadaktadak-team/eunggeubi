@@ -1,15 +1,32 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  Image,
+  Alert,
+} from 'react-native';
+import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { searchPills, PillSearchResponse } from '../api/pill';
+import { addRecentSearch } from '../storage/recentSearches';
+import { getDrugFormIconName } from '../utils/drugIcon';
 
-const PillSearchScreen = () => {
+const PillSearchScreen = ({ navigation }: any) => {
   const [printText, setPrintText] = useState('');
   const [selectedShape, setSelectedShape] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [selectedForm, setSelectedForm] = useState('');
+
+  const [results, setResults] = useState<PillSearchResponse[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
 
   // 필터 옵션 데이터
   const shapes = ['원형', '타원형', '장방형', '삼각형', '사각형', '기타'];
@@ -21,6 +38,28 @@ const PillSearchScreen = () => {
     setSelectedShape('');
     setSelectedColor('');
     setSelectedForm('');
+  };
+
+  const handleSearch = async () => {
+    if (!printText.trim() && !selectedShape && !selectedColor) {
+      Alert.alert('조건 필요', '모양, 색상, 식별문자 중 하나는 입력해주세요.');
+      return;
+    }
+    try {
+      setLoading(true);
+      setSearched(true);
+      const data = await searchPills({
+        drugShape: selectedShape || undefined,
+        colorClass: selectedColor || undefined,
+        printFront: printText.trim() || undefined,
+      });
+      setResults(data);
+    } catch (error) {
+      console.error('낱알 특징 검색 오류:', error);
+      Alert.alert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -99,11 +138,66 @@ const PillSearchScreen = () => {
             ))}
           </View>
         </View>
+
+        {/* 검색 결과 */}
+        {loading && (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        )}
+
+        {!loading && searched && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>검색 결과 ({results.length})</Text>
+            {results.length === 0 ? (
+              <Text style={styles.emptyText}>조건에 맞는 약을 찾지 못했습니다.</Text>
+            ) : (
+              results.map((item) => (
+                <TouchableOpacity
+                  key={item.itemSeq}
+                  style={styles.resultCard}
+                  onPress={() => {
+                    addRecentSearch({
+                      itemSeq: item.itemSeq,
+                      name: item.itemName,
+                      drugType: item.etcOtcName,
+                      itemImage: item.itemImage,
+                    });
+                    navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
+                  }}
+                >
+                  {item.itemImage ? (
+                    <Image source={{ uri: item.itemImage }} style={styles.resultImage} />
+                  ) : (
+                    <View style={styles.resultNoImage}>
+                      <MaterialCommunityIcons
+                        name={getDrugFormIconName(item.itemName)}
+                        size={26}
+                        color={colors.placeholder}
+                      />
+                    </View>
+                  )}
+                  <View style={styles.resultInfo}>
+                    <Text style={styles.resultName} numberOfLines={1}>
+                      {item.itemName}
+                    </Text>
+                    {item.entpName && (
+                      <Text style={styles.resultEntp} numberOfLines={1}>
+                        {item.entpName}
+                      </Text>
+                    )}
+                  </View>
+                  <Feather name="chevron-right" size={20} color={colors.placeholder} />
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* 하단 검색하기 버튼 */}
       <View style={styles.bottomContainer}>
-        <TouchableOpacity style={styles.searchButton} activeOpacity={0.8}>
+        <TouchableOpacity style={styles.searchButton} activeOpacity={0.8} onPress={handleSearch}>
           <Ionicons name="search" size={20} color={colors.white} style={{ marginRight: spacing.sm }} />
           <Text style={styles.searchButtonText}>조건으로 약물 검색</Text>
         </TouchableOpacity>
@@ -191,6 +285,52 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: font.body,
     fontWeight: 'bold',
+  },
+  centerContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  emptyText: {
+    fontSize: font.body,
+    color: colors.textSub,
+  },
+  resultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md + 2,
+    borderRadius: radius.md,
+    backgroundColor: colors.inputBg,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  resultImage: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.sm,
+    marginRight: spacing.md,
+  },
+  resultNoImage: {
+    width: 56,
+    height: 56,
+    borderRadius: radius.sm,
+    backgroundColor: colors.border,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  resultInfo: {
+    flex: 1,
+  },
+  resultName: {
+    fontSize: font.body,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  resultEntp: {
+    fontSize: font.sub,
+    color: colors.textSub,
   },
 });
 

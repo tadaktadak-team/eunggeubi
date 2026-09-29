@@ -1,13 +1,17 @@
 package com.tadaktadak.eunggeubi.domain.drug.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "drug_infos")
 @Getter
+@Builder
 @NoArgsConstructor
+@AllArgsConstructor
 public class DrugInfo {
 
     @Id
@@ -37,4 +41,10 @@ public class DrugInfo {
 
     @Column(name = "drug_type", length = 20)
     private String drugType; // 약품구분
+
+    @Column(name = "entp_name", length = 100)
+    private String entpName; // 제조/수입 업체명 - 낱알검색
+
+    @Column(name = "item_image", length = 500)
+    private String itemImage; // 알약 이미지 URL
 }

@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tadaktadak.eunggeubi.domain.drug.dto.DrugInfoResponse;
 import com.tadaktadak.eunggeubi.domain.drug.dto.DrugSearchPageResponse;
 import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchResponse;
+import com.tadaktadak.eunggeubi.domain.drug.entity.DrugInfo;
+import com.tadaktadak.eunggeubi.domain.drug.repository.DrugInfoRepository;
 import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ public class DrugService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final PillService pillService;
+    private final DrugInfoRepository drugInfoRepository;
 
     @Value("${openapi.e-drug.url}")
     private String apiUrl;
@@ -141,11 +144,24 @@ public class DrugService {
         throw new IllegalArgumentException("해당 약물 정보를 찾을 수 없습니다: " + itemSeq);
     }
 
-    // e약은요 API에는 모양/색상/각인/전문·일반 구분 필드가 없어서, 낱알식별 API로 한 번 더 조회해 채운다.
-    // 실패하거나 결과가 없어도(액상/시럽처럼 애초에 낱알식별 DB에 없는 약일 수 있음) 상세조회 자체는
-    // 정상 응답하도록 예외를 여기서 흡수한다.
+    // e약은요 API에는 모양/색상/각인/전문·일반 구분 필드가 없어서 채워줘야 한다.
+    // PillInfoIndexingRunner가 미리 적재해둔 DrugInfo 테이블을 먼저 보고(빠르고, 외부 API 의존 없음),
+    // 배치를 아직 안 돌렸거나 새로 등록된 약이라 DB에 없으면 낱알식별 API를 실시간으로 호출해 보완한다.
+    // 둘 다 실패하거나 결과가 없어도(액상/시럽처럼 애초에 낱알식별 대상이 아닌 약일 수 있음) 상세조회
+    // 자체는 정상 응답하도록 예외를 여기서 흡수한다.
     private DrugInfoResponse enrichWithPillInfo(DrugInfoResponse base, String itemSeq) {
         try {
+            var cached = drugInfoRepository.findById(itemSeq);
+            if (cached.isPresent()) {
+                DrugInfo info = cached.get();
+                return base.toBuilder()
+                        .shape(info.getShape())
+                        .color(info.getColor())
+                        .imprint(info.getImprint())
+                        .drugType(info.getDrugType())
+                        .build();
+            }
+
             PillSearchResponse pill = pillService.getPillByItemSeq(itemSeq);
             if (pill == null) {
                 return base;
@@ -153,23 +169,13 @@ public class DrugService {
             return base.toBuilder()
                     .shape(pill.getDrugShape())
                     .color(pill.getColorClass())
-                    .imprint(combineImprint(pill.getPrintFront(), pill.getPrintBack()))
+                    .imprint(PillService.combineImprint(pill.getPrintFront(), pill.getPrintBack()))
                     .drugType(pill.getEtcOtcName())
                     .build();
         } catch (Exception e) {
             log.warn("낱알식별 정보 조회 실패 (itemSeq={}), 외형정보 없이 응답함", itemSeq, e);
             return base;
         }
-    }
-
-    // 각인은 앞/뒤가 따로 내려오는데 화면엔 한 줄(imprint)로 보여줘야 해서 합친다.
-    private String combineImprint(String printFront, String printBack) {
-        boolean hasFront = printFront != null && !printFront.isBlank();
-        boolean hasBack = printBack != null && !printBack.isBlank();
-        if (hasFront && hasBack) return printFront + " / " + printBack;
-        if (hasFront) return printFront;
-        if (hasBack) return printBack;
-        return null;
     }
 
     // 💡 추가된 메서드: API 응답 에러 공통 검증 로직
