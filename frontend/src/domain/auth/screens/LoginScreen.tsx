@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
@@ -81,7 +82,7 @@ export default function LoginScreen() {
       >
         <View style={styles.container}>
           <View style={styles.logo}>
-            <Ionicons name="heart" size={30} color={colors.white} />
+            <Image source={require('../../../../assets/logo.png')} style={styles.logo} />
           </View>
           <Text style={styles.title}>로그인</Text>
 
@@ -181,8 +182,6 @@ const styles = StyleSheet.create({
   logo: {
     width: 56,
     height: 56,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     alignSelf: 'center',
