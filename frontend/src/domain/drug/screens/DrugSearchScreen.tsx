@@ -14,7 +14,7 @@ import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
-import { searchDrugsByName, DrugInfoResponse } from '../api/drug';
+import { searchDrugsByName, searchLocalDrugs, DrugInfoResponse } from '../api/drug';
 import { addRecentSearch } from '../storage/recentSearches';
 import { stripHtmlTags } from '../../../shared/utils/html';
 import { getDrugFormIconName } from '../utils/drugIcon';
@@ -34,6 +34,13 @@ const dedupeByItemSeq = (items: DrugInfoResponse[]) => {
 
 const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const initialKeyword: string = route?.params?.initialKeyword ?? '';
+  // 상호작용 체크 화면 등에서 "약 고르기" 용도로 이 화면을 열었을 때 켜는 모드.
+  // 켜져 있으면 결과 탭 시 상세화면으로 가는 대신 고른 약을 onSelect로 돌려주고 뒤로 간다.
+  const selectMode: boolean = route?.params?.selectMode ?? false;
+  const onSelect: ((drug: DrugInfoResponse) => void) | undefined = route?.params?.onSelect;
+  // true면 e약은요(좁음) 대신 우리 DB(넓음, 전문의약품 포함)에서 검색한다. 페이지네이션은
+  // 지원 안 함(서버가 상위 30건으로 이미 제한해서 줌) — 상호작용 체크에서 약 고를 때 씀.
+  const broadSearch: boolean = route?.params?.broadSearch ?? false;
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [searchedKeyword, setSearchedKeyword] = useState('');
@@ -58,6 +65,19 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
       setLoading(true);
       setSearched(true);
       setSearchedKeyword(kw.trim());
+
+      if (broadSearch) {
+        const items = await searchLocalDrugs(kw.trim());
+        if (requestId !== requestIdRef.current) return;
+        const deduped = dedupeByItemSeq(items);
+        setDrugs(deduped);
+        setPageNo(1);
+        // 서버가 이미 상위 30건으로 잘라서 주는 결과라 더 불러올 페이지가 없다.
+        // NUM_OF_ROWS보다 작거나 같게 맞춰서 loadMore가 절대 실행되지 않게 한다.
+        setTotalCount(Math.min(deduped.length, NUM_OF_ROWS));
+        return;
+      }
+
       const result = await searchDrugsByName(kw.trim(), 1, NUM_OF_ROWS);
       if (requestId !== requestIdRef.current) return; // 그 사이 더 새로운 검색이 시작됐으면 이 응답은 버림
       setDrugs(dedupeByItemSeq(result.items));
@@ -76,6 +96,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
 
   // 스크롤이 끝에 닿으면 다음 페이지를 이어붙임
   const loadMore = async () => {
+    if (broadSearch) return; // 로컬 검색은 페이지네이션 없이 상위 30건만 보여줌
     if (loading || fetchingMoreRef.current) return;
     // 중복 제거로 목록 길이가 줄 수 있어서 길이가 아니라 페이지 수로 끝을 판단한다
     if (pageNo * NUM_OF_ROWS >= totalCount) return;
@@ -111,7 +132,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
 
   return (
     <View style={styles.container}>
-      <AppHeader title="약품명 검색" />
+      <AppHeader title={selectMode ? '약 선택' : '약품명 검색'} />
 
       <View style={styles.searchContainer}>
         <View style={styles.searchRow}>
@@ -169,6 +190,12 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
             <TouchableOpacity
               style={styles.card}
               onPress={() => {
+                if (selectMode) {
+                  // 상호작용 체크용으로 잠깐 고르는 것뿐이라 최근 검색엔 남기지 않는다.
+                  onSelect?.(item);
+                  navigation.goBack();
+                  return;
+                }
                 addRecentSearch({
                   itemSeq: item.itemSeq,
                   name: item.name,

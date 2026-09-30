@@ -31,6 +31,7 @@ public class DrugInfoResponse {
                 .useInfo(drugInfo.getUseInfo())
                 .caution(drugInfo.getCaution())
                 .drugType(drugInfo.getDrugType())
+                .itemImage(drugInfo.getItemImage())
                 .build();
     }
 }

@@ -95,6 +95,17 @@ public class DrugService {
     }
 
     /**
+     * 상호작용 체크 화면의 "약 검색해서 추가"용. e약은요(OTC 위주, 좁음) 대신 우리 DB
+     * (낱알식별로 적재해둔 25,000여 건, 전문의약품 포함)에서 이름으로 검색한다.
+     * 실시간 외부 API 호출이 없어서 빠르고, 병용금기 체크 대상이 될 약을 훨씬 폭넓게 찾을 수 있다.
+     */
+    public List<DrugInfoResponse> searchLocalDrugsByName(String keyword) {
+        return drugInfoRepository.findTop30ByNameContainingOrderByNameAsc(keyword).stream()
+                .map(DrugInfoResponse::from)
+                .toList();
+    }
+
+    /**
      * 2. 약품 상세 조회 API 연동 (itemSeq 기반 조회)
      */
     public DrugInfoResponse getDrugDetail(String itemSeq) {
