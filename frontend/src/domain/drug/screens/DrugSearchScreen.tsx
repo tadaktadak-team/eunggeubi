@@ -22,7 +22,7 @@ import { getDrugFormIconName } from '../utils/drugIcon';
 const NUM_OF_ROWS = 10;
 
 // 스크롤 중 같은 페이지가 두 번 붙거나 페이지 경계에서 같은 약이 겹쳐 내려와도
-// FlatList key(itemSeq)가 중복되지 않도록 itemSeq 기준으로 걸러낸다
+// FlatList key(itemSeq)가 중복되지 않도록 itemSeq 기준으로 걸러냄
 const dedupeByItemSeq = (items: DrugInfoResponse[]) => {
   const seen = new Set<string>();
   return items.filter((d) => {
@@ -44,8 +44,8 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
   const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  // state는 비동기로 갱신돼서 onEndReached가 연달아 호출되면 loadingMore 검사를 둘 다 통과한다.
-  // ref로 즉시 잠가서 같은 페이지를 두 번 요청하지 않게 하고, 새 검색이 시작되면 이전 요청 결과는 버린다.
+  // state는 비동기로 갱신돼서 onEndReached가 연달아 호출되면 loadingMore 검사를 둘 다 통과
+  // ref로 즉시 잠가서 같은 페이지를 두 번 요청하지 않게 하고, 새 검색이 시작되면 이전 요청 결과는 버림
   const fetchingMoreRef = useRef(false);
   const requestIdRef = useRef(0);
 
