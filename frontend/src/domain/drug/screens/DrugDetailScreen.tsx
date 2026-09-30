@@ -73,9 +73,9 @@ const DrugDetailScreen = ({ route }: any) => {
         <View style={styles.summaryCard}>
           <View style={styles.iconContainer}>
             {drug.itemImage ? (
-              <Image source={{ uri: drug.itemImage }} style={styles.drugImage} />
+              <Image source={{ uri: drug.itemImage }} style={styles.drugImage} resizeMode="contain" />
             ) : (
-              <MaterialCommunityIcons name={getDrugFormIconName(drug.name)} size={32} color={colors.primary} />
+              <MaterialCommunityIcons name={getDrugFormIconName(drug.name)} size={56} color={colors.primary} />
             )}
           </View>
           <Text style={styles.drugName}>{drug.name}</Text>
@@ -155,9 +155,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.lg,
+    width: 120,
+    height: 120,
+    borderRadius: radius.lg + 8,
     backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
@@ -165,8 +165,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   drugImage: {
-    width: 64,
-    height: 64,
+    width: 120,
+    height: 120,
   },
   drugName: {
     fontSize: font.h2,
