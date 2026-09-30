@@ -53,19 +53,24 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
   const runSearch = async (kw: string) => {
     if (!kw.trim()) return;
     requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
     try {
       setLoading(true);
       setSearched(true);
       setSearchedKeyword(kw.trim());
       const result = await searchDrugsByName(kw.trim(), 1, NUM_OF_ROWS);
+      if (requestId !== requestIdRef.current) return; // 그 사이 더 새로운 검색이 시작됐으면 이 응답은 버림
       setDrugs(dedupeByItemSeq(result.items));
       setPageNo(1);
       setTotalCount(result.totalCount);
     } catch (error) {
       console.error('약품 검색 오류:', error);
       Alert.alert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
+      if (requestId !== requestIdRef.current) return; // 실패도 최신 요청 건일 때만 반영
+      setDrugs([]);
+      setTotalCount(0);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   };
 
