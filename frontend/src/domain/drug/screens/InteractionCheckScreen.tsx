@@ -20,8 +20,6 @@ const InteractionCheckScreen = ({ navigation }: any) => {
   const handleAddDrug = () => {
     navigation.navigate('DrugSearch', {
       selectMode: true,
-      // e약은요(OTC 위주)는 병용금기 대상과 거의 안 겹쳐서, 우리 DB(전문의약품 포함) 검색을 쓴다.
-      broadSearch: true,
       onSelect: (drug: DrugInfoResponse) => {
         setSelectedDrugs((prev) => {
           if (prev.some((d) => d.itemSeq === drug.itemSeq)) {
