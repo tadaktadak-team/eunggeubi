@@ -36,6 +36,12 @@ public class ConsultationHistoryService {
                 .toList();
     }
 
+    // 비회원 기록(guestCode, userId 없음)을 이 계정으로 옮긴다. 이미 다른 계정으로 옮겨진 건 안 건드린다.
+    @Transactional
+    public int claimGuestConsultations(Long userId, String guestCode) {
+        return aiConsultationRepository.claimGuestConsultations(userId, guestCode);
+    }
+
     @Transactional(readOnly = true)
     public ConsultationDetailResponse getMyConsultationDetail(Long userId, String sessionId) {
         List<AiConsultation> messages =

@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -20,7 +21,8 @@ import lombok.NoArgsConstructor;
 // (Guardian 엔티티와 같은 패턴).
 @Getter
 @Entity
-@Table(name = "ai_consultations")
+// guest_code 인덱스: 비회원 요청마다 사용 횟수를 이 컬럼으로 센다(AiConsultationService).
+@Table(name = "ai_consultations", indexes = @Index(name = "idx_ai_consultations_guest_code", columnList = "guest_code"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class AiConsultation {
 

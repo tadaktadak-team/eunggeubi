@@ -16,8 +16,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
 // 인스턴스 수만큼 늘어난다. 여러 대로 늘리게 되면 Redis 등 공유 저장소 기반 카운터로 교체할 것.
 public class RateLimitFilter extends OncePerRequestFilter {
 
+    public static final String CLIENT_IP_ATTR = "clientIp";
     private static final String LIMITED_PATH_PREFIX = "/api/ai-consultations";
-    private static final int MAX_REQUESTS_PER_WINDOW = 10;
+    private static final int MAX_REQUESTS_PER_WINDOW = 5;
     private static final long WINDOW_MS = 60_000;
 
     private final boolean trustForwardedFor;
@@ -44,7 +45,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
         long now = System.currentTimeMillis();
         cleanupIfDue(now);
 
-        int countAfterThisRequest = windows.compute(clientIp(request), (key, window) ->
+        String ip = clientIp(request);
+        // 비회원 guestCode 발급 제한(AiConsultationService)도 같은 IP 기준을 쓰도록 넘겨준다.
+        request.setAttribute(CLIENT_IP_ATTR, ip);
+        int countAfterThisRequest = windows.compute(ip, (key, window) ->
                 (window == null || now - window.windowStartMs >= WINDOW_MS)
                         ? new Window(now, 1)
                         : window.increment()

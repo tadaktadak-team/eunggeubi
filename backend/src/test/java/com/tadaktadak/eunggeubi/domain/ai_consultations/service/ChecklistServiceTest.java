@@ -47,6 +47,18 @@ class ChecklistServiceTest {
     }
 
     @Test
+    void 질문_한도를_다_쓴_비회원도_마지막_답변의_체크리스트는_만든다() {
+        AiConsultation aiMessage = aiMessage(30L, "g1", "두통");
+        when(aiConsultationRepository.findById(30L)).thenReturn(Optional.of(aiMessage));
+        when(aiConsultationRepository.countByGuestCodeAndSenderType("g1", SenderType.USER))
+                .thenReturn((long) AiConsultationService.GUEST_MESSAGE_LIMIT);
+        stubChecklistSave();
+        stubChatClientEntity(new RawChecklist(List.of("3일 이상 지속되나요?")));
+
+        assertThat(service.generate(30L, null, "g1").items()).containsExactly("3일 이상 지속되나요?");
+    }
+
+    @Test
     void USER_메시지에는_체크리스트를_못_만든다() {
         AiConsultation userMessage = AiConsultation.builder()
                 .sessionId("s1").sessionRoot(true).guestCode("g1")

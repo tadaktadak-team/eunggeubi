@@ -11,7 +11,10 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.SubmitChecklistRespo
 import com.tadaktadak.eunggeubi.domain.ai_consultations.service.AiConsultationService;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.service.ChecklistService;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.service.ConsultationRegenerationService;
+import com.tadaktadak.eunggeubi.global.security.RateLimitFilter;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,8 +38,12 @@ public class AiConsultationController {
 
     @PostMapping
     public ResponseEntity<ConsultationResponse> consult(@AuthenticationPrincipal Long userId,
-                                                          @Valid @RequestBody ConsultationRequest request) {
-        return ResponseEntity.ok(aiConsultationService.consult(request, userId));
+                                                          @Valid @RequestBody ConsultationRequest request,
+                                                          HttpServletRequest httpRequest) {
+        // RateLimitFilter가 신뢰 프록시 설정까지 반영해 뽑아둔 IP. 필터가 안 탔을 때만 remoteAddr로.
+        String clientIp = Objects.requireNonNullElse(
+                (String) httpRequest.getAttribute(RateLimitFilter.CLIENT_IP_ATTR), httpRequest.getRemoteAddr());
+        return ResponseEntity.ok(aiConsultationService.consult(request, userId, clientIp));
     }
 
     @PostMapping("/{id}/checklist")
