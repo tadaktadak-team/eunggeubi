@@ -130,6 +130,24 @@ oauth:
     userinfo-uri: https://www.googleapis.com/oauth2/v3/userinfo
     scope: openid email profile
 
+# 배포·모니터링용 상태 확인.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health        # health 외 엔드포인트(env, beans, configprops 등)는 노출하지 않는다
+  endpoint:
+    health:
+      show-details: never      # 외부에 DB 종류·디스크 용량 같은 내부 정보를 흘리지 않는다
+      probes:
+        enabled: true          # /actuator/health/liveness, /actuator/health/readiness 생성
+      group:
+        readiness:
+          include: readinessState, db
+  health:
+    diskspace:
+      enabled: true
+
 ---
 spring:
   config:
@@ -165,30 +183,3 @@ spring:
         initialize-schema: true
 
 
-
----
-# 운영(EC2) 프로필. 서버에서 SPRING_PROFILES_ACTIVE=prod 로 실행한다.
-# 비밀값은 전부 서버의 환경변수 파일에서 주입한다. (application-local.yml 은 서버에 없음)
-spring:
-  config:
-    activate:
-      on-profile: prod
-
-  datasource:
-    url: jdbc:mysql://localhost:3306/eunggeubi?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: false
-    open-in-view: false
-
-app:
-  # 보호자 동의 SMS 링크 등에 쓰는 서버 공개 주소
-  base-url: ${APP_BASE_URL:https://eunggeubi.duckdns.org}
-  rate-limit:
-    # Caddy(리버스 프록시) 뒤에 있으므로 X-Forwarded-For 를 신뢰한다
-    trust-proxy: true
