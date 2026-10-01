@@ -70,6 +70,16 @@ app:
     # nginx/ALB 등 X-Forwarded-For를 덮어써주는 신뢰된 프록시 뒤에 배포했을 때만 true로.
     trust-proxy: ${RATE_LIMIT_TRUST_PROXY:false}
 
+  # 소셜 로그인 후 되돌아갈 수 있는 앱 주소 접두사. 여기 없는 주소로는 토큰을 보내지 않는다.
+  # ⚠️ YAML 리스트(- 항목)가 아니라 반드시 쉼표 구분 문자열이어야 @Value 로 바인딩된다.
+  allowed-app-redirects: "${APP_ALLOWED_REDIRECTS:eunggeubi://}"
+  # 문자 발송 상한. IP 기준 레이트리밋으로는 못 막는 "IP 를 바꿔가며 보내는" 경우를
+  # 번호·총량 기준으로 한 번 더 막는다. 데모 때 부족하면 daily-limit-total 만 올리면 된다.
+  sms:
+    resend-cooldown-seconds: 60   # 같은 번호 재발송 간격
+    daily-limit-per-phone: 5      # 번호당 하루 최대 건수
+    daily-limit-total: 200        # 서비스 전체 하루 최대 = 요금 상한선 (약 4,000원)
+
 medical_locator:
   secret: ${MEDICAL_LOCATOR_SECRET:}
   hospital:
@@ -136,6 +146,10 @@ spring:
     show-sql: true
     open-in-view: false
 
+
+# 로컬 개발에서는 Expo Go(exp://)와 웹 프리뷰(localhost)도 허용한다. 운영에는 적용되지 않는다.
+app:
+  allowed-app-redirects: "eunggeubi://,exp://,exp+eunggeubi://,http://localhost:"
 
 
 ---

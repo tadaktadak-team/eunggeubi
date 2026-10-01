@@ -28,6 +28,11 @@ async function startSocialLogin(provider: SocialProvider): Promise<SocialLoginRe
   }
 
   const { queryParams } = Linking.parse(result.url);
+  // 서버가 되돌려준 오류: 이미 가입된 이메일 (소셜 자동연동은 허용하지 않는다)
+  if (queryParams?.error === 'email_taken') {
+    throw new Error('이미 가입된 이메일입니다. 기존에 사용하던 방법으로 로그인해주세요.');
+  }
+
 
   if (queryParams?.needConsent === 'true') {
     return {
@@ -37,12 +42,21 @@ async function startSocialLogin(provider: SocialProvider): Promise<SocialLoginRe
     };
   }
 
+  // 기존 회원: URL 에는 1회용 티켓만 실려 온다. 토큰은 본문으로 따로 받아온다.
+  const loginTicket = String(queryParams?.loginTicket ?? '');
+  if (!loginTicket) {
+    throw new Error('로그인 응답이 올바르지 않습니다. 다시 시도해주세요.');
+  }
+  const tokens = await api.post<LoginResponse>('/api/auth/social/exchange', {
+    ticket: loginTicket,
+  });
   return {
     type: 'login',
-    userId: Number(queryParams?.userId),
-    accessToken: String(queryParams?.accessToken ?? ''),
-    refreshToken: String(queryParams?.refreshToken ?? ''),
+    userId: tokens.userId,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken,
   };
+
 }
 
 export const startNaverLogin = () => startSocialLogin('naver');

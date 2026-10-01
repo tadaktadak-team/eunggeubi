@@ -5,20 +5,46 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-// AI 상담 엔드포인트(/api/ai-consultations/**)는 permitAll이라 IP당 요청 수를 여기서 막지 않으면
-// 익명이 무제한으로 LLM 호출을 태울 수 있다(비용 폭탄). IP당 분당 고정 횟수만 허용하는 최소 구현.
+// permitAll 로 열려 있는 엔드포인트들을 IP당 요청 수로 제한한다. 막지 않으면 익명이
+// 무제한으로 LLM 호출(비용)·SMS 발송(비용)·비밀번호 대입을 할 수 있다.
 //
-// ponytail: 인스턴스 로컬 고정 윈도우 카운터라 서버가 여러 대로 스케일아웃되면 IP당 실질 허용량이
-// 인스턴스 수만큼 늘어난다. 여러 대로 늘리게 되면 Redis 등 공유 저장소 기반 카운터로 교체할 것.
+// 한계 1: IP 단위라 NAT 뒤 여러 명이 할당량을 나눠 쓰고, 반대로 IP를 바꿔가며 오면 총량이 늘어난다.
+//         돈이 나가는 SMS 는 번호 단위 쿨다운/일일 상한을 PhoneVerificationService 에서 한 번 더 건다.
+// 한계 2: 인스턴스 로컬 고정 윈도우 카운터라 서버가 여러 대로 스케일아웃되면 IP당 실질 허용량이
+//         인스턴스 수만큼 늘어난다. 여러 대로 늘리면 Redis 등 공유 저장소 기반 카운터로 교체할 것.
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final String LIMITED_PATH_PREFIX = "/api/ai-consultations";
-    private static final int MAX_REQUESTS_PER_WINDOW = 10;
+    // 경로별 "IP당 분당 허용 횟수". 접두사가 겹치면 더 긴 쪽이 우선한다.
+    private record Rule(String pathPrefix, int maxPerMinute) {}
+
+    private static final List<Rule> RULES = List.of(
+            new Rule("/api/ai-consultations",      10),  // LLM 호출 비용
+            new Rule("/api/auth/phone/send",        5),  // SMS 건당 과금
+            new Rule("/api/auth/guardian/request",  5),  // SMS 건당 과금
+            new Rule("/api/auth/login",            20),  // 비밀번호 대입 (NAT 공유 고려해 넉넉히)
+            new Rule("/api/auth/find-email",       10),  // 가입자 탐색
+            new Rule("/api/auth/reset-password",   10),
+            new Rule("/api/auth/social/exchange",  20)
+    );
+
     private static final long WINDOW_MS = 60_000;
+
+    // 요청 경로에 적용할 규칙. 없으면 null = 이 필터가 관여하지 않는다.
+    private static Rule ruleFor(String uri) {
+        Rule best = null;
+        for (Rule rule : RULES) {
+            if (uri.startsWith(rule.pathPrefix())
+                    && (best == null || rule.pathPrefix().length() > best.pathPrefix().length())) {
+                best = rule;
+            }
+        }
+        return best;
+    }
 
     private final boolean trustForwardedFor;
     private final ConcurrentHashMap<String, Window> windows = new ConcurrentHashMap<>();
@@ -35,24 +61,28 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith(LIMITED_PATH_PREFIX);
+        return ruleFor(request.getRequestURI()) == null;
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                      FilterChain filterChain) throws ServletException, IOException {
+        Rule rule = ruleFor(request.getRequestURI());
         long now = System.currentTimeMillis();
         cleanupIfDue(now);
 
-        int countAfterThisRequest = windows.compute(clientIp(request), (key, window) ->
+        // 엔드포인트마다 버킷을 따로 쓴다. 로그인 시도가 AI 상담 할당량을 깎으면 안 된다.
+        String key = rule.pathPrefix() + "|" + clientIp(request);
+        int countAfterThisRequest = windows.compute(key, (k, window) ->
                 (window == null || now - window.windowStartMs >= WINDOW_MS)
                         ? new Window(now, 1)
                         : window.increment()
         ).count;
 
-        if (countAfterThisRequest > MAX_REQUESTS_PER_WINDOW) {
+        if (countAfterThisRequest > rule.maxPerMinute()) {
             response.setStatus(429); // Too Many Requests (jakarta.servlet엔 상수가 없음)
             response.setContentType("application/json;charset=UTF-8");
+            response.setHeader("Retry-After", "60"); // 클라이언트가 재시도 시점을 알 수 있게
             response.getWriter().write("{\"message\":\"요청이 너무 많습니다. 잠시 후 다시 시도해주세요.\"}");
             return;
         }

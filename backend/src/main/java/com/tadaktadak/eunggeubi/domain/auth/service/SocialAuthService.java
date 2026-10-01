@@ -13,6 +13,7 @@ import com.tadaktadak.eunggeubi.domain.user.entity.User;
 import com.tadaktadak.eunggeubi.domain.user.entity.UserStatus;
 import com.tadaktadak.eunggeubi.domain.user.repository.TermsAgreementRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
+import com.tadaktadak.eunggeubi.global.exception.SocialEmailConflictException;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -48,12 +49,9 @@ public class SocialAuthService {
             return Optional.of(issueTokens(requireActive(user)));
         }
 
-        if (profile.email() != null) {
-            User existing = userRepository.findByEmail(profile.email()).orElse(null);
-            if (existing != null) {
-                linkSocialAccount(provider, profile, existing.getId());
-                return Optional.of(issueTokens(requireActive(existing)));
-            }
+        // 이메일이 같다는 이유만으로 기존 계정에 연동하지 않는다.
+        if (profile.email() != null && userRepository.existsByEmail(profile.email())) {
+            throw new SocialEmailConflictException();
         }
 
         return Optional.empty();
@@ -69,9 +67,12 @@ public class SocialAuthService {
         if (profile.email() == null) {
             throw new IllegalArgumentException("소셜 계정에서 이메일을 받지 못했습니다.");
         }
-        // 중복 클릭 등으로 그 사이 이미 만들어졌으면 기존 회원을 쓴다
-        User user = userRepository.findByEmail(profile.email())
-                .orElseGet(() -> createUser(profile, phone, birthDate, gender));
+        // 같은 이메일의 회원이 이미 있으면 그 계정에 붙이지 않는다.
+        // (loginIfExisting 에서 이미 걸러지지만, 티켓 발급 이후 생겼을 경우를 위한 2차 방어)
+        if (userRepository.existsByEmail(profile.email())) {
+            throw new SocialEmailConflictException();
+        }
+        User user = createUser(profile, phone, birthDate, gender);
         linkSocialAccount(provider, profile, user.getId());
         return issueTokens(requireActive(user));
     }
@@ -90,7 +91,7 @@ public class SocialAuthService {
         }
         // 제공자가 전화번호를 안 줘서 앱에서 입력받은 경우 → SMS 인증을 거쳤는지 확인
         if (profile.phone() == null) {
-            phoneVerificationService.ensureVerified(phone, Purpose.SIGNUP);
+            phoneVerificationService.consumeVerified(phone, Purpose.SIGNUP);
         }
 
         User user = User.builder()

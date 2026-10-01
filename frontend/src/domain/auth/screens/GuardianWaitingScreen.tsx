@@ -15,14 +15,13 @@ type WaitingRoute = RouteProp<RootStackParamList, 'GuardianWaiting'>;
 export default function GuardianWaitingScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<WaitingRoute>();
-  const { userId, email, maskedPhone } = route.params;
-
+  const { consentToken, email, maskedPhone } = route.params;
   const [checking, setChecking] = useState(false);
 
   const onCheck = async () => {
     setChecking(true);
     try {
-      const res = await authApi.getGuardianConsentStatus(userId);
+      const res = await authApi.getGuardianConsentStatus(consentToken);
       if (res.confirmed) {
         navigation.navigate('SignupComplete', { email });
       } else {

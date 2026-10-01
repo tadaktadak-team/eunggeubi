@@ -18,6 +18,10 @@ public class JwtProvider {
     private static final String CLAIM_TYPE = "tokenType";
     private static final String TYPE_ACCESS = "access";
     private static final String TYPE_REFRESH = "refresh";
+    private static final String TYPE_CONSENT = "consent";
+
+    // 보호자 동의 링크 유효기간(3일)과 맞춘다 - 그 안에 동의가 안 되면 어차피 링크도 만료된다.
+    private static final long CONSENT_TOKEN_VALIDITY_MS = 3L * 24 * 60 * 60 * 1000;
 
     private final SecretKey key;
     private final long accessTokenValidityMs;
@@ -40,6 +44,20 @@ public class JwtProvider {
     // refresh 토큰 생성
     public String createRefreshToken(Long userId) {
         return createToken(userId, refreshTokenValidityMs, TYPE_REFRESH);
+    }
+    // 보호자 동의 전용 토큰. 가입 응답으로 내려주고, 보호자 정보 입력/상태 조회에만 쓴다.
+    // tokenType 이 access 가 아니라서 JwtAuthenticationFilter 는 이 토큰을 인증으로 쳐주지 않는다.
+    public String createConsentToken(Long userId) {
+        return createToken(userId, CONSENT_TOKEN_VALIDITY_MS, TYPE_CONSENT);
+    }
+
+    // 보호자 동의 토큰인지 검사 (서명·만료·종류)
+    public boolean isConsentToken(String token) {
+        try {
+            return TYPE_CONSENT.equals(parseClaims(token).get(CLAIM_TYPE, String.class));
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
     }
 
     private String createToken(Long userId, long validityMs, String tokenType) {

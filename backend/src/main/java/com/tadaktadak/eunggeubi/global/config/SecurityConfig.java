@@ -51,7 +51,7 @@ public class SecurityConfig {
                                 "/api/emergency-beds",
                                 "/api/drugs/**"
                         ).permitAll()   // 인증/위치/약품 정보 전역 허용
-                        .requestMatchers("/health", "/error").permitAll()        // 서버 상태체크
+                        .requestMatchers("/health", "/error", "/consent").permitAll()  // 상태체크 + 보호자 동의 웹페이지
                         .requestMatchers("/api/ai-consultations/**").permitAll()  // AI 증상 상담: 비로그인도 이용 가능
                         .anyRequest().authenticated()                  // 나머지는 토큰 필수
                 )
