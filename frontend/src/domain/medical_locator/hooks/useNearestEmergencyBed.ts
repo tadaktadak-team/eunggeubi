@@ -8,12 +8,13 @@ import { EmergencyBed } from '../types/emergencyBed';
 
 export type NearestBedState =
   | { status: 'loading' }
-  | { status: 'ready'; bed: EmergencyBed }
+  | { status: 'ready'; beds: EmergencyBed[] }
   | { status: 'empty' | 'denied' | 'outside' | 'error' };
 
 const REFRESH_MS = 60_000;
+const MAX_BEDS = 3;
 
-// 현재 위치에서 가장 가까운 응급실 1곳. 화면에 다시 들어올 때 1분이 지났으면 새로 조회한다
+// 현재 위치에서 가까운 응급실 최대 3곳. 화면에 다시 들어올 때 1분이 지났으면 새로 조회한다
 export function useNearestEmergencyBed() {
   const [state, setState] = useState<NearestBedState>({ status: 'loading' });
   const loadedAtRef = useRef(0);
@@ -42,13 +43,13 @@ export function useNearestEmergencyBed() {
       if (!stage1) return done({ status: 'error' });
 
       const beds = await getEmergencyBeds(latitude, longitude, stage1);
-      const nearest = beds.reduce<EmergencyBed | null>((best, bed) => {
-        if (bed.distance == null) return best;
-        return !best || best.distance == null || bed.distance < best.distance ? bed : best;
-      }, null);
+      const nearest = beds
+        .filter((bed) => bed.distance != null)
+        .sort((a, b) => (a.distance as number) - (b.distance as number))
+        .slice(0, MAX_BEDS);
 
       loadedAtRef.current = Date.now();
-      done(nearest ? { status: 'ready', bed: nearest } : { status: 'empty' });
+      done(nearest.length > 0 ? { status: 'ready', beds: nearest } : { status: 'empty' });
     } catch (e) {
       console.log('가까운 응급실 조회 실패:', e);
       done({ status: 'error' });

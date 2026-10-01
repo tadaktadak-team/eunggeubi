@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useNearestEmergencyBed } from '../../medical_locator/hooks/useNearestEmergencyBed';
+import { callPhone, openDirections } from '../../medical_locator/utils/contact';
 import DisclaimerFooter from '../components/DisclaimerFooter';
 import QuickLinkCard from '../components/QuickLinkCard';
 import SymptomChip from '../components/SymptomChip';
@@ -81,26 +82,53 @@ export default function SymptomHomeScreen() {
             <QuickLinkCard label="약물정보" icon={{ lib: 'mci', name: 'pill' }} onPress={() => goToTab('Medicine')} />
           </View>
 
-          <Text style={styles.sectionTitle}>가까운 응급실</Text>
-          {nearestBed.status === 'ready' ? (
-            <Pressable style={styles.erCard} onPress={() => goToTab('Hospital')}>
-              <View style={styles.erInfo}>
-                <Text style={styles.erName} numberOfLines={1}>
-                  {nearestBed.bed.name}
-                </Text>
-                <Text style={styles.erMeta}>
-                  {[
-                    nearestBed.bed.distance != null && `${nearestBed.bed.distance}km`,
-                    nearestBed.bed.congestion != null && `혼잡도 ${nearestBed.bed.congestion}%`,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') || '거리 정보 없음'}
-                </Text>
-              </View>
-              <View style={styles.erBadge}>
-                <Text style={styles.erBadgeText}>병상 {nearestBed.bed.availableBeds ?? '-'}</Text>
-              </View>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitleInline}>가까운 응급실</Text>
+            <Pressable onPress={() => goToTab('Hospital')} hitSlop={8}>
+              <Text style={styles.moreLink}>전체 보기</Text>
             </Pressable>
+          </View>
+          {nearestBed.status === 'ready' ? (
+            nearestBed.beds.map((bed) => (
+              <View key={bed.hpid} style={styles.erBedCard}>
+                <View style={styles.erBedTop}>
+                  <View style={styles.erInfo}>
+                    <Text style={styles.erName} numberOfLines={1}>
+                      {bed.name}
+                    </Text>
+                    <Text style={styles.erMeta}>
+                      {[
+                        bed.distance != null && `${bed.distance}km`,
+                        bed.congestion != null && `혼잡도 ${bed.congestion}%`,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ') || '거리 정보 없음'}
+                    </Text>
+                  </View>
+                  <View style={styles.erBadge}>
+                    <Text style={styles.erBadgeText}>병상 {bed.availableBeds ?? '-'}</Text>
+                  </View>
+                </View>
+                <View style={styles.erActions}>
+                  <Pressable
+                    style={[styles.erActionBtn, !bed.phone && styles.erActionDisabled]}
+                    onPress={() => callPhone(bed.phone)}
+                    disabled={!bed.phone}
+                  >
+                    <Ionicons name="call-outline" size={16} color={colors.text} />
+                    <Text style={styles.erActionText}>전화</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.erActionBtn, styles.erActionPrimary, (bed.latitude == null || bed.longitude == null) && styles.erActionDisabled]}
+                    onPress={() => bed.latitude != null && bed.longitude != null && openDirections(bed.name, bed.latitude, bed.longitude)}
+                    disabled={bed.latitude == null || bed.longitude == null}
+                  >
+                    <Ionicons name="navigate-outline" size={16} color={colors.white} />
+                    <Text style={[styles.erActionText, { color: colors.white }]}>길찾기</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))
           ) : nearestBed.status === 'loading' ? (
             <View style={[styles.erCard, styles.erLoading]}>
               <ActivityIndicator color={colors.primary} />
@@ -180,6 +208,33 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
   },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  sectionTitleInline: { fontSize: font.h3, fontWeight: '700', color: colors.text },
+  moreLink: { fontSize: font.sub, color: colors.textSub, fontWeight: '600' },
+  erBedCard: {
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    gap: spacing.md,
+  },
+  erBedTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  erActions: { flexDirection: 'row', gap: spacing.sm },
+  erActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  erActionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
+  erActionDisabled: { opacity: 0.4 },
+  erActionText: { fontSize: font.sub, fontWeight: '700', color: colors.text },
   erInfo: { flex: 1, gap: spacing.xs },
   erLoading: { justifyContent: 'flex-start', gap: spacing.md },
   erName: { fontSize: font.body, fontWeight: '700', color: colors.text },
