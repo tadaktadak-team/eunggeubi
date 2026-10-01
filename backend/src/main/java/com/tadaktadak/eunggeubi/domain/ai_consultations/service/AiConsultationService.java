@@ -10,8 +10,11 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.AiConsultatio
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ReferenceSourceRepository;
 import com.tadaktadak.eunggeubi.domain.health.entity.HealthProfile;
 import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -45,6 +48,20 @@ public class AiConsultationService {
     // 재시도 대상이다. 안 잡으면 일시적인 오류 한 번에 전체 요청이 500으로 끝난다.
     private static final int MAX_ATTEMPTS = 3;
 
+    // 비회원이 보낼 수 있는 질문 메시지 수. 초과하면 GuestLimitExceededException(403).
+    public static final int GUEST_MESSAGE_LIMIT = 10;
+
+    // IP 하나가 하루에 새로 받을 수 있는 guestCode 수. guestCode를 버리고(=비우거나 지어낸 값을 보내고)
+    // 새로 받는 식으로 위 10회 제한을 초기화하는 걸 막는다. 모바일망(CGNAT)은 수많은 사용자가 공인 IP
+    // 하나를 공유하므로 작게 잡으면 처음 쓰는 사람이 첫 질문부터 막힌다 - 넉넉하게 두고 남용은 RateLimitFilter가 늦춘다.
+    static final int GUEST_CODES_PER_IP_PER_DAY = 10;
+
+    // ponytail: 인스턴스 로컬 메모리 카운터(RateLimitFilter와 같은 한계) - 재시작하면 초기화되고 스케일아웃하면
+    // 인스턴스 수만큼 허용량이 늘어난다. 여러 대로 늘리면 Redis 등 공유 저장소로 옮길 것.
+    // 아래 두 필드는 synchronized 메서드(checkGuestCodeIssueAllowed/recordGuestCodeIssue)에서만 만진다.
+    private final Map<String, Integer> guestCodesIssuedToday = new HashMap<>();
+    private LocalDate guestCodeDay = LocalDate.now();
+
     private final RagRetrievalService ragRetrievalService;
     private final ChatClient chatClient;
     private final AiConsultationRepository aiConsultationRepository;
@@ -55,19 +72,35 @@ public class AiConsultationService {
     // 그동안 DB 커넥션을 잡고 있으면 동시 요청 몇 개만으로 커넥션 풀이 고갈된다. 저장(save)은 Spring
     // Data가 호출마다 개별 트랜잭션으로 처리하므로 그대로 안전하다. 대신 LLM 실패 시 이미 저장된
     // userMessage가 롤백되지 않고 남을 수 있다(응답 없는 사용자 메시지) - 감내 가능한 트레이드오프.
-    public ConsultationResponse consult(ConsultationRequest request, Long userId) {
-        boolean isNewSession = isBlank(request.sessionId());
-        String sessionId = isNewSession ? UUID.randomUUID().toString() : request.sessionId();
-
-        // 게스트가 새 세션을 시작할 때만 guest_code를 새로 발급한다 - 세션을 이어가는 요청이면
-        // 클라이언트가 이미 갖고 있는 값을 그대로 쓴다 (재발급하면 이전 메시지와 소유권이 끊어짐).
-        boolean guestCodeIssued = userId == null && isBlank(request.guestCode());
+    public ConsultationResponse consult(ConsultationRequest request, Long userId, String clientIp) {
+        // 게스트는 이미 쓰던 guestCode가 있으면 그대로 쓰고(재발급하면 이전 메시지와 소유권이 끊어짐),
+        // 없으면 새로 발급한다. 메시지가 하나도 없는 코드(지어낸 값, 가입으로 계정에 이전돼 비워진 값)도
+        // 새 발급으로 취급한다 - 안 그러면 아무 값이나 보내서 횟수 제한을 초기화할 수 있다.
+        long guestUsed = userId == null && !isBlank(request.guestCode())
+                ? aiConsultationRepository.countByGuestCodeAndSenderType(request.guestCode(), SenderType.USER)
+                : 0;
+        if (guestUsed >= GUEST_MESSAGE_LIMIT) {
+            throw new GuestLimitExceededException();
+        }
+        boolean guestCodeIssued = userId == null && guestUsed == 0;
+        if (guestCodeIssued) {
+            checkGuestCodeIssueAllowed(clientIp);
+        }
         String guestCode = userId != null ? null : (guestCodeIssued ? generateGuestCode() : request.guestCode());
+
+        // 이어가려는 세션이 없거나 요청자 것이 아니면(남의 sessionId, 가입으로 계정에 이전된 세션을
+        // 비회원 상태로 이어가기 등) 새 세션으로 시작한다 - 거부 대신 새로 여는 건, 가입 직후 같은
+        // 화면에서 계속 질문해도 에러 없이 이어지게 하려는 것. 남의 대화가 LLM 컨텍스트로 새지는 않는다.
+        List<AiConsultation> existing = isBlank(request.sessionId())
+                ? List.of()
+                : aiConsultationRepository.findBySessionIdOrderByCreatedAtAsc(request.sessionId());
+        boolean isNewSession = existing.isEmpty() || !existing.get(0).isOwnedBy(userId, guestCode);
+        String sessionId = isNewSession ? UUID.randomUUID().toString() : request.sessionId();
 
         // 후속 질문("그럼 며칠 지나면 병원 가야해요?")은 이전 대화를 알아야 뭘 묻는지 이해가 된다 -
         // 새 세션이면 이전 대화가 없으니 빈 목록, 아니면 이번 사용자 메시지를 저장하기 전에(=순수하게
         // "이전" 턴만) 최근 것만 잘라서 가져온다.
-        List<AiConsultation> priorTurns = isNewSession ? List.of() : recentTurns(sessionId);
+        List<AiConsultation> priorTurns = isNewSession ? List.of() : recentTurns(existing);
 
         AiConsultation userMessage = aiConsultationRepository.save(AiConsultation.builder()
                 .userId(userId)
@@ -78,6 +111,15 @@ public class AiConsultationService {
                 .content(request.query())
                 .regenerated(false)
                 .build());
+
+        // 동시 요청 대비 재확인: 위의 횟수 검사와 저장 사이에 같은 코드의 다른 요청이 끼면 둘 다 통과한다.
+        // 저장 뒤 다시 세서 넘쳤으면 방금 저장한 걸 지우고 막는다. 동시에 넘친 요청은 둘 다 막힐 수도
+        // 있지만(한도보다 적게 허용) 넘치는 쪽은 없다 - 락 없이 서버가 여러 대여도 성립한다.
+        if (guestCode != null
+                && aiConsultationRepository.countByGuestCodeAndSenderType(guestCode, SenderType.USER) > GUEST_MESSAGE_LIMIT) {
+            aiConsultationRepository.delete(userMessage);
+            throw new GuestLimitExceededException();
+        }
 
         String searchQuery = buildSearchQuery(priorTurns, ragRetrievalService.rewriteForSearch(request.query()));
         List<List<Document>> docGroups = ragRetrievalService.retrieveGrouped(searchQuery);
@@ -107,6 +149,12 @@ public class AiConsultationService {
 
         List<ConsultationResponse.AnswerSegment> answer = buildAnswer(request.query(), result.segments());
 
+        // 발급 횟수는 응답까지 성공했을 때만 센다 - LLM 오류 등으로 실패하면 클라이언트는 코드를 못 받았는데
+        // IP 한도만 깎이게 된다.
+        if (guestCodeIssued) {
+            recordGuestCodeIssue(clientIp);
+        }
+
         return new ConsultationResponse(
                 answer, result.citedSources(), aiMessage.getId(), sessionId,
                 guestCodeIssued ? guestCode : null, ConsultationDisclaimer.TEXT);
@@ -133,8 +181,7 @@ public class AiConsultationService {
 
     // 세션의 최근 대화를 시간순으로 가져온다(이번 사용자 메시지 저장 전이라 "이전" 턴만 잡힌다).
     // 길게 이어진 세션이라도 프롬프트/검색어에 태울 건 최근 몇 개로만 자른다(MAX_HISTORY_MESSAGES).
-    private List<AiConsultation> recentTurns(String sessionId) {
-        List<AiConsultation> all = aiConsultationRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+    private List<AiConsultation> recentTurns(List<AiConsultation> all) {
         return all.size() > MAX_HISTORY_MESSAGES
                 ? all.subList(all.size() - MAX_HISTORY_MESSAGES, all.size())
                 : all;
@@ -343,6 +390,31 @@ public class AiConsultationService {
                 (String) doc.getMetadata().get("section"),
                 (String) doc.getMetadata().get("source"),
                 (String) doc.getMetadata().get("cntntsSn"));
+    }
+
+    // 여기선 검사만 하고, 실제 카운트는 consult 성공 시점에 올린다.
+    // ponytail: 검사와 카운트 사이가 벌어져서 같은 IP의 동시 첫 요청 몇 개는 한도를 살짝 넘길 수 있다 - 비용 방어용 느슨한 상한이라 감수.
+    // synchronized: 날짜 전환(clear)과 카운트 갱신이 섞이면 자정 무렵 카운트가 샌다. 새 guestCode 발급
+    // 요청에서만 불리고 맵 연산 몇 개뿐이라 락 비용은 무시할 수준.
+    private synchronized void checkGuestCodeIssueAllowed(String clientIp) {
+        rollGuestCodeDay();
+        if (guestCodesIssuedToday.getOrDefault(clientIp, 0) >= GUEST_CODES_PER_IP_PER_DAY) {
+            throw new GuestLimitExceededException();
+        }
+    }
+
+    private synchronized void recordGuestCodeIssue(String clientIp) {
+        rollGuestCodeDay();
+        guestCodesIssuedToday.merge(clientIp, 1, Integer::sum);
+    }
+
+    // 날짜가 바뀌면 통째로 비운다(IP별 만료 관리 대신) - 맵이 distinct IP 수만큼 계속 자라지 않게.
+    private void rollGuestCodeDay() {
+        LocalDate today = LocalDate.now();
+        if (!today.equals(guestCodeDay)) {
+            guestCodesIssuedToday.clear();
+            guestCodeDay = today;
+        }
     }
 
     private String generateGuestCode() {

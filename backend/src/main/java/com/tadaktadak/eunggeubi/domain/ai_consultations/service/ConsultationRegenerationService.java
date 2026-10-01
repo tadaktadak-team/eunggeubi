@@ -49,6 +49,13 @@ public class ConsultationRegenerationService {
     // 몇 개만으로 커넥션 풀이 고갈된다(저장은 Spring Data가 save() 호출마다 개별 트랜잭션으로 처리).
     public RegenerateResponse regenerate(Long consultationId, Long userId, String guestCode) {
         AiConsultation baseMessage = getOwnedAiMessage(consultationId, userId, guestCode);
+        // 비회원은 답변 하나당 재생성 1회 - 질문 수 한도와 별개로 재생성만 반복 호출해 LLM을 쓰는 걸 막는다.
+        // (질문 한도로 막으면 10번째 질문 직후 이전 답변들의 재생성까지 같이 막혀버린다.)
+        // 요청자 기준으로 본다 - 로그인 후 "가져오지 않기"를 골라 guestCode로 남은 기록도 로그인 사용자면 제한 없음.
+        if (userId == null
+                && aiConsultationRepository.existsByBasedOnResponseId(baseMessage.getId())) {
+            throw new GuestLimitExceededException();
+        }
         String symptomText = resolveSymptomText(baseMessage);
         List<String> checkedItems = resolveCheckedItems(baseMessage);
 

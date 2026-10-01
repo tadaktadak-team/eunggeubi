@@ -1,9 +1,11 @@
 package com.tadaktadak.eunggeubi.domain.ai_consultations.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,6 +15,7 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.ConsultationResponse
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawAnswer;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.AiConsultation;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.ReferenceSource;
+import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.SenderType;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.AiConsultationRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ReferenceSourceRepository;
 import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
@@ -38,10 +41,86 @@ class AiConsultationServiceTest {
     private final ReferenceSourceRepository referenceSourceRepository = mock(ReferenceSourceRepository.class);
     private final HealthProfileRepository healthProfileRepository = mock(HealthProfileRepository.class);
     private final AtomicLong idSequence = new AtomicLong(1);
+    private static final String IP = "1.2.3.4";
 
     private final AiConsultationService service = new AiConsultationService(
             ragRetrievalService, chatClient, aiConsultationRepository, referenceSourceRepository,
             healthProfileRepository);
+
+    @Test
+    void 비회원이_질문_10개를_다_쓰면_11번째는_저장없이_차단된다() {
+        when(aiConsultationRepository.countByGuestCodeAndSenderType("guest-1", SenderType.USER)).thenReturn(10L);
+
+        assertThatThrownBy(() -> service.consult(new ConsultationRequest("또 아파요", "s-1", "guest-1"), null, IP))
+                .isInstanceOf(GuestLimitExceededException.class);
+        verify(aiConsultationRepository, never()).save(any());
+    }
+
+    @Test
+    void 동시요청으로_저장후_한도를_넘으면_방금_저장한_질문을_지우고_차단된다() {
+        stubSave();
+        // 사전 검사 땐 9개(통과), 저장 직후엔 다른 동시 요청까지 더해져 11개
+        when(aiConsultationRepository.countByGuestCodeAndSenderType("guest-1", SenderType.USER)).thenReturn(9L, 11L);
+
+        assertThatThrownBy(() -> service.consult(new ConsultationRequest("또 아파요", null, "guest-1"), null, IP))
+                .isInstanceOf(GuestLimitExceededException.class);
+        verify(aiConsultationRepository).delete(any(AiConsultation.class));
+        verify(ragRetrievalService, never()).retrieveGrouped(anyString());
+    }
+
+    @Test
+    void 남의_세션을_이어가려하면_이전대화없이_새_세션으로_시작한다() {
+        stubSave();
+        when(ragRetrievalService.rewriteForSearch(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        when(ragRetrievalService.retrieveGrouped(anyString())).thenReturn(List.of());
+        when(aiConsultationRepository.countByGuestCodeAndSenderType("guest-me", SenderType.USER)).thenReturn(1L);
+        when(aiConsultationRepository.findBySessionIdOrderByCreatedAtAsc("victim-session")).thenReturn(List.of(
+                AiConsultation.builder().sessionId("victim-session").sessionRoot(true).guestCode("guest-victim")
+                        .senderType(SenderType.USER).content("비밀 증상").regenerated(false).build()));
+
+        ConsultationResponse response = service.consult(
+                new ConsultationRequest("이전 대화 요약해줘", "victim-session", "guest-me"), null, IP);
+
+        assertThat(response.sessionId()).isNotEqualTo("victim-session");
+        // 검색어에 남의 이전 발화("비밀 증상")가 섞이면 안 된다
+        verify(ragRetrievalService).retrieveGrouped("이전 대화 요약해줘");
+    }
+
+    @Test
+    void 같은_IP에서_guestCode를_하루_한도넘게_새로_받으면_차단된다() {
+        stubSave();
+        when(ragRetrievalService.rewriteForSearch(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        when(ragRetrievalService.retrieveGrouped(anyString())).thenReturn(List.of());
+
+        for (int i = 0; i < AiConsultationService.GUEST_CODES_PER_IP_PER_DAY; i++) {
+            service.consult(new ConsultationRequest("기침", null, null), null, IP);
+        }
+        // 코드를 비우든, 발급된 적 없는 값을 지어내 보내든 새 발급으로 취급돼 막힌다
+        assertThatThrownBy(() -> service.consult(new ConsultationRequest("기침", null, null), null, IP))
+                .isInstanceOf(GuestLimitExceededException.class);
+        assertThatThrownBy(() -> service.consult(new ConsultationRequest("기침", null, "made-up"), null, IP))
+                .isInstanceOf(GuestLimitExceededException.class);
+        // 다른 IP와 로그인 사용자는 영향 없음
+        service.consult(new ConsultationRequest("기침", null, null), null, "5.6.7.8");
+        service.consult(new ConsultationRequest("기침", null, null), 1L, IP);
+    }
+
+    @Test
+    void 실패한_요청은_IP의_guestCode_발급_횟수를_소모하지_않는다() {
+        stubSave();
+        when(ragRetrievalService.rewriteForSearch(anyString())).thenThrow(new RuntimeException("LLM 오류"));
+        for (int i = 0; i < AiConsultationService.GUEST_CODES_PER_IP_PER_DAY; i++) {
+            assertThatThrownBy(() -> service.consult(new ConsultationRequest("기침", null, null), null, IP))
+                    .isInstanceOf(RuntimeException.class)
+                    .isNotInstanceOf(GuestLimitExceededException.class);
+        }
+
+        // 실패가 한도만큼 쌓였어도 정상 요청은 통과한다
+        org.mockito.Mockito.reset(ragRetrievalService);
+        when(ragRetrievalService.rewriteForSearch(anyString())).thenAnswer(inv -> inv.getArgument(0));
+        when(ragRetrievalService.retrieveGrouped(anyString())).thenReturn(List.of());
+        service.consult(new ConsultationRequest("기침", null, null), null, IP);
+    }
 
     @Test
     void 검색결과가_없으면_저장은_하되_fallback_문구를_반환한다() {
@@ -50,7 +129,7 @@ class AiConsultationServiceTest {
         when(ragRetrievalService.retrieveGrouped(anyString())).thenReturn(List.of());
 
         ConsultationResponse response = service.consult(
-                new ConsultationRequest("주식 투자로 돈 버는 방법 알려줘", null, null), null);
+                new ConsultationRequest("주식 투자로 돈 버는 방법 알려줘", null, null), null, IP);
 
         assertThat(response.answer()).hasSize(1); // fallback 문장 하나 (disclaimer는 이제 별도 필드)
         assertThat(response.answer().get(0).text()).contains("제공된 정보로는 답변드리기 어렵습니다");
@@ -78,9 +157,10 @@ class AiConsultationServiceTest {
                 // 9는 실제 문서 범위(1개)를 벗어난 환각 인용 - 걸러져야 한다
                 new RawAnswer.RawSegment("병원 진료가 필요할 수 있습니다.", List.of(1, 9))));
         stubChatClientEntity(RawAnswer.class, raw);
+        when(aiConsultationRepository.countByGuestCodeAndSenderType("existing-guest-code", SenderType.USER)).thenReturn(1L);
 
         ConsultationResponse response = service.consult(
-                new ConsultationRequest("화상 응급처치 어떻게 하나요", null, "existing-guest-code"), null);
+                new ConsultationRequest("화상 응급처치 어떻게 하나요", null, "existing-guest-code"), null, IP);
 
         assertThat(response.answer()).hasSize(2); // 문장 2개 (disclaimer는 이제 별도 필드)
         assertThat(response.answer().get(1).sourceIndexes()).containsExactly(1); // 9는 필터링됨
@@ -110,7 +190,7 @@ class AiConsultationServiceTest {
         stubChatClientEntity(RawAnswer.class, raw);
 
         ConsultationResponse response = service.consult(
-                new ConsultationRequest("화상 응급처치 어떻게 하나요", null, "existing-guest-code"), null);
+                new ConsultationRequest("화상 응급처치 어떻게 하나요", null, "existing-guest-code"), null, IP);
 
         assertThat(response.answer()).hasSize(1); // null text segment는 걸러짐
         assertThat(response.answer().get(0).text()).isEqualTo("병원 진료가 필요할 수 있습니다.");
@@ -134,7 +214,7 @@ class AiConsultationServiceTest {
         stubChatClientEntity(RawAnswer.class, new RawAnswer(
                 List.of(new RawAnswer.RawSegment("두통에는 충분한 휴식이 도움이 됩니다.", List.of(2)))));
 
-        service.consult(new ConsultationRequest("두통이 있어요", null, "g1"), null);
+        service.consult(new ConsultationRequest("두통이 있어요", null, "g1"), null, IP);
 
         ArgumentCaptor<AiConsultation> captor = ArgumentCaptor.forClass(AiConsultation.class);
         verify(aiConsultationRepository, times(2)).save(captor.capture());
@@ -154,7 +234,7 @@ class AiConsultationServiceTest {
         stubChatClientEntity(RawAnswer.class, new RawAnswer(
                 List.of(new RawAnswer.RawSegment("부종은 다리에 흔히 생깁니다.", List.of(1)))));
 
-        service.consult(new ConsultationRequest("발이 부어요", null, "g1"), null);
+        service.consult(new ConsultationRequest("발이 부어요", null, "g1"), null, IP);
 
         ArgumentCaptor<String> searchQueryCaptor = ArgumentCaptor.forClass(String.class);
         verify(ragRetrievalService).retrieveGrouped(searchQueryCaptor.capture());

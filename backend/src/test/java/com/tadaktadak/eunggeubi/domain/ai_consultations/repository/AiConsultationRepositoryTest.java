@@ -47,4 +47,21 @@ class AiConsultationRepositoryTest {
         assertThat(guestMessage.isOwnedBy(null, "다른guest")).isFalse();
         assertThat(guestMessage.isOwnedBy(1L, null)).isFalse(); // 게스트 세션인데 로그인 사용자가 접근
     }
+
+    @Test
+    void 회원가입시_비회원_기록만_새_계정으로_이전된다() {
+        repository.save(AiConsultation.builder()
+                .sessionId("s-a").sessionRoot(true).guestCode("guest-9")
+                .senderType(SenderType.USER).content("기침").regenerated(false).build());
+        repository.save(AiConsultation.builder()
+                .sessionId("s-b").sessionRoot(true).guestCode("guest-other")
+                .senderType(SenderType.USER).content("두통").regenerated(false).build());
+
+        int moved = repository.claimGuestConsultations(7L, "guest-9");
+
+        assertThat(moved).isEqualTo(1);
+        assertThat(repository.countByGuestCodeAndSenderType("guest-9", SenderType.USER)).isZero();
+        assertThat(repository.findByUserIdAndSessionRootTrueOrderByCreatedAtDesc(7L))
+                .extracting(AiConsultation::getContent).containsExactly("기침");
+    }
 }
