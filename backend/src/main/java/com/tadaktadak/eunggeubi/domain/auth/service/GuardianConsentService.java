@@ -15,6 +15,7 @@ import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.common.MessageType;
 import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
 import com.tadaktadak.eunggeubi.global.sms.SmsSender;
+import com.tadaktadak.eunggeubi.global.util.PhoneNumbers;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -49,6 +50,9 @@ public class GuardianConsentService {
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
         if (user.getStatus() != UserStatus.PENDING) {
             throw new IllegalArgumentException("보호자 동의가 필요한 상태가 아닙니다.");
+        }
+        if (PhoneNumbers.digitsOnly(user.getPhone()).equals(request.phone())) {
+            throw new IllegalArgumentException("본인 번호는 보호자로 등록할 수 없어요.");
         }
 
         LocalDateTime now = LocalDateTime.now();
