@@ -20,6 +20,7 @@ import { getEmergencyBeds } from "../api/emergencyBed";
 import { EmergencyBed } from "../types/emergencyBed";
 import { getNearbyHospitals, getNearbyPharmacies } from "../api/medicalFacility";
 import { MedicalFacility } from "../types/medicalFacility";
+import CharacterSlot from "../../../shared/components/CharacterSlot";
 import { isInKorea } from "../../../shared/utils/geo";
 
 type FilterType = "all" | "hospital" | "pharmacy" | "emergency";
@@ -395,19 +396,6 @@ export default function MedicalLocatorScreen() {
     );
   }
 
-  if (outOfKorea) {
-    return (
-      <SafeAreaView style={styles.center}>
-        <Text style={styles.notice}>
-          응급이는 대한민국 안에서만 주변 병원·약국·응급실을 찾을 수 있어요.
-        </Text>
-        <TouchableOpacity style={styles.retryButton} onPress={loadInitialData}>
-          <Text style={styles.retryText}>위치 다시 확인</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
   // 에러 화면
   if (error) {
     return (
@@ -477,7 +465,8 @@ export default function MedicalLocatorScreen() {
       </View>
 
       {/* 지도 */}
-      {location && (
+      {outOfKorea && <View style={[styles.map, styles.mapPlaceholder]} />}
+      {location && !outOfKorea && (
         <View style={styles.map}>
           <KakaoMapView
             centerLatitude={location.coords.latitude}
@@ -707,6 +696,19 @@ export default function MedicalLocatorScreen() {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* 한국 밖이면 화면 위에 반투명 안내를 덮어 뒤 화면이 비쳐 보이게 한다 */}
+      {outOfKorea && (
+        <View style={styles.outOfKoreaOverlay}>
+          <CharacterSlot />
+          <Text style={styles.notice}>
+            응급이는 대한민국 안에서만{"\n"}주변 병원·약국·응급실을 찾을 수 있어요.
+          </Text>
+          <TouchableOpacity style={styles.retryButton} onPress={loadInitialData}>
+            <Text style={styles.retryText}>위치 다시 확인</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -825,7 +827,23 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
+  outOfKoreaOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.88)",
+  },
+
+  mapPlaceholder: {
+    backgroundColor: "#ECECEE",
+  },
+
   notice: {
+    marginTop: 20,
     paddingHorizontal: 32,
     color: "#444",
     textAlign: "center",
