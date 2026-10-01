@@ -35,24 +35,31 @@ export default function LoginRequiredSheet({ visible, onClose }: Props) {
           <View style={styles.iconCircle}>
             <Ionicons name="shield-checkmark" size={28} color={colors.primary} />
           </View>
-          <Text style={styles.title}>로그인이 필요한 기능이에요</Text>
+          <Text style={styles.title}>로그인하면 이런 기능이 더해져요</Text>
           <Text style={styles.subtitle}>
-            보호자 알림, 상담 이력 저장,{'\n'}건강 프로필은 로그인 후 사용할 수 있어요
+            지금도 상담·병원 찾기·약물 정보는 바로 쓸 수 있어요.{'\n'}로그인하면 보호자 알림과 기록 저장까지 이어져요.
           </Text>
 
           <View style={styles.featureBox}>
-            {AVAILABLE.map((f) => (
-              <View key={f} style={styles.featureRow}>
-                <Ionicons name="checkmark" size={18} color={colors.success} />
-                <Text style={styles.featureText}>{f}</Text>
-              </View>
-            ))}
-            {LOCKED.map((f) => (
-              <View key={f} style={styles.featureRow}>
-                <Ionicons name="close" size={18} color={colors.placeholder} />
-                <Text style={[styles.featureText, styles.featureLocked]}>{f}</Text>
-              </View>
-            ))}
+            <View style={styles.column}>
+              <Text style={styles.columnTitle}>지금 바로 이용</Text>
+              {AVAILABLE.map((f) => (
+                <View key={f} style={styles.featureRow}>
+                  <Ionicons name="checkmark" size={18} color={colors.success} />
+                  <Text style={styles.featureText}>{f}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.divider} />
+            <View style={styles.column}>
+              <Text style={styles.columnTitle}>로그인하면 추가</Text>
+              {LOCKED.map((f) => (
+                <View key={f} style={styles.featureRow}>
+                  <Ionicons name="close" size={18} color={colors.placeholder} />
+                  <Text style={[styles.featureText, styles.featureLocked]}>{f}</Text>
+                </View>
+              ))}
+            </View>
           </View>
 
           <TouchableOpacity style={styles.loginBtn} onPress={goLogin}>
@@ -98,14 +105,18 @@ const styles = StyleSheet.create({
   },
   featureBox: {
     width: '100%',
+    flexDirection: 'row',
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     padding: spacing.lg,
     marginBottom: spacing.lg,
   },
+  column: { flex: 1 },
+  columnTitle: { fontSize: font.caption, color: colors.textSub, fontWeight: '700', marginBottom: spacing.sm },
+  divider: { width: 1, backgroundColor: colors.border, marginHorizontal: spacing.md },
   featureRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs },
-  featureText: { marginLeft: spacing.sm, fontSize: font.body, color: colors.text, fontWeight: '600' },
+  featureText: { flexShrink: 1, marginLeft: spacing.xs, fontSize: font.sub + 1, color: colors.text, fontWeight: '600' },
   featureLocked: { color: colors.placeholder, fontWeight: '400' },
   loginBtn: {
     width: '100%',
