@@ -13,8 +13,15 @@ interface Props {
   onClose: () => void;
 }
 
-const AVAILABLE = ['AI 증상 상담', '병원·약국 찾기', '약물 정보 조회'];
-const LOCKED = ['상담 이력 저장', '보호자 알림 발송', '건강 프로필 관리'];
+// [기능, 로그인 없이 가능한지]. 로그인하면 전부 가능하다
+const FEATURES: [string, boolean][] = [
+  ['AI 증상 상담', true],
+  ['병원·약국 찾기', true],
+  ['약물 정보 조회', true],
+  ['상담 이력 저장', false],
+  ['보호자 알림 발송', false],
+  ['건강 프로필 관리', false],
+];
 
 export default function LoginRequiredSheet({ visible, onClose }: Props) {
   const navigation = useNavigation<Nav>();
@@ -40,34 +47,43 @@ export default function LoginRequiredSheet({ visible, onClose }: Props) {
             지금도 상담·병원 찾기·약물 정보는 바로 쓸 수 있어요.{'\n'}로그인하면 보호자 알림과 기록 저장까지 이어져요.
           </Text>
 
-          <View style={styles.featureBox}>
-            <View style={styles.column}>
-              <Text style={styles.columnTitle}>지금 바로 이용</Text>
-              {AVAILABLE.map((f) => (
-                <View key={f} style={styles.featureRow}>
-                  <Ionicons name="checkmark" size={18} color={colors.success} />
-                  <Text style={styles.featureText}>{f}</Text>
-                </View>
-              ))}
+          <View style={styles.table}>
+            <View style={styles.tableRow}>
+              <View style={styles.labelCell} />
+              <View style={styles.markCell}>
+                <Text style={styles.colTitle}>로그인 없이</Text>
+              </View>
+              <View style={[styles.markCell, styles.loginCell, styles.loginCellTop]}>
+                <Text style={[styles.colTitle, styles.colTitleLogin]}>로그인</Text>
+              </View>
             </View>
-            <View style={styles.divider} />
-            <View style={styles.column}>
-              <Text style={styles.columnTitle}>로그인하면 추가</Text>
-              {LOCKED.map((f) => (
-                <View key={f} style={styles.featureRow}>
-                  <Ionicons name="close" size={18} color={colors.placeholder} />
-                  <Text style={[styles.featureText, styles.featureLocked]}>{f}</Text>
+            {FEATURES.map(([label, guestOk], i) => (
+              <View key={label} style={styles.tableRow}>
+                <View style={styles.labelCell}>
+                  <Text style={styles.featureText}>{label}</Text>
                 </View>
-              ))}
-            </View>
+                <View style={styles.markCell}>
+                  {guestOk ? (
+                    <Ionicons name="checkmark" size={18} color={colors.textSub} />
+                  ) : (
+                    <Ionicons name="close" size={18} color={colors.disabled} />
+                  )}
+                </View>
+                <View style={[styles.markCell, styles.loginCell, i === FEATURES.length - 1 && styles.loginCellBottom]}>
+                  <Ionicons name="checkmark" size={18} color={colors.primary} />
+                </View>
+              </View>
+            ))}
           </View>
 
-          <TouchableOpacity style={styles.loginBtn} onPress={goLogin}>
-            <Text style={styles.loginBtnText}>로그인 / 회원가입</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.guestBtn} onPress={onClose}>
-            <Text style={styles.guestText}>로그인 없이 계속 이용하기</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.guestBtn} onPress={onClose}>
+              <Text style={styles.guestText}>로그인 없이 이용</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.loginBtn} onPress={goLogin}>
+              <Text style={styles.loginBtnText}>로그인 / 회원가입</Text>
+            </TouchableOpacity>
+          </View>
         </Pressable>
       </Pressable>
     </Modal>
@@ -103,31 +119,34 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginBottom: spacing.lg,
   },
-  featureBox: {
-    width: '100%',
-    flexDirection: 'row',
+  table: { width: '100%', marginBottom: spacing.lg },
+  tableRow: { flexDirection: 'row', alignItems: 'center', minHeight: 38 },
+  labelCell: { flex: 1, paddingLeft: spacing.xs },
+  markCell: { width: 84, height: 38, alignItems: 'center', justifyContent: 'center' },
+  loginCell: { backgroundColor: colors.primaryLight },
+  loginCellTop: { borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md },
+  loginCellBottom: { borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md },
+  colTitle: { fontSize: font.caption, color: colors.textSub, fontWeight: '700' },
+  colTitleLogin: { color: colors.primary },
+  featureText: { fontSize: font.body, color: colors.text, fontWeight: '600' },
+  buttonRow: { width: '100%', flexDirection: 'row', gap: spacing.sm },
+  guestBtn: {
+    flex: 1,
+    height: 52,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  column: { flex: 1 },
-  columnTitle: { fontSize: font.caption, color: colors.textSub, fontWeight: '700', marginBottom: spacing.sm },
-  divider: { width: 1, backgroundColor: colors.border, marginHorizontal: spacing.md },
-  featureRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs },
-  featureText: { flexShrink: 1, marginLeft: spacing.xs, fontSize: font.sub + 1, color: colors.text, fontWeight: '600' },
-  featureLocked: { color: colors.placeholder, fontWeight: '400' },
+  guestText: { color: colors.text, fontSize: font.body, fontWeight: '700' },
   loginBtn: {
-    width: '100%',
+    flex: 1.2,
     backgroundColor: colors.primary,
     height: 52,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md,
   },
   loginBtnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
-  guestBtn: { paddingVertical: spacing.sm },
-  guestText: { color: colors.textSub, fontSize: font.sub },
 });
