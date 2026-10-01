@@ -2,10 +2,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { useNearestEmergencyBed } from '../../medical_locator/hooks/useNearestEmergencyBed';
 import DisclaimerFooter from '../components/DisclaimerFooter';
 import QuickLinkCard from '../components/QuickLinkCard';
 import SymptomChip from '../components/SymptomChip';
@@ -17,6 +18,7 @@ export default function SymptomHomeScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
+  const { state: nearestBed, retry: retryNearestBed } = useNearestEmergencyBed();
 
   const goAsk = (message: string) => {
     const trimmed = message.trim();
@@ -80,15 +82,46 @@ export default function SymptomHomeScreen() {
           </View>
 
           <Text style={styles.sectionTitle}>가까운 응급실</Text>
-          <Pressable style={styles.erCard} onPress={() => goToTab('Hospital')}>
-            <View style={styles.erInfo}>
-              <Text style={styles.erName}>OO대학병원</Text>
-              <Text style={styles.erMeta}>2.1km · 혼잡도 낮음</Text>
+          {nearestBed.status === 'ready' ? (
+            <Pressable style={styles.erCard} onPress={() => goToTab('Hospital')}>
+              <View style={styles.erInfo}>
+                <Text style={styles.erName} numberOfLines={1}>
+                  {nearestBed.bed.name}
+                </Text>
+                <Text style={styles.erMeta}>
+                  {[
+                    nearestBed.bed.distance != null && `${nearestBed.bed.distance}km`,
+                    nearestBed.bed.congestion != null && `혼잡도 ${nearestBed.bed.congestion}%`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ') || '거리 정보 없음'}
+                </Text>
+              </View>
+              <View style={styles.erBadge}>
+                <Text style={styles.erBadgeText}>병상 {nearestBed.bed.availableBeds ?? '-'}</Text>
+              </View>
+            </Pressable>
+          ) : nearestBed.status === 'loading' ? (
+            <View style={[styles.erCard, styles.erLoading]}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.erMeta}>가까운 응급실을 찾는 중...</Text>
             </View>
-            <View style={styles.erBadge}>
-              <Text style={styles.erBadgeText}>병상 12</Text>
-            </View>
-          </Pressable>
+          ) : (
+            <Pressable
+              style={styles.erCard}
+              onPress={nearestBed.status === 'denied' ? () => Linking.openSettings() : nearestBed.status === 'error' ? retryNearestBed : () => goToTab('Hospital')}
+            >
+              <Text style={styles.erMeta}>
+                {nearestBed.status === 'denied'
+                  ? '위치 권한을 허용하면 가까운 응급실을 보여드려요. (눌러서 설정 열기)'
+                  : nearestBed.status === 'outside'
+                    ? '응급이는 대한민국 안에서만 가까운 응급실을 찾을 수 있어요.'
+                    : nearestBed.status === 'empty'
+                      ? '근처 응급실 정보가 없어요.'
+                      : '가까운 응급실을 불러오지 못했어요. (눌러서 다시 시도)'}
+              </Text>
+            </Pressable>
+          )}
         </ScrollView>
 
         <DisclaimerFooter />
@@ -147,7 +180,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
   },
-  erInfo: { gap: spacing.xs },
+  erInfo: { flex: 1, gap: spacing.xs },
+  erLoading: { justifyContent: 'flex-start', gap: spacing.md },
   erName: { fontSize: font.body, fontWeight: '700', color: colors.text },
   erMeta: { fontSize: font.caption, color: colors.textSub },
   erBadge: {
