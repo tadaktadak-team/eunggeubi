@@ -7,6 +7,7 @@ import { ActivityIndicator, Alert, FlatList, Image, Pressable, StyleSheet, Text,
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchMedications } from '../api/health';
+import { getDrugFormIconName } from '../../drug/utils/drugIcon';
 import { MedicationItem, MedicationSearchItem, MyPageStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<MyPageStackParamList>;
@@ -72,7 +73,10 @@ export default function MedicationPickerScreen() {
       </View>
 
       {loading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>약 정보를 불러오는 중...</Text>
+        </View>
       ) : (
         <FlatList
           data={results}
@@ -80,9 +84,16 @@ export default function MedicationPickerScreen() {
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <Text style={styles.guide}>
-              {searched ? '검색 결과가 없어요.' : '복용 중인 약 이름을 검색해서 골라주세요.\n처방약도 검색돼요.'}
-            </Text>
+            searched ? (
+              <View style={styles.center}>
+                <Text style={styles.emptyText}>검색 결과가 없습니다.</Text>
+              </View>
+            ) : (
+              <View style={styles.center}>
+                <Feather name="search" size={32} color={colors.border} />
+                <Text style={styles.guideText}>복용 중인 약의 이름을 검색해 보세요.</Text>
+              </View>
+            )
           }
           renderItem={({ item }) => (
             <Pressable style={styles.row} onPress={() => pick({ name: item.name, itemSeq: item.itemSeq })}>
@@ -90,7 +101,7 @@ export default function MedicationPickerScreen() {
                 <Image source={{ uri: item.itemImage }} style={styles.image} />
               ) : (
                 <View style={styles.noImage}>
-                  <MaterialCommunityIcons name="pill" size={24} color={colors.primary} />
+                  <MaterialCommunityIcons name={getDrugFormIconName(item.name)} size={26} color={colors.placeholder} />
                 </View>
               )}
               <View style={styles.info}>
@@ -141,7 +152,10 @@ const styles = StyleSheet.create({
   },
   searchBtnText: { color: colors.white, fontWeight: '700', fontSize: font.body },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
-  guide: { textAlign: 'center', color: colors.placeholder, fontSize: font.body, lineHeight: 22, marginTop: spacing.xxl },
+  center: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
+  loadingText: { marginTop: spacing.md, fontSize: font.sub, color: colors.textSub },
+  emptyText: { fontSize: font.body, color: colors.textSub },
+  guideText: { marginTop: spacing.md, fontSize: font.body, color: colors.placeholder },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -150,19 +164,21 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   image: { width: 48, height: 48, borderRadius: radius.sm },
   noImage: {
     width: 48,
     height: 48,
     borderRadius: radius.sm,
-    backgroundColor: colors.primaryLight,
+    backgroundColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   info: { flex: 1, gap: 2 },
-  name: { fontSize: font.body, fontWeight: '700', color: colors.text },
-  type: { fontSize: font.caption, color: colors.textSub, fontWeight: '600' },
+  name: { fontSize: font.body + 1, fontWeight: 'bold', color: colors.text },
+  type: { fontSize: font.sub, color: colors.primaryDark },
   typePro: { color: colors.danger },
   manualBtn: { alignItems: 'center', paddingVertical: spacing.lg },
   manualText: { color: colors.textSub, fontSize: font.sub, textDecorationLine: 'underline' },
