@@ -3,6 +3,7 @@ package com.tadaktadak.eunggeubi.domain.health.controller;
 import com.tadaktadak.eunggeubi.domain.health.dto.HealthProfileRequest;
 import com.tadaktadak.eunggeubi.domain.health.dto.HealthProfileResponse;
 import com.tadaktadak.eunggeubi.domain.health.service.HealthProfileService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,7 +26,7 @@ public class HealthProfileController {
 
     @PutMapping
     public HealthProfileResponse saveProfile(@AuthenticationPrincipal Long userId,
-                                             @RequestBody HealthProfileRequest request) {
+                                             @Valid @RequestBody HealthProfileRequest request) {
         return healthProfileService.saveProfile(userId, request);
     }
 }

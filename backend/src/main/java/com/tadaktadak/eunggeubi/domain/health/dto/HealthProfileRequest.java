@@ -1,11 +1,15 @@
 package com.tadaktadak.eunggeubi.domain.health.dto;
 
+import jakarta.validation.constraints.Size;
 import java.util.List;
 
 public record HealthProfileRequest(
-        String bloodType, //혈액형
-        List<String> diseases, //병명
-        List<String> medications, //약명
-        List<String> allergies //알레르기
+        @Size(max = 10, message = "혈액형이 올바르지 않습니다.") String bloodType, //혈액형
+        @Size(max = 20, message = "병명은 최대 20개까지 등록할 수 있습니다.")
+        List<@Size(max = 50, message = "항목은 50자 이내로 입력해주세요.") String> diseases, //병명
+        @Size(max = 20, message = "약명은 최대 20개까지 등록할 수 있습니다.")
+        List<@Size(max = 50, message = "항목은 50자 이내로 입력해주세요.") String> medications, //약명
+        @Size(max = 20, message = "알레르기는 최대 20개까지 등록할 수 있습니다.")
+        List<@Size(max = 50, message = "항목은 50자 이내로 입력해주세요.") String> allergies //알레르기
 ) {
 }
