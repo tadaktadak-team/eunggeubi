@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 
 public record GuardianRequest(
         @NotBlank @Size(max = 50, message = "이름은 50자 이내로 입력해주세요.") String name,
-        @NotBlank @KoreanMobile String phone,
+        @NotNull(message = "전화번호를 입력해주세요.") @KoreanMobile String phone,
         @NotNull Relationship relationship,
         Boolean notifyEnabled // null이면 등록 시 기본 true
 ) {
