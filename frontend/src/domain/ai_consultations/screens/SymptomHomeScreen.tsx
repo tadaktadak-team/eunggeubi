@@ -7,7 +7,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useNearestEmergencyBed } from '../../medical_locator/hooks/useNearestEmergencyBed';
-import { callPhone, openDirections } from '../../medical_locator/utils/contact';
+import EmergencyBedSheet from '../../medical_locator/components/EmergencyBedSheet';
+import { EmergencyBed } from '../../medical_locator/types/emergencyBed';
+import { formatBeds, getBedStatus } from '../../medical_locator/utils/bedStatus';
 import DisclaimerFooter from '../components/DisclaimerFooter';
 import QuickLinkCard from '../components/QuickLinkCard';
 import SymptomChip from '../components/SymptomChip';
@@ -15,11 +17,23 @@ import { AiConsultationStackParamList, QUICK_SYMPTOMS } from '../types';
 
 type Nav = NativeStackNavigationProp<AiConsultationStackParamList>;
 
+const ER_ROW_STEP = 64;
+const ER_HEADER_HEIGHT = 36;
+
 export default function SymptomHomeScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const { state: nearestBed, retry: retryNearestBed } = useNearestEmergencyBed();
+  const [selectedBed, setSelectedBed] = useState<EmergencyBed | null>(null);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [erTop, setErTop] = useState(0);
+
+  // 화면 높이에 맞춰 스크롤 없이 들어가는 만큼만 보여준다 (최소 1곳, 최대 3곳)
+  const visibleBedCount =
+    viewportHeight > 0 && erTop > 0
+      ? Math.max(1, Math.min(3, Math.floor((viewportHeight - erTop - ER_HEADER_HEIGHT - spacing.lg) / ER_ROW_STEP)))
+      : 3;
 
   const goAsk = (message: string) => {
     const trimmed = message.trim();
@@ -46,7 +60,11 @@ export default function SymptomHomeScreen() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
+        >
           <Text style={styles.subtitle}>증상을 말하면 AI가 참고정보를 안내해요</Text>
 
           <View style={styles.inputCard}>
@@ -82,6 +100,7 @@ export default function SymptomHomeScreen() {
             <QuickLinkCard label="약물정보" icon={{ lib: 'mci', name: 'pill' }} onPress={() => goToTab('Medicine')} />
           </View>
 
+          <View onLayout={(e) => setErTop(e.nativeEvent.layout.y)}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitleInline}>가까운 응급실</Text>
             <Pressable onPress={() => goToTab('Hospital')} hitSlop={8}>
@@ -89,46 +108,29 @@ export default function SymptomHomeScreen() {
             </Pressable>
           </View>
           {nearestBed.status === 'ready' ? (
-            nearestBed.beds.map((bed) => (
-              <View key={bed.hpid} style={styles.erBedCard}>
-                <View style={styles.erBedTop}>
+            nearestBed.beds.slice(0, visibleBedCount).map((bed) => {
+              const status = getBedStatus(bed);
+              return (
+                <Pressable key={bed.hpid} style={styles.erRow} onPress={() => setSelectedBed(bed)}>
                   <View style={styles.erInfo}>
                     <Text style={styles.erName} numberOfLines={1}>
                       {bed.name}
                     </Text>
-                    <Text style={styles.erMeta}>
-                      {[
-                        bed.distance != null && `${bed.distance}km`,
-                        bed.congestion != null && `혼잡도 ${bed.congestion}%`,
-                      ]
+                    <Text style={styles.erMeta} numberOfLines={1}>
+                      {[bed.distance != null && `${bed.distance}km`, formatBeds(bed.availableBeds)]
                         .filter(Boolean)
-                        .join(' · ') || '거리 정보 없음'}
+                        .join(' · ')}
                     </Text>
                   </View>
-                  <View style={styles.erBadge}>
-                    <Text style={styles.erBadgeText}>병상 {bed.availableBeds ?? '-'}</Text>
-                  </View>
-                </View>
-                <View style={styles.erActions}>
-                  <Pressable
-                    style={[styles.erActionBtn, !bed.phone && styles.erActionDisabled]}
-                    onPress={() => callPhone(bed.phone)}
-                    disabled={!bed.phone}
-                  >
-                    <Ionicons name="call-outline" size={16} color={colors.text} />
-                    <Text style={styles.erActionText}>전화</Text>
-                  </Pressable>
-                  <Pressable
-                    style={[styles.erActionBtn, styles.erActionPrimary, (bed.latitude == null || bed.longitude == null) && styles.erActionDisabled]}
-                    onPress={() => bed.latitude != null && bed.longitude != null && openDirections(bed.name, bed.latitude, bed.longitude)}
-                    disabled={bed.latitude == null || bed.longitude == null}
-                  >
-                    <Ionicons name="navigate-outline" size={16} color={colors.white} />
-                    <Text style={[styles.erActionText, { color: colors.white }]}>길찾기</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ))
+                  {status && (
+                    <View style={[styles.erBadge, { borderColor: status.color }]}>
+                      <Text style={[styles.erBadgeText, { color: status.color }]}>{status.label}</Text>
+                    </View>
+                  )}
+                  <Ionicons name="chevron-forward" size={16} color={colors.placeholder} />
+                </Pressable>
+              );
+            })
           ) : nearestBed.status === 'loading' ? (
             <View style={[styles.erCard, styles.erLoading]}>
               <ActivityIndicator color={colors.primary} />
@@ -150,8 +152,10 @@ export default function SymptomHomeScreen() {
               </Text>
             </Pressable>
           )}
+          </View>
         </ScrollView>
 
+        <EmergencyBedSheet bed={selectedBed} onClose={() => setSelectedBed(null)} />
         <DisclaimerFooter />
       </View>
   );
@@ -211,40 +215,25 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
   sectionTitleInline: { fontSize: font.h3, fontWeight: '700', color: colors.text },
   moreLink: { fontSize: font.sub, color: colors.textSub, fontWeight: '600' },
-  erBedCard: {
-    backgroundColor: colors.inputBg,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
-    gap: spacing.md,
-  },
-  erBedTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  erActions: { flexDirection: 'row', gap: spacing.sm },
-  erActionBtn: {
-    flex: 1,
+  erRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    height: 40,
+    gap: spacing.sm,
+    backgroundColor: colors.inputBg,
     borderRadius: radius.md,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 1,
+    marginBottom: spacing.sm - 2,
   },
-  erActionPrimary: { backgroundColor: colors.primary, borderColor: colors.primary },
-  erActionDisabled: { opacity: 0.4 },
-  erActionText: { fontSize: font.sub, fontWeight: '700', color: colors.text },
   erInfo: { flex: 1, gap: spacing.xs },
   erLoading: { justifyContent: 'flex-start', gap: spacing.md },
   erName: { fontSize: font.body, fontWeight: '700', color: colors.text },
   erMeta: { fontSize: font.caption, color: colors.textSub },
   erBadge: {
     borderWidth: 1,
-    borderColor: colors.primary,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: 2,
   },
-  erBadgeText: { color: colors.primary, fontSize: font.caption, fontWeight: '700' },
+  erBadgeText: { fontSize: font.caption, fontWeight: '700' },
 });
