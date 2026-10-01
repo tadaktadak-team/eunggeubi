@@ -20,6 +20,7 @@ import { getEmergencyBeds } from "../api/emergencyBed";
 import { EmergencyBed } from "../types/emergencyBed";
 import { getNearbyHospitals, getNearbyPharmacies } from "../api/medicalFacility";
 import { MedicalFacility } from "../types/medicalFacility";
+import { isInKorea } from "../../../shared/utils/geo";
 
 type FilterType = "all" | "hospital" | "pharmacy" | "emergency";
 
@@ -42,6 +43,11 @@ export default function MedicalLocatorScreen() {
   const [visibleCount, setVisibleCount] = useState(5);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [outOfKorea, setOutOfKorea] = useState(false);
+  const [stage1, setStage1] = useState<string | null>(null);
+  const [bedsFailed, setBedsFailed] = useState(false);
+  const [hospitalsFailed, setHospitalsFailed] = useState(false);
+  const [pharmaciesFailed, setPharmaciesFailed] = useState(false);
   const [location, setLocation] =
     useState<Location.LocationObject | null>(null);
 
@@ -78,6 +84,7 @@ export default function MedicalLocatorScreen() {
     try {
       setLoading(true);
       setError(null);
+      setOutOfKorea(false);
 
       // 위치 권한 요청
       const { status } =
@@ -99,6 +106,13 @@ export default function MedicalLocatorScreen() {
       const longitude = currentLocation.coords.longitude;
 
       console.log("현재 위치:", latitude, longitude);
+
+      // 서비스 지원 지역(대한민국) 밖이면 서버에 묻지 않고 안내한다
+      if (!isInKorea(latitude, longitude)) {
+        setOutOfKorea(true);
+        setLoading(false);
+        return;
+      }
 
       // 현재 위치의 주소 확인
       const addresses = await Location.reverseGeocodeAsync({
@@ -126,6 +140,7 @@ export default function MedicalLocatorScreen() {
       }
 
       console.log("조회 지역:", stage1);
+      setStage1(stage1);
 
       // 여기까지 성공하면 위치는 확보된 것 -> 화면을 먼저 띄운다.
       setLoading(false);
@@ -136,7 +151,7 @@ export default function MedicalLocatorScreen() {
       loadPharmacies(latitude, longitude);
 
     } catch (e) {
-      console.error("위치 조회 실패:", e);
+      console.log("위치 조회 실패:", e);
 
       if (e instanceof Error) {
         setError(e.message);
@@ -210,31 +225,37 @@ export default function MedicalLocatorScreen() {
     stage1: string
   ) {
     try {
+      setBedsFailed(false);
       const data = await getEmergencyBeds(latitude, longitude, stage1);
       setBeds(data);
     } catch (e) {
-      console.error("응급실 조회 실패:", e);
+      console.log("응급실 조회 실패:", e);
       setBeds([]);
+      setBedsFailed(true);
     }
   }
 
   async function loadHospitals(latitude: number, longitude: number) {
     try {
+      setHospitalsFailed(false);
       const data = await getNearbyHospitals(latitude, longitude);
       setHospitals(data);
     } catch (e) {
-      console.error("병원 조회 실패:", e);
+      console.log("병원 조회 실패:", e);
       setHospitals([]);
+      setHospitalsFailed(true);
     }
   }
 
   async function loadPharmacies(latitude: number, longitude: number) {
     try {
+      setPharmaciesFailed(false);
       const data = await getNearbyPharmacies(latitude, longitude);
       setPharmacies(data);
     } catch (e) {
-      console.error("약국 조회 실패:", e);
+      console.log("약국 조회 실패:", e);
       setPharmacies([]);
+      setPharmaciesFailed(true);
     }
   }
 
@@ -374,13 +395,44 @@ export default function MedicalLocatorScreen() {
     );
   }
 
+  if (outOfKorea) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text style={styles.notice}>
+          응급이는 대한민국 안에서만 주변 병원·약국·응급실을 찾을 수 있어요.
+        </Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadInitialData}>
+          <Text style={styles.retryText}>위치 다시 확인</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   // 에러 화면
   if (error) {
     return (
       <SafeAreaView style={styles.center}>
         <Text style={styles.error}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadInitialData}>
+          <Text style={styles.retryText}>다시 시도</Text>
+        </TouchableOpacity>
       </SafeAreaView>
     );
+  }
+
+  // 조회에 실패한 항목은 빈 목록(=근처에 없음)과 구분해서 보여준다
+  const failedSections: { label: string; retry: () => void }[] = [];
+  if (location) {
+    const { latitude, longitude } = location.coords;
+    if (bedsFailed && stage1) {
+      failedSections.push({ label: "응급실", retry: () => loadBeds(latitude, longitude, stage1) });
+    }
+    if (hospitalsFailed) {
+      failedSections.push({ label: "병원", retry: () => loadHospitals(latitude, longitude) });
+    }
+    if (pharmaciesFailed) {
+      failedSections.push({ label: "약국", retry: () => loadPharmacies(latitude, longitude) });
+    }
   }
 
   return (
@@ -452,6 +504,13 @@ export default function MedicalLocatorScreen() {
       <Text style={styles.sectionTitle}>
         주변 의료기관
       </Text>
+
+      {failedSections.map((section) => (
+        <TouchableOpacity key={section.label} style={styles.failBanner} onPress={section.retry}>
+          <Text style={styles.failText}>{section.label} 정보를 불러오지 못했어요.</Text>
+          <Text style={styles.failRetry}>다시 시도</Text>
+        </TouchableOpacity>
+      ))}
 
             <FlatList
         data={visibleItems}
@@ -764,6 +823,45 @@ const styles = StyleSheet.create({
   error: {
     color: "#d00",
     textAlign: "center",
+  },
+
+  notice: {
+    paddingHorizontal: 32,
+    color: "#444",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#f0f0f0",
+  },
+
+  retryText: {
+    color: "#1E88E5",
+    fontWeight: "700",
+  },
+
+  failBanner: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginHorizontal: 20,
+    marginBottom: 8,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: "#FFF4E5",
+  },
+
+  failText: {
+    color: "#8A5A00",
+  },
+
+  failRetry: {
+    color: "#1E88E5",
+    fontWeight: "700",
   },
 
   markerLabel: {
