@@ -32,7 +32,7 @@ public class EmergencyService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
 
-        List<Guardian> guardians = guardianRepository.findByUserIdAndNotifyEnabledTrue(userId);
+        List<Guardian> guardians = guardianRepository.findByUserIdAndNotifyEnabledTrueAndVerifiedAtIsNotNull(userId);
 
         LocalDateTime sentAt = LocalDateTime.now();
         String mapLink = "https://map.kakao.com/link/map/"

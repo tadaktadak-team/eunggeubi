@@ -6,6 +6,7 @@ export interface Guardian {
   relationship: Relationship;
   phone: string;
   notifyEnabled: boolean;
+  verified: boolean; // 보호자가 문자로 동의했는지 (동의 전에는 긴급 알림이 가지 않음)
 }
 
 export const RELATIONSHIP_LABEL: Record<Relationship, string> = {

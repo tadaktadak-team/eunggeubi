@@ -26,7 +26,7 @@ function buildSummary(guardians: GuardianResult[]) {
       ok: false,
       icon: 'alert-circle' as const,
       title: '알림을 보낼 보호자가 없어요',
-      sub: '마이페이지 > 보호자 관리에서 보호자를 등록해주세요.',
+      sub: '마이페이지 > 보호자 관리에서 보호자를 등록하고, 보호자의 문자 동의를 받아주세요.',
     };
   }
   if (failed === guardians.length) {
