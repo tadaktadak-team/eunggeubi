@@ -6,7 +6,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class PillSearchRequest {
-    private String itemName;    // 약품명 (일부만 입력해도 됨)
     private String drugShape;   // 모양 (예: 원형, 타원형)
     private String colorClass;  // 색상 (예: 하양, 노랑)
     private String printFront;  // 각인 앞면
