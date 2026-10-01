@@ -43,6 +43,9 @@ public class PillService {
                     .queryParam("numOfRows", 20);
 
             // 동적 검색 조건 처리 (한글 URLEncoder 적용)
+            if (request.getItemName() != null && !request.getItemName().isBlank()) {
+                builder.queryParam("item_name", URLEncoder.encode(request.getItemName(), StandardCharsets.UTF_8.toString()));
+            }
             if (request.getDrugShape() != null && !request.getDrugShape().isBlank()) {
                 builder.queryParam("DRUG_SHAPE", URLEncoder.encode(request.getDrugShape(), StandardCharsets.UTF_8.toString()));
             }
@@ -110,6 +113,7 @@ public class PillService {
                 .itemName(getTextOrNull(item, "ITEM_NAME"))
                 .entpName(getTextOrNull(item, "ENTP_NAME"))
                 .itemImage(getTextOrNull(item, "ITEM_IMAGE"))
+                .etcOtcName(getTextOrNull(item, "ETC_OTC_NAME"))
                 .drugShape(getTextOrNull(item, "DRUG_SHAPE"))
                 .colorClass(getTextOrNull(item, "COLOR_CLASS1"))
                 .printFront(getTextOrNull(item, "PRINT_FRONT"))

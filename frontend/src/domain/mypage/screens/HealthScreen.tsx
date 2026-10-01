@@ -1,15 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Dispatch, SetStateAction, useEffect, useState } from 'react';
+import { Dispatch, SetStateAction, useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { getHealthProfile, saveHealthProfile } from '../api/health';
-import { BLOOD_TYPES, MyPageStackParamList } from '../types';
+import { BLOOD_TYPES, MedicationItem, MyPageStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<MyPageStackParamList>;
+type HealthRoute = RouteProp<MyPageStackParamList, 'Health'>;
+
+// 같은 약: 번호가 있으면 번호로, 직접 입력한 약은 이름으로 비교
+const sameMedication = (a: MedicationItem, b: MedicationItem) =>
+  a.itemSeq && b.itemSeq ? a.itemSeq === b.itemSeq : a.name === b.name;
 
 // 태그(칩) 추가/삭제 섹션 (지병·알레르기·복약 공통 재사용)
 function TagSection({
@@ -60,13 +65,50 @@ function TagSection({
   );
 }
 
+// 복용약: 약 검색 화면에서 골라 추가한다 (번호가 연결된 약은 파란 칩, 직접 입력한 약은 회색 칩)
+function MedicationSection({
+  items,
+  onRemove,
+  onSearch,
+}: {
+  items: MedicationItem[];
+  onRemove: (item: MedicationItem) => void;
+  onSearch: () => void;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>복용 중인 약</Text>
+      <View style={styles.chipWrap}>
+        {items.map((it) => (
+          <Pressable
+            key={it.itemSeq ?? `name:${it.name}`}
+            style={[styles.tag, !it.itemSeq && styles.tagUnlinked]}
+            onPress={() => onRemove(it)}
+          >
+            <Text style={[styles.tagText, !it.itemSeq && styles.tagTextUnlinked]} numberOfLines={1}>
+              {it.name}
+            </Text>
+            <Ionicons name="close" size={14} color={it.itemSeq ? colors.primaryDark : colors.textSub} />
+          </Pressable>
+        ))}
+        {items.length === 0 && <Text style={styles.empty}>등록된 항목이 없습니다</Text>}
+      </View>
+      <Pressable style={styles.searchBtn} onPress={onSearch}>
+        <Ionicons name="search" size={16} color={colors.textSub} />
+        <Text style={styles.searchBtnText}>약 검색해서 추가</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function HealthScreen() {
   const navigation = useNavigation<Nav>();
+  const route = useRoute<HealthRoute>();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [bloodType, setBloodType] = useState<string | null>(null);
   const [diseases, setDiseases] = useState<string[]>([]);
-  const [medications, setMedications] = useState<string[]>([]);
+  const [medications, setMedications] = useState<MedicationItem[]>([]);
   const [allergies, setAllergies] = useState<string[]>([]);
 
   useEffect(() => {
@@ -75,7 +117,7 @@ export default function HealthScreen() {
         const p = await getHealthProfile();
         setBloodType(p.bloodType);
         setDiseases(p.diseases);
-        setMedications(p.medications);
+        setMedications(p.medicationItems ?? p.medications.map((name) => ({ name, itemSeq: null })));
         setAllergies(p.allergies);
       } catch (e: any) {
         Alert.alert('오류', e?.message ?? '불러오지 못했어요.');
@@ -85,6 +127,16 @@ export default function HealthScreen() {
     })();
   }, []);
 
+  // 약 검색 화면에서 고른 약을 받아 목록에 추가
+  useFocusEffect(
+    useCallback(() => {
+      const picked = route.params?.pickedMedication;
+      if (!picked) return;
+      setMedications((prev) => (prev.some((m) => sameMedication(m, picked)) ? prev : [...prev, picked]));
+      navigation.setParams({ pickedMedication: undefined });
+    }, [route.params?.pickedMedication, navigation]),
+  );
+
   const addTo = (setter: Dispatch<SetStateAction<string[]>>) => (v: string) =>
     setter((prev) => (prev.includes(v) ? prev : [...prev, v]));
   const removeFrom = (setter: Dispatch<SetStateAction<string[]>>) => (v: string) =>
@@ -93,7 +145,7 @@ export default function HealthScreen() {
   const onSave = async () => {
     try {
       setSaving(true);
-      await saveHealthProfile({ bloodType, diseases, medications, allergies });
+      await saveHealthProfile({ bloodType, diseases, medicationItems: medications, allergies });
       Alert.alert('저장 완료', '건강 프로필이 저장됐어요.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
@@ -141,7 +193,11 @@ export default function HealthScreen() {
         </View>
 
         <TagSection title="지병" items={diseases} onAdd={addTo(setDiseases)} onRemove={removeFrom(setDiseases)} />
-        <TagSection title="복용 중인 약" items={medications} onAdd={addTo(setMedications)} onRemove={removeFrom(setMedications)} />
+        <MedicationSection
+          items={medications}
+          onRemove={(item) => setMedications((prev) => prev.filter((m) => !sameMedication(m, item)))}
+          onSearch={() => navigation.navigate('MedicationPicker')}
+        />
         <TagSection title="알레르기" items={allergies} onAdd={addTo(setAllergies)} onRemove={removeFrom(setAllergies)} />
 
         <Pressable style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={onSave} disabled={saving}>
@@ -172,7 +228,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 4,
   },
-  tagText: { fontSize: font.sub, color: colors.primaryDark, fontWeight: '600' },
+  tagText: { fontSize: font.sub, color: colors.primaryDark, fontWeight: '600', flexShrink: 1 },
+  tagUnlinked: { backgroundColor: colors.inputBg },
+  tagTextUnlinked: { color: colors.textSub },
+  searchBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    height: 46,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: radius.md,
+  },
+  searchBtnText: { color: colors.textSub, fontSize: font.sub, fontWeight: '600' },
   selectChip: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
