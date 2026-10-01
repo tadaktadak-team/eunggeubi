@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @Service
 @RequiredArgsConstructor
@@ -39,9 +40,10 @@ public class GuardianConsentService {
     private final UserRepository userRepository;
     private final SmsSender smsSender;
 
-    // 문자에 넣을 동의 링크의 서버 주소 (없으면 localhost 기본값)
-    @Value("${app.base-url:http://localhost:8080}")
-    private String baseUrl;
+    // 동의 링크의 서버 주소. 운영은 app.base-url로 고정하고(요청 헤더를 믿지 않는다),
+    // 비어 있는 로컬 개발에서만 요청이 들어온 주소(예: 같은 와이파이의 PC IP)를 쓴다
+    @Value("${app.base-url:}")
+    private String configuredBaseUrl;
 
     @Transactional
     public GuardianConsentResponse requestConsent(GuardianRequest request) {
@@ -82,11 +84,18 @@ public class GuardianConsentService {
                 .build());
 
         // 4. 보호자에게 동의 링크 문자 발송 (개발 중엔 콘솔에 찍힘)
-        String link = baseUrl + "/api/auth/guardian/confirm?token=" + token;
+        String link = confirmLink(token);
         smsSender.send(request.phone(),
                 "[응급이] 자녀의 보호자 동의 요청입니다. 아래 링크를 눌러 동의해주세요.\n" + link);
 
         return new GuardianConsentResponse(maskPhone(request.phone()));
+    }
+
+    private String confirmLink(String token) {
+        String baseUrl = configuredBaseUrl.isBlank()
+                ? ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString()
+                : configuredBaseUrl;
+        return baseUrl + "/api/auth/guardian/confirm?token=" + token;
     }
 
     @Transactional
@@ -160,7 +169,7 @@ public class GuardianConsentService {
                 .expiresAt(now.plusDays(CONSENT_VALID_DAYS))
                 .build());
 
-        String link = baseUrl + "/api/auth/guardian/confirm?token=" + token;
+        String link = confirmLink(token);
         String text = user.getName() + "님이 회원님을 응급 상황 알림을 받는 보호자로 등록했습니다.\n"
                 + "동의하시면 아래 링크를 눌러 확인해 주세요. 동의하기 전에는 어떤 알림도 발송되지 않습니다.\n"
                 + "모르는 분이라면 무시하셔도 됩니다. (링크는 " + CONSENT_VALID_DAYS + "일 후 만료)\n"
