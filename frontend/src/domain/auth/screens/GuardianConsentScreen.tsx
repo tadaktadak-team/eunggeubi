@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { toDigits } from '../../../shared/utils/phone';
 import * as authApi from '../api/auth';
 import { Relationship } from '../types';
 
@@ -103,7 +104,7 @@ export default function GuardianConsentScreen() {
             placeholderTextColor={colors.placeholder}
             keyboardType="number-pad"
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(v) => setPhone(toDigits(v))}
           />
 
           <Text style={styles.label}>보호자와의 관계</Text>
