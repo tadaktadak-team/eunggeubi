@@ -8,6 +8,7 @@ import {
 } from '../../../shared/storage/tokenStorage';
 import * as authApi from '../api/auth';
 import * as userApi from '../../user/api/user';
+import { offerGuestHistoryImport } from '../../mypage/offerGuestHistoryImport';
 
 interface AuthContextValue {
   isLoggedIn: boolean;
@@ -42,6 +43,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
   }, []);
+
+  // 로그인 상태가 되는 모든 경로(이메일/소셜/자동 로그인)가 여기로 모인다 - 이 기기의 비회원 상담
+  // 기록을 가져올지 한 곳에서 묻는다.
+  useEffect(() => {
+    if (userId !== null) offerGuestHistoryImport().catch(console.error);
+  }, [userId]);
 
   //client.ts에서 재발급까지 실패하면 로그인 상태를 해제
   useEffect(() => {

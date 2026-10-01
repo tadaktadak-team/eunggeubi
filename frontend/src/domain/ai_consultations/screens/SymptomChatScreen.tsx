@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,6 +11,7 @@ import AnswerCard from '../components/AnswerCard';
 import ChatBubbleUser from '../components/ChatBubbleUser';
 import ChecklistCard from '../components/ChecklistCard';
 import DisclaimerFooter from '../components/DisclaimerFooter';
+import GuestLimitSheet from '../components/GuestLimitSheet';
 import ReferenceInfoCard from '../components/ReferenceInfoCard';
 import RegeneratedAnswerCard from '../components/RegeneratedAnswerCard';
 import { useSymptomChat } from '../hooks/useSymptomChat';
@@ -23,17 +24,38 @@ export default function SymptomChatScreen() {
   const navigation = useNavigation<Nav>();
   const { params } = useRoute<ChatRoute>();
   const insets = useSafeAreaInsets();
-  const { messages, loading, sendText, toggleChecklistItem, submitChecklist, submitChecklistNone } =
-      useSymptomChat(params?.initialMessage);
+  const {
+    messages, loading, guestLimitReached, limitSheetVisible, setLimitSheetVisible,
+    sendText, toggleChecklistItem, submitChecklist, submitChecklistNone,
+  } = useSymptomChat();
 
   const [inputText, setInputText] = useState('');
   const scrollRef = useRef<ScrollView>(null);
+  const sentInitialRef = useRef(false);
+
+  // 한도 초과로 거절되면 질문을 입력창에 되돌린다 - 그 사이 새로 친 게 있으면 그걸 덮지 않는다.
+  const send = (text: string) =>
+    sendText(text).then((accepted) => {
+      if (!accepted) setInputText((cur) => cur || text);
+    });
+
+  // 홈 화면에서 증상을 들고 들어온 경우, 진입 시 한 번만 자동 전송(거절되면 위와 똑같이 입력창으로 되돌림)
+  useEffect(() => {
+    if (params?.initialMessage && !sentInitialRef.current) {
+      sentInitialRef.current = true;
+      send(params.initialMessage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params?.initialMessage]);
 
   const onSend = () => {
     // 응답 오는 중에 연타하면 sessionRef 갱신 순서가 응답 도착 순서에 의존하게 된다 - 로딩 중엔 막는다.
     if (!inputText.trim() || loading) return;
-    sendText(inputText);
+    // 한도 초과 후 다시 보내려 하면 서버에 안 보내고 가입 안내만 다시 띄운다.
+    if (guestLimitReached) return setLimitSheetVisible(true);
+    const text = inputText;
     setInputText('');
+    send(text);
   };
 
   const showDisclaimer = () =>
@@ -129,6 +151,14 @@ export default function SymptomChatScreen() {
         {/* 지금은 AI 상담이 근거로 쓰는 자료가 질병관리청 국가건강정보포털 하나뿐이라 여기 고정값으로
             둔다 - 출처가 여러 곳이 되면 답변 카드처럼 메시지별로 받아써야 한다. */}
         <DisclaimerFooter sourceName="질병관리청 국가건강정보포털" />
+        <GuestLimitSheet
+          visible={limitSheetVisible}
+          onClose={() => setLimitSheetVisible(false)}
+          onCloseButton={() => {
+            setLimitSheetVisible(false);
+            navigation.popTo('SymptomHome');
+          }}
+        />
       </KeyboardAvoidingView>
   );
 }

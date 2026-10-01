@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useRef, useState } from 'react';
 
 import {
   nextChatMessageId,
@@ -6,31 +7,52 @@ import {
   requestSymptomAdvice,
   submitChecklistAnswers,
 } from '../api/aiConsultations';
+import { getGuestCode, saveGuestCode } from '../../../shared/storage/guestCodeStorage';
 import { ChatMessage } from '../types';
 
-export function useSymptomChat(initialMessage?: string) {
+export function useSymptomChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const sentInitialRef = useRef(false);
   // 상담 세션을 이어가기 위한 값들. 화면(훅 인스턴스)이 살아있는 동안 대화 전체에서 공유한다.
   const sessionRef = useRef<{ sessionId?: string; guestCode?: string }>({});
+  // 비회원 무료 상담 횟수를 다 써서 서버가 403을 준 상태 - 화면이 회원가입 안내 시트를 띄운다.
+  const [guestLimitReached, setGuestLimitReached] = useState(false);
+  const [limitSheetVisible, setLimitSheetVisible] = useState(false);
+  // 안내 시트에서 가입/로그인하고 돌아오면 더 이상 막으면 안 된다 - 화면에 돌아올 때마다 풀어준다.
+  // 여전히 비회원이면 다음 전송에서 서버가 다시 403을 주고 시트가 다시 뜬다.
+  useFocusEffect(useCallback(() => setGuestLimitReached(false), []));
 
   // 사용자 텍스트를 말풍선으로 추가하고, AI 응답(+있으면 체크리스트)을 이어서 붙인다.
-  const sendText = useCallback(async (text: string) => {
+  // false = 비회원 한도 초과로 거절됨(질문이 저장도 안 됐으니 화면이 입력창에 되돌려 놓는다).
+  const sendText = useCallback(async (text: string): Promise<boolean> => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed) return true;
 
     setMessages((prev) => [...prev, { id: nextChatMessageId(), type: 'user', text: trimmed }]);
     setLoading(true);
     try {
+      // 기기에 저장된 guestCode를 세션이 바뀌어도 계속 쓴다(횟수 제한/가입 시 기록 이전의 기준).
+      // 로그인 상태면 서버가 무시한다.
+      // 메모리(sessionRef)보다 저장소가 우선 - 가입하면 저장소만 비워지므로, 메모리 값을 먼저 쓰면
+      // 이미 계정으로 이전된 옛 코드를 계속 보내게 된다.
+      const storedGuestCode = (await getGuestCode()) ?? undefined;
       const { answerMessage, checklistMessage, sessionId, guestCode } = await requestSymptomAdvice(
         trimmed,
         sessionRef.current.sessionId,
-        sessionRef.current.guestCode,
+        storedGuestCode,
       );
-      sessionRef.current = { sessionId, guestCode: guestCode ?? sessionRef.current.guestCode };
+      if (guestCode) await saveGuestCode(guestCode);
+      sessionRef.current = { sessionId, guestCode: guestCode ?? storedGuestCode };
       setMessages((prev) => [...prev, answerMessage, ...(checklistMessage ? [checklistMessage] : [])]);
     } catch (e) {
+      // 403 전체가 아니라 서버가 한도 초과로 표시한 것만 - 다른 403까지 가입 안내로 새지 않게.
+      if ((e as { code?: string }).code === 'GUEST_LIMIT') {
+        // 답변 못 받은 질문 말풍선은 치운다 - 저장도 안 됐다.
+        setMessages((prev) => prev.slice(0, -1));
+        setGuestLimitReached(true);
+        setLimitSheetVisible(true);
+        return false;
+      }
       console.error(e);
       const message = e instanceof Error ? e.message : '요청 중 오류가 발생했습니다.';
       setMessages((prev) => [
@@ -40,15 +62,8 @@ export function useSymptomChat(initialMessage?: string) {
     } finally {
       setLoading(false);
     }
+    return true;
   }, []);
-
-  // 홈 화면에서 증상을 들고 들어온 경우, 진입 시 한 번만 자동 전송
-  useEffect(() => {
-    if (initialMessage && !sentInitialRef.current) {
-      sentInitialRef.current = true;
-      sendText(initialMessage);
-    }
-  }, [initialMessage, sendText]);
 
   const toggleChecklistItem = useCallback((messageId: string, itemId: string) => {
     setMessages((prev) =>
@@ -83,6 +98,14 @@ export function useSymptomChat(initialMessage?: string) {
         const regenerated = await regenerateAnswer(target.consultationId, sessionRef.current.guestCode);
         setMessages((prev) => [...prev, regenerated]);
       } catch (e) {
+        // 비회원은 답변당 재생성 1회까지다 - 넘으면 에러 말풍선 대신 가입 안내를 띄우고, 가입 후 다시
+        // 답변할 수 있게 체크리스트는 풀어둔다.
+        if ((e as { code?: string }).code === 'GUEST_LIMIT') {
+          setMessages((prev) => prev.map((m) => (m.id === messageId && m.type === 'checklist' ? { ...m, answered: false } : m)));
+          setGuestLimitReached(true);
+          setLimitSheetVisible(true);
+          return;
+        }
         console.error(e);
         const message = e instanceof Error ? e.message : '요청 중 오류가 발생했습니다.';
         // answered를 다시 false로 되돌려서 재시도(다시 "답변하기")할 수 있게 한다 - 안 그러면
@@ -114,5 +137,5 @@ export function useSymptomChat(initialMessage?: string) {
     [finishChecklist],
   );
 
-  return { messages, loading, sendText, toggleChecklistItem, submitChecklist, submitChecklistNone };
+  return { messages, loading, guestLimitReached, limitSheetVisible, setLimitSheetVisible, sendText, toggleChecklistItem, submitChecklist, submitChecklistNone };
 }
