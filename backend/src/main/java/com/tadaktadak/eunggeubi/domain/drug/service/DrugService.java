@@ -124,8 +124,13 @@ public class DrugService {
 
             JsonNode itemsNode = rootNode.path("body").path("items");
 
-            if (itemsNode.isArray() && !itemsNode.isEmpty()) {
-                return mapToDrugInfoResponse(itemsNode.get(0));
+            // 외부 API가 itemSeq를 부분일치로 찾으므로, 요청한 번호와 정확히 같은 품목만 인정한다
+            if (itemsNode.isArray()) {
+                for (JsonNode item : itemsNode) {
+                    if (itemSeq.equals(getTextOrNull(item, "itemSeq"))) {
+                        return mapToDrugInfoResponse(item);
+                    }
+                }
             }
         } catch (ExternalApiException e) {
             throw e; // 검증 로직에서 발생한 커스텀 에러는 그대로 던짐
