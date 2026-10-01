@@ -5,6 +5,7 @@ import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianConsentResponse;
 import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianRequest;
 import com.tadaktadak.eunggeubi.domain.auth.service.GuardianConsentService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,7 +30,9 @@ public class GuardianConsentController {
 
     // 보호자가 문자 링크 클릭 → 동의 확정 (브라우저에 안내 문구 표시)
     @GetMapping("/confirm")
-    public ResponseEntity<String> confirm(@RequestParam String token) {
+    public ResponseEntity<String> confirm(
+            @RequestParam
+            @Pattern(regexp = "^[a-f0-9]{32}$", message = "유효하지 않은 동의 링크입니다.") String token) {
         guardianConsentService.confirmConsent(token);
         return ResponseEntity.ok("보호자 동의가 완료되었습니다. 이제 앱에서 로그인할 수 있어요.");
     }
