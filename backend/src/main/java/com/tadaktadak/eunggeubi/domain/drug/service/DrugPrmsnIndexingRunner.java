@@ -35,6 +35,10 @@ public class DrugPrmsnIndexingRunner implements CommandLineRunner {
     // 급증). 요청을 가볍게 만들어 타임아웃을 줄이려고 100건으로 낮춰 잡는다.
     private static final int NUM_OF_ROWS = 100;
     private static final long REQUEST_INTERVAL_MS = 200;
+    // 첫 페이지는 전체 건수를 몰라 이후 페이지처럼 건너뛸 수 없어서, 실패 시 몇 번 재시도한다
+    // (이번 세션에 실제로 첫 페이지 타임아웃 한 번으로 배치 전체가 바로 크래시하는 걸 겪음).
+    private static final int FIRST_PAGE_MAX_RETRIES = 3;
+    private static final long FIRST_PAGE_RETRY_DELAY_MS = 2000;
 
     private final DrugPrmsnService drugPrmsnService;
     private final DrugInfoRepository drugInfoRepository;
@@ -47,7 +51,7 @@ public class DrugPrmsnIndexingRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        DrugPrmsnService.PrmsnPage firstPage = drugPrmsnService.getAllPrmsnDetailPage(startPage, NUM_OF_ROWS);
+        DrugPrmsnService.PrmsnPage firstPage = fetchFirstPage();
         int totalCount = firstPage.totalCount();
         int totalPages = (int) Math.ceil((double) totalCount / NUM_OF_ROWS);
         if (maxPages > 0 && startPage + maxPages - 1 < totalPages) {
@@ -74,6 +78,21 @@ public class DrugPrmsnIndexingRunner implements CommandLineRunner {
         }
 
         log.info("의약품 제품 허가정보 공백 채우기 완료: 이번 실행에서 {}건 채움, 실패 페이지 {}개", filledCount, failedPages);
+    }
+
+    private DrugPrmsnService.PrmsnPage fetchFirstPage() throws InterruptedException {
+        for (int attempt = 1; attempt <= FIRST_PAGE_MAX_RETRIES; attempt++) {
+            try {
+                return drugPrmsnService.getAllPrmsnDetailPage(startPage, NUM_OF_ROWS);
+            } catch (Exception e) {
+                if (attempt == FIRST_PAGE_MAX_RETRIES) {
+                    throw e;
+                }
+                log.warn("첫 페이지 수집 실패({}번째 시도), {}ms 후 재시도", attempt, FIRST_PAGE_RETRY_DELAY_MS, e);
+                Thread.sleep(FIRST_PAGE_RETRY_DELAY_MS);
+            }
+        }
+        throw new IllegalStateException("unreachable");
     }
 
     private int fillGaps(List<PrmsnDetailResponse> items) {
