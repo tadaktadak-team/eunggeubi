@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tadaktadak.eunggeubi.domain.drug.dto.DrugInfoResponse;
 import com.tadaktadak.eunggeubi.domain.drug.dto.DrugSearchPageResponse;
+import com.tadaktadak.eunggeubi.domain.drug.dto.DrugSearchSummary;
 import com.tadaktadak.eunggeubi.domain.drug.entity.DrugInfo;
 import com.tadaktadak.eunggeubi.domain.drug.repository.DrugInfoRepository;
 import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
@@ -37,16 +38,20 @@ public class DrugService {
     private String serviceKey;
 
     /**
-     * 1. 약품명 키워드 검색. 낱알식별+e약은요가 모두 적재된 DrugInfo 테이블(27,000여 건, 전문의약품
-     * 포함) 하나만 조회한다. 예전엔 e약은요를 실시간 호출해 OTC 위주로만 찾고 로컬 DB로 보완했지만,
-     * 이제 로컬 DB 자체가 두 소스를 합친 상태라 실시간 외부 API 의존 없이 이 결과로 완결된다.
+     * 1. 약품명 키워드 검색. 낱알식별+e약은요+의약품 제품 허가정보가 모두 적재된 DrugInfo
+     * 테이블(27,000여 건, 전문의약품 포함) 하나만 조회한다. 예전엔 e약은요를 실시간 호출해 OTC
+     * 위주로만 찾고 로컬 DB로 보완했지만, 이제 로컬 DB 자체가 세 소스를 합친 상태라 실시간 외부
+     * API 의존 없이 이 결과로 완결된다.
+     * 목록 조회라 useInfo/caution은 안 가져오고 efficacy도 미리보기용 200자만 받는다 — 행당 평균
+     * 2만 자에 달하는 LONGTEXT 컬럼들을 그대로 긁어오면 LIKE 검색(인덱스 못 타는 풀스캔)마다
+     * 그 무거운 데이터까지 디스크에서 다 읽어와 응답이 10초 넘게 걸리는 문제가 실측으로 확인됨.
      */
     public DrugSearchPageResponse searchDrugsByName(String keyword, int pageNo, int numOfRows) {
         Pageable pageable = PageRequest.of(pageNo - 1, numOfRows);
-        Page<DrugInfo> page = drugInfoRepository.findByNameContainingOrderByNameAsc(keyword, pageable);
+        Page<DrugSearchSummary> page = drugInfoRepository.findSummaryByNameContaining(keyword, pageable);
 
         List<DrugInfoResponse> items = page.getContent().stream()
-                .map(DrugInfoResponse::from)
+                .map(this::toDrugInfoResponse)
                 .toList();
 
         return DrugSearchPageResponse.builder()
@@ -54,6 +59,19 @@ public class DrugService {
                 .pageNo(pageNo)
                 .numOfRows(numOfRows)
                 .totalCount((int) page.getTotalElements())
+                .build();
+    }
+
+    private DrugInfoResponse toDrugInfoResponse(DrugSearchSummary summary) {
+        return DrugInfoResponse.builder()
+                .itemSeq(summary.getItemSeq())
+                .name(summary.getName())
+                .shape(summary.getShape())
+                .color(summary.getColor())
+                .imprint(summary.getImprint())
+                .drugType(summary.getDrugType())
+                .itemImage(summary.getItemImage())
+                .efficacy(summary.getEfficacySnippet())
                 .build();
     }
 

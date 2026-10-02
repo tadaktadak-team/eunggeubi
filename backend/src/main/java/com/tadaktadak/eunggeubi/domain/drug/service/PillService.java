@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchRequest;
 import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchResponse;
-import com.tadaktadak.eunggeubi.domain.drug.entity.DrugInfo;
+import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchSummary;
 import com.tadaktadak.eunggeubi.domain.drug.repository.DrugInfoRepository;
 import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +45,7 @@ public class PillService {
      * 검색은 그 테이블에서 하도록 바꿨다.
      */
     public List<PillSearchResponse> searchPills(PillSearchRequest request) {
-        List<DrugInfo> results = drugInfoRepository.searchByAppearance(
+        List<PillSearchSummary> results = drugInfoRepository.searchByAppearance(
                 blankToNull(request.getDrugShape()),
                 blankToNull(request.getColorClass()),
                 blankToNull(request.getPrintFront())
@@ -60,7 +60,7 @@ public class PillService {
         return (value == null || value.isBlank()) ? null : value;
     }
 
-    private PillSearchResponse toPillSearchResponse(DrugInfo info) {
+    private PillSearchResponse toPillSearchResponse(PillSearchSummary info) {
         return PillSearchResponse.builder()
                 .itemSeq(info.getItemSeq())
                 .itemName(info.getName())
