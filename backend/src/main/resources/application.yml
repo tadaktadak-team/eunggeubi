@@ -56,6 +56,9 @@ openapi:
   dur:
     url: https://apis.data.go.kr/1471000/DURPrdlstInfoService03/getUsjntTabooInfoList03
     service-key: ${DUR_SECRET:}
+  drug-prmsn:
+    url: https://apis.data.go.kr/1471000/DrugPrdtPrmsnInfoService08/getDrugPrdtPrmsnDtlInq08
+    service-key: ${DRUG_PRMSN_SECRET:}
 
 # 컬렉션 초기화(QdrantCollectionResetService)가 쓰는 REST 주소. gRPC(6334)와 포트가 다르다.
 qdrant:

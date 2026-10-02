@@ -7,7 +7,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "drug_infos")
+@Table(name = "drug_infos", indexes = {
+        @Index(name = "idx_drug_infos_name", columnList = "name"),
+        @Index(name = "idx_drug_infos_shape_color", columnList = "shape, color"),
+})
 @Getter
 @Builder(toBuilder = true)
 @NoArgsConstructor
@@ -30,14 +33,26 @@ public class DrugInfo {
     @Column(name = "imprint", length = 50)
     private String imprint; // 각인 - 낱알검색
 
-    @Column(name = "efficacy", columnDefinition = "TEXT")
+    // TEXT(65,535바이트)로는 의약품 제품 허가정보 API의 주의사항 원문이 넘칠 수 있어 LONGTEXT로 둔다.
+    // efficacy/useInfo/caution/cautionSections 중 전문의약품(의약품 제품 허가정보 API 소스) 분량은
+    // 상세화면에서 현재 노출하지 않는다 — 임상시험 수치·금기 목록 등 규제 문서 원문이라 일반의약품
+    // (e약은요, 짧은 소비자용 문구)과 결이 너무 달라서, 전문의약품은 외형정보 + 식약처 원문 링크로만
+    // 안내하기로 함(DrugDetailScreen.isPrescription 참고). 데이터 자체는 재사용 가능성(AI상담 RAG
+    // 등)이 있어 지우지 않고 그대로 보관한다.
+    @Column(name = "efficacy", columnDefinition = "LONGTEXT")
     private String efficacy; // 효능/효과
 
-    @Column(name = "use_info", columnDefinition = "TEXT")
+    @Column(name = "use_info", columnDefinition = "LONGTEXT")
     private String useInfo; // 용법/용량
 
-    @Column(name = "caution", columnDefinition = "TEXT")
-    private String caution; // 주의사항
+    @Column(name = "caution", columnDefinition = "LONGTEXT")
+    private String caution; // 주의사항 (e약은요 등 평문 소스)
+
+    // 의약품 제품 허가정보 API 소스 전용. "1. 다음 환자에는 투여하지 말 것" 같은 항목 단위로 쪼갠
+    // [{title, body}, ...] JSON 배열. caution(평문)과 별개 컬럼으로 둬서, 전문의약품처럼 caution이
+    // 비어있던 약만 이 필드로 채우고 기존 e약은요 평문 데이터는 안 건드린다.
+    @Column(name = "caution_sections", columnDefinition = "LONGTEXT")
+    private String cautionSections;
 
     @Column(name = "drug_type", length = 20)
     private String drugType; // 약품구분

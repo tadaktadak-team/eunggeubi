@@ -1,12 +1,19 @@
 package com.tadaktadak.eunggeubi.domain.drug.dto;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tadaktadak.eunggeubi.domain.drug.entity.DrugInfo;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+
+@Slf4j
 @Getter
 @Builder(toBuilder = true)
 public class DrugInfoResponse {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private String itemSeq;   // 약품 코드
     private String name;      // 약품명
@@ -15,7 +22,8 @@ public class DrugInfoResponse {
     private String imprint;   // 각인
     private String efficacy;  // 효능/효과
     private String useInfo;   // 용법/용량
-    private String caution;   // 주의사항
+    private String caution;   // 주의사항 (평문 — e약은요 등 짧은 소스용)
+    private List<CautionSection> cautionSections; // 주의사항 (항목별 구조화 — 의약품 제품 허가정보 소스용)
     private String drugType;  // 약품구분
     private String itemImage; // 알약 이미지 URL
 
@@ -30,8 +38,22 @@ public class DrugInfoResponse {
                 .efficacy(drugInfo.getEfficacy())
                 .useInfo(drugInfo.getUseInfo())
                 .caution(drugInfo.getCaution())
+                .cautionSections(parseCautionSections(drugInfo.getItemSeq(), drugInfo.getCautionSections()))
                 .drugType(drugInfo.getDrugType())
                 .itemImage(drugInfo.getItemImage())
                 .build();
+    }
+
+    private static List<CautionSection> parseCautionSections(String itemSeq, String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return OBJECT_MAPPER.readValue(json, OBJECT_MAPPER.getTypeFactory()
+                    .constructCollectionType(List.class, CautionSection.class));
+        } catch (Exception e) {
+            log.warn("cautionSections 파싱 실패 (itemSeq={})", itemSeq, e);
+            return null;
+        }
     }
 }
