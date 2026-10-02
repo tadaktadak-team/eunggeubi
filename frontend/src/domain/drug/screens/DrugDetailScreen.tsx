@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Linking, Alert } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
@@ -7,6 +7,13 @@ import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { getDrugDetail, DrugInfoResponse } from '../api/drug';
 import { stripHtmlTags } from '../../../shared/utils/html';
 import { getDrugFormIconName } from '../utils/drugIcon';
+import { getPermitStatusLabel } from '../utils/drugStatus';
+
+// 우리 DB에 효능/용법/주의사항이 비어있거나 요약돼 있어도, 식약처 원문(의약품안전나라)은
+// itemSeq(cacheSeq)만 있으면 모든 약에 대해 항상 조회 가능 — 공백을 메우는 안전망으로 제공.
+function buildMfdsUrl(itemSeq: string): string {
+  return `https://nedrug.mfds.go.kr/pbp/CCBBB01/getItemDetailCache?cacheSeq=${itemSeq}`;
+}
 
 // 값이 있는 항목만 화면에 표시 (없는 걸 빈 줄로 보여주면 오히려 오해를 줌)
 function buildAppearanceRows(drug: DrugInfoResponse): { label: string; value: string }[] {
@@ -63,6 +70,17 @@ const DrugDetailScreen = ({ route }: any) => {
   }
 
   const appearanceRows = buildAppearanceRows(drug);
+  // 전문의약품의 효능/용법/주의사항은 식약처 허가정보 원문(임상시험 수치, 금기 목록 등 규제
+  // 문서 그대로)이라 일반의약품(e약은요, 짧은 소비자용 문구)과 결이 너무 달라 화면에서는
+  // 생략하고 외형정보 + 식약처 원문 링크만 보여준다. DB에는 그대로 보관돼 있음(향후 활용 대비).
+  const permitStatusLabel = getPermitStatusLabel(drug.cancelName);
+  const isPrescription = drug.drugType === '전문의약품' || drug.drugType === '전문,희귀';
+
+  const handleOpenMfds = () => {
+    Linking.openURL(buildMfdsUrl(drug.itemSeq)).catch(() =>
+      Alert.alert('오류', '식약처 페이지를 열 수 없어요.'),
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -71,19 +89,29 @@ const DrugDetailScreen = ({ route }: any) => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 약물 요약 카드 */}
         <View style={styles.summaryCard}>
-          <View style={styles.iconContainer}>
-            {drug.itemImage ? (
-              <Image source={{ uri: drug.itemImage }} style={styles.drugImage} />
-            ) : (
-              <MaterialCommunityIcons name={getDrugFormIconName(drug.name)} size={32} color={colors.primary} />
-            )}
-          </View>
-          <Text style={styles.drugName}>{drug.name}</Text>
-          {drug.drugType && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{drug.drugType}</Text>
+          {/* 식약처 실측 사진은 자 눈금까지 찍힌 가로로 긴 사진이라, 아이콘 대체용 정사각형
+              박스에 넣으면 여백이 어색하게 남는다. 사진이 있을 땐 비율 그대로 넓게 보여주고,
+              없을 때만 정사각형 아이콘 박스를 쓴다. */}
+          {drug.itemImage ? (
+            <Image source={{ uri: drug.itemImage }} style={styles.drugPhoto} resizeMode="contain" />
+          ) : (
+            <View style={styles.iconContainer}>
+              <MaterialCommunityIcons name={getDrugFormIconName(drug.name)} size={56} color={colors.primary} />
             </View>
           )}
+          <Text style={styles.drugName}>{drug.name}</Text>
+          <View style={styles.badgeRow}>
+            {drug.drugType && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{drug.drugType}</Text>
+              </View>
+            )}
+            {permitStatusLabel && (
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusBadgeText}>{permitStatusLabel}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* 외형 정보 */}
@@ -99,21 +127,21 @@ const DrugDetailScreen = ({ route }: any) => {
           </View>
         )}
 
-        {drug.efficacy && (
+        {!isPrescription && drug.efficacy && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>효능 · 효과</Text>
             <Text style={styles.bodyText}>{stripHtmlTags(drug.efficacy)}</Text>
           </View>
         )}
 
-        {drug.useInfo && (
+        {!isPrescription && drug.useInfo && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>용법 · 용량</Text>
             <Text style={styles.bodyText}>{stripHtmlTags(drug.useInfo)}</Text>
           </View>
         )}
 
-        {drug.caution && (
+        {!isPrescription && drug.caution && (
           <View style={[styles.section, styles.cautionSection]}>
             <View style={styles.cautionHeader}>
               <Feather name="alert-triangle" size={18} color={colors.danger} style={{ marginRight: spacing.xs }} />
@@ -122,6 +150,21 @@ const DrugDetailScreen = ({ route }: any) => {
             <Text style={styles.cautionText}>{stripHtmlTags(drug.caution)}</Text>
           </View>
         )}
+
+        {isPrescription && (
+          <View style={styles.prescriptionNotice}>
+            <Feather name="info" size={16} color={colors.textSub} style={{ marginRight: spacing.xs }} />
+            <Text style={styles.prescriptionNoticeText}>
+              전문의약품은 의사·약사의 복약지도에 따라 복용해야 합니다. 상세 정보는 식약처
+              공식 문서를 통해 확인하시기 바랍니다.
+            </Text>
+          </View>
+        )}
+
+        <TouchableOpacity style={styles.mfdsLink} onPress={handleOpenMfds} activeOpacity={0.7}>
+          <Feather name="external-link" size={16} color={colors.textSub} style={{ marginRight: spacing.xs }} />
+          <Text style={styles.mfdsLinkText}>식약처에서 원문 보기</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -155,18 +198,21 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
   },
   iconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.lg,
+    width: 120,
+    height: 120,
+    borderRadius: radius.lg + 8,
     backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: spacing.md,
     overflow: 'hidden',
   },
-  drugImage: {
-    width: 64,
-    height: 64,
+  drugPhoto: {
+    width: '100%',
+    height: 140,
+    borderRadius: radius.lg,
+    backgroundColor: colors.white,
+    marginBottom: spacing.md,
   },
   drugName: {
     fontSize: font.h2,
@@ -174,6 +220,23 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.sm + 2,
     textAlign: 'center',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  statusBadge: {
+    backgroundColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.md,
+  },
+  statusBadgeText: {
+    fontSize: font.caption,
+    fontWeight: 'bold',
+    color: colors.textSub,
   },
   badge: {
     backgroundColor: colors.primaryLight,
@@ -239,6 +302,31 @@ const styles = StyleSheet.create({
     fontSize: font.sub,
     lineHeight: 20,
     color: colors.text,
+  },
+  prescriptionNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.inputBg,
+    padding: spacing.md + 2,
+    borderRadius: radius.md,
+    marginBottom: spacing.sm,
+  },
+  prescriptionNoticeText: {
+    flex: 1,
+    fontSize: font.sub,
+    lineHeight: 18,
+    color: colors.textSub,
+  },
+  mfdsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+  },
+  mfdsLinkText: {
+    fontSize: font.sub,
+    color: colors.textSub,
+    textDecorationLine: 'underline',
   },
 });
 
