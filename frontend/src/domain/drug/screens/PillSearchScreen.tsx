@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
+  FlatList,
   ActivityIndicator,
   Image,
   Alert,
@@ -27,6 +27,12 @@ const PillSearchScreen = ({ navigation }: any) => {
   const [results, setResults] = useState<PillSearchResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  // 필터(식별문자/모양/색상/제형)가 길어서, 검색 버튼을 눌러도 결과가 화면 아래쪽에 있어 바로 안
+  // 보이고 직접 스크롤해야 하는 문제가 있었다. 검색이 끝나면 필터 영역 높이만큼 자동으로 스크롤해
+  // 결과(또는 "결과 없음" 안내)가 바로 보이게 한다.
+  const listRef = useRef<FlatList<PillSearchResponse>>(null);
+  const headerHeightRef = useRef(0);
 
   // 필터 옵션 데이터
   const shapes = ['원형', '타원형', '장방형', '삼각형', '사각형', '기타'];
@@ -62,138 +68,163 @@ const PillSearchScreen = ({ navigation }: any) => {
     }
   };
 
+  // loading이 false로 바뀌어 헤더가 최종 상태("검색 결과 (N)")로 다시 그려진 뒤에 스크롤해야
+  // 해서, onLayout으로 측정된 높이를 약간의 지연 후에 사용한다(레이아웃이 먼저 안정되도록).
+  useEffect(() => {
+    if (!searched || loading) return;
+    const timer = setTimeout(() => {
+      listRef.current?.scrollToOffset({ offset: headerHeightRef.current, animated: true });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [results, searched, loading]);
+
+  // 필터 UI(식별문자/모양/색상/제형)는 결과와 달리 몇 개 안 되는 고정 항목이라 그냥 렌더링해도
+  // 되지만, 결과 카드는 조건에 따라 수천 건까지 나올 수 있어(예: 원형+하양 4,944건) ScrollView에
+  // 전부 올려두면 전부 한 번에 네이티브 뷰로 그려져 렉이 심했다. FlatList로 바꿔 화면에 보이는
+  // 만큼만 그리도록 하고, 필터 UI는 FlatList의 ListHeaderComponent로 넣어 하나의 스크롤로 유지한다.
+  const renderFilters = () => (
+    <View onLayout={(e) => { headerHeightRef.current = e.nativeEvent.layout.height; }}>
+      <View style={styles.resetRow}>
+        <TouchableOpacity onPress={handleReset} hitSlop={8}>
+          <Text style={styles.resetText}>초기화</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 식별문자 입력 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>식별문자</Text>
+        <TextInput
+          style={styles.textInput}
+          placeholder="알약에 적힌 글자 (예: TY, 500)"
+          value={printText}
+          onChangeText={setPrintText}
+          placeholderTextColor={colors.placeholder}
+        />
+      </View>
+
+      {/* 모양 선택 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>모양</Text>
+        <View style={styles.chipContainer}>
+          {shapes.map((shape) => (
+            <TouchableOpacity
+              key={shape}
+              style={[styles.chip, selectedShape === shape && styles.chipSelected]}
+              onPress={() => setSelectedShape(selectedShape === shape ? '' : shape)}
+            >
+              <Text style={[styles.chipText, selectedShape === shape && styles.chipTextSelected]}>
+                {shape}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* 색상 선택 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>색상</Text>
+        <View style={styles.chipContainer}>
+          {colorOptions.map((color) => (
+            <TouchableOpacity
+              key={color}
+              style={[styles.chip, selectedColor === color && styles.chipSelected]}
+              onPress={() => setSelectedColor(selectedColor === color ? '' : color)}
+            >
+              <Text style={[styles.chipText, selectedColor === color && styles.chipTextSelected]}>
+                {color}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* 제형 선택 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>제형</Text>
+        <View style={styles.chipContainer}>
+          {forms.map((form) => (
+            <TouchableOpacity
+              key={form}
+              style={[styles.chip, selectedForm === form && styles.chipSelected]}
+              onPress={() => setSelectedForm(selectedForm === form ? '' : form)}
+            >
+              <Text style={[styles.chipText, selectedForm === form && styles.chipTextSelected]}>
+                {form}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {loading && (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      )}
+
+      {!loading && searched && (
+        <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>검색 결과 ({results.length})</Text>
+      )}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       <AppHeader title="낱알 특징 검색" />
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.resetRow}>
-          <TouchableOpacity onPress={handleReset} hitSlop={8}>
-            <Text style={styles.resetText}>초기화</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* 식별문자 입력 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>식별문자</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="알약에 적힌 글자 (예: TY, 500)"
-            value={printText}
-            onChangeText={setPrintText}
-            placeholderTextColor={colors.placeholder}
-          />
-        </View>
-
-        {/* 모양 선택 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>모양</Text>
-          <View style={styles.chipContainer}>
-            {shapes.map((shape) => (
-              <TouchableOpacity
-                key={shape}
-                style={[styles.chip, selectedShape === shape && styles.chipSelected]}
-                onPress={() => setSelectedShape(selectedShape === shape ? '' : shape)}
-              >
-                <Text style={[styles.chipText, selectedShape === shape && styles.chipTextSelected]}>
-                  {shape}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* 색상 선택 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>색상</Text>
-          <View style={styles.chipContainer}>
-            {colorOptions.map((color) => (
-              <TouchableOpacity
-                key={color}
-                style={[styles.chip, selectedColor === color && styles.chipSelected]}
-                onPress={() => setSelectedColor(selectedColor === color ? '' : color)}
-              >
-                <Text style={[styles.chipText, selectedColor === color && styles.chipTextSelected]}>
-                  {color}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* 제형 선택 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>제형</Text>
-          <View style={styles.chipContainer}>
-            {forms.map((form) => (
-              <TouchableOpacity
-                key={form}
-                style={[styles.chip, selectedForm === form && styles.chipSelected]}
-                onPress={() => setSelectedForm(selectedForm === form ? '' : form)}
-              >
-                <Text style={[styles.chipText, selectedForm === form && styles.chipTextSelected]}>
-                  {form}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* 검색 결과 */}
-        {loading && (
-          <View style={styles.centerContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        )}
-
-        {!loading && searched && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>검색 결과 ({results.length})</Text>
-            {results.length === 0 ? (
-              <Text style={styles.emptyText}>조건에 맞는 약을 찾지 못했습니다.</Text>
+      <FlatList
+        ref={listRef}
+        contentContainerStyle={styles.scrollContent}
+        data={results}
+        keyExtractor={(item) => item.itemSeq}
+        ListHeaderComponent={renderFilters}
+        ListEmptyComponent={
+          !loading && searched ? <Text style={styles.emptyText}>조건에 맞는 약을 찾지 못했습니다.</Text> : null
+        }
+        // 결과가 수천 건까지 나올 수 있어 초기/배치 렌더링 양을 보수적으로 잡고 화면 밖 항목은
+        // 뷰 자체를 비워(removeClippedSubviews) 메모리·렉을 줄인다.
+        initialNumToRender={12}
+        maxToRenderPerBatch={12}
+        windowSize={7}
+        removeClippedSubviews
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.resultCard}
+            onPress={() => {
+              addRecentSearch({
+                itemSeq: item.itemSeq,
+                name: item.itemName,
+                drugType: item.etcOtcName,
+                itemImage: item.itemImage,
+              });
+              navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
+            }}
+          >
+            {item.itemImage ? (
+              <Image source={{ uri: item.itemImage }} style={styles.resultImage} />
             ) : (
-              results.map((item) => (
-                <TouchableOpacity
-                  key={item.itemSeq}
-                  style={styles.resultCard}
-                  onPress={() => {
-                    addRecentSearch({
-                      itemSeq: item.itemSeq,
-                      name: item.itemName,
-                      drugType: item.etcOtcName,
-                      itemImage: item.itemImage,
-                    });
-                    navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
-                  }}
-                >
-                  {item.itemImage ? (
-                    <Image source={{ uri: item.itemImage }} style={styles.resultImage} />
-                  ) : (
-                    <View style={styles.resultNoImage}>
-                      <MaterialCommunityIcons
-                        name={getDrugFormIconName(item.itemName)}
-                        size={26}
-                        color={colors.placeholder}
-                      />
-                    </View>
-                  )}
-                  <View style={styles.resultInfo}>
-                    <Text style={styles.resultName} numberOfLines={1}>
-                      {item.itemName}
-                    </Text>
-                    {item.entpName && (
-                      <Text style={styles.resultEntp} numberOfLines={1}>
-                        {item.entpName}
-                      </Text>
-                    )}
-                  </View>
-                  <Feather name="chevron-right" size={20} color={colors.placeholder} />
-                </TouchableOpacity>
-              ))
+              <View style={styles.resultNoImage}>
+                <MaterialCommunityIcons
+                  name={getDrugFormIconName(item.itemName)}
+                  size={26}
+                  color={colors.primary}
+                />
+              </View>
             )}
-          </View>
+            <View style={styles.resultInfo}>
+              <Text style={styles.resultName} numberOfLines={1}>
+                {item.itemName}
+              </Text>
+              {item.entpName && (
+                <Text style={styles.resultEntp} numberOfLines={1}>
+                  {item.entpName}
+                </Text>
+              )}
+            </View>
+            <Feather name="chevron-right" size={20} color={colors.placeholder} />
+          </TouchableOpacity>
         )}
-      </ScrollView>
+      />
 
       {/* 하단 검색하기 버튼 */}
       <View style={styles.bottomContainer}>
@@ -314,7 +345,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: radius.sm,
-    backgroundColor: colors.border,
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,

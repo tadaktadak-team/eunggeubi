@@ -196,7 +196,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
                   <MaterialCommunityIcons
                     name={getDrugFormIconName(item.name)}
                     size={28}
-                    color={colors.placeholder}
+                    color={colors.primary}
                   />
                 </View>
               )}
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: radius.sm,
-    backgroundColor: colors.border,
+    backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
