@@ -97,6 +97,9 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
       setTotalCount(result.totalCount);
     } catch (error) {
       console.error('약품 검색 추가 로딩 오류:', error);
+      // runSearch와 달리 여기서 Alert가 없으면, 실패로 조용히 멈춘 게 "결과 끝"처럼 보여서
+      // 사용자가 재시도할 방법도 모른 채 더 있는 결과를 놓치게 된다.
+      Alert.alert('불러오기 실패', '추가 결과를 불러오지 못했습니다. 다시 스크롤해 재시도해 주세요.');
     } finally {
       fetchingMoreRef.current = false;
       setLoadingMore(false);

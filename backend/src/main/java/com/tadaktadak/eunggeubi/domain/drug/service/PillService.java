@@ -48,7 +48,7 @@ public class PillService {
         List<PillSearchSummary> results = drugInfoRepository.searchByAppearance(
                 blankToNull(request.getDrugShape()),
                 blankToNull(request.getColorClass()),
-                blankToNull(request.getPrintFront())
+                blankToNull(request.getImprint())
         );
 
         return results.stream()
@@ -68,7 +68,7 @@ public class PillService {
                 .itemImage(info.getItemImage())
                 .drugShape(info.getShape())
                 .colorClass(info.getColor())
-                .printFront(info.getImprint())
+                .imprint(info.getImprint())
                 .etcOtcName(info.getDrugType())
                 .build();
     }
@@ -191,8 +191,7 @@ public class PillService {
                 .itemImage(getTextOrNull(item, "ITEM_IMAGE"))
                 .drugShape(getTextOrNull(item, "DRUG_SHAPE"))
                 .colorClass(getTextOrNull(item, "COLOR_CLASS1"))
-                .printFront(getTextOrNull(item, "PRINT_FRONT"))
-                .printBack(getTextOrNull(item, "PRINT_BACK"))
+                .imprint(combineImprint(getTextOrNull(item, "PRINT_FRONT"), getTextOrNull(item, "PRINT_BACK")))
                 .etcOtcName(getTextOrNull(item, "ETC_OTC_NAME"))
                 .build();
     }

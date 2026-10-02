@@ -22,13 +22,12 @@ const PillSearchScreen = ({ navigation }: any) => {
   const [printText, setPrintText] = useState('');
   const [selectedShape, setSelectedShape] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
-  const [selectedForm, setSelectedForm] = useState('');
 
   const [results, setResults] = useState<PillSearchResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  // 필터(식별문자/모양/색상/제형)가 길어서, 검색 버튼을 눌러도 결과가 화면 아래쪽에 있어 바로 안
+  // 필터(식별문자/모양/색상)가 길어서, 검색 버튼을 눌러도 결과가 화면 아래쪽에 있어 바로 안
   // 보이고 직접 스크롤해야 하는 문제가 있었다. 검색이 끝나면 필터 영역 높이만큼 자동으로 스크롤해
   // 결과(또는 "결과 없음" 안내)가 바로 보이게 한다.
   const listRef = useRef<FlatList<PillSearchResponse>>(null);
@@ -37,13 +36,11 @@ const PillSearchScreen = ({ navigation }: any) => {
   // 필터 옵션 데이터
   const shapes = ['원형', '타원형', '장방형', '삼각형', '사각형', '기타'];
   const colorOptions = ['하양', '노랑', '주황', '분홍', '빨강', '갈색', '연두', '초록', '파랑'];
-  const forms = ['정제', '경질캡슐', '연질캡슐'];
 
   const handleReset = () => {
     setPrintText('');
     setSelectedShape('');
     setSelectedColor('');
-    setSelectedForm('');
   };
 
   const handleSearch = async () => {
@@ -57,7 +54,7 @@ const PillSearchScreen = ({ navigation }: any) => {
       const data = await searchPills({
         drugShape: selectedShape || undefined,
         colorClass: selectedColor || undefined,
-        printFront: printText.trim() || undefined,
+        imprint: printText.trim() || undefined,
       });
       setResults(data);
     } catch (error) {
@@ -78,7 +75,7 @@ const PillSearchScreen = ({ navigation }: any) => {
     return () => clearTimeout(timer);
   }, [results, searched, loading]);
 
-  // 필터 UI(식별문자/모양/색상/제형)는 결과와 달리 몇 개 안 되는 고정 항목이라 그냥 렌더링해도
+  // 필터 UI(식별문자/모양/색상)는 결과와 달리 몇 개 안 되는 고정 항목이라 그냥 렌더링해도
   // 되지만, 결과 카드는 조건에 따라 수천 건까지 나올 수 있어(예: 원형+하양 4,944건) ScrollView에
   // 전부 올려두면 전부 한 번에 네이티브 뷰로 그려져 렉이 심했다. FlatList로 바꿔 화면에 보이는
   // 만큼만 그리도록 하고, 필터 UI는 FlatList의 ListHeaderComponent로 넣어 하나의 스크롤로 유지한다.
@@ -132,24 +129,6 @@ const PillSearchScreen = ({ navigation }: any) => {
             >
               <Text style={[styles.chipText, selectedColor === color && styles.chipTextSelected]}>
                 {color}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* 제형 선택 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>제형</Text>
-        <View style={styles.chipContainer}>
-          {forms.map((form) => (
-            <TouchableOpacity
-              key={form}
-              style={[styles.chip, selectedForm === form && styles.chipSelected]}
-              onPress={() => setSelectedForm(selectedForm === form ? '' : form)}
-            >
-              <Text style={[styles.chipText, selectedForm === form && styles.chipTextSelected]}>
-                {form}
               </Text>
             </TouchableOpacity>
           ))}

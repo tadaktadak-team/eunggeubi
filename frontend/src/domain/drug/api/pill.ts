@@ -8,22 +8,21 @@ export interface PillSearchResponse {
   itemImage?: string;    // 알약 이미지 URL
   drugShape?: string;    // 모양
   colorClass?: string;   // 색상
-  printFront?: string;   // 각인 앞
-  printBack?: string;    // 각인 뒤
+  imprint?: string;      // 각인(식별문자)
   etcOtcName?: string;   // 전문의약품/일반의약품 구분
 }
 
 export interface PillSearchParams {
   drugShape?: string;
   colorClass?: string;
-  printFront?: string;
+  imprint?: string;
 }
 
 export const searchPills = async (params: PillSearchParams): Promise<PillSearchResponse[]> => {
   const query = new URLSearchParams();
   if (params.drugShape) query.set('drugShape', params.drugShape);
   if (params.colorClass) query.set('colorClass', params.colorClass);
-  if (params.printFront) query.set('printFront', params.printFront);
+  if (params.imprint) query.set('imprint', params.imprint);
 
   return api.get<PillSearchResponse[]>(`/api/drugs/pills/identification?${query.toString()}`);
 };
