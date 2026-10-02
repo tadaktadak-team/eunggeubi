@@ -13,15 +13,8 @@ interface Props {
   onClose: () => void;
 }
 
-// [기능, 로그인 없이 가능한지]. 로그인하면 전부 가능하다
-const FEATURES: [string, boolean][] = [
-  ['AI 증상 상담', true],
-  ['병원·약국 찾기', true],
-  ['약물 정보 조회', true],
-  ['상담 이력 저장', false],
-  ['보호자 알림 발송', false],
-  ['건강 프로필 관리', false],
-];
+// 로그인해야 쓸 수 있는 기능. 상담·병원 찾기·약물 정보는 로그인 없이도 되므로 문구로만 안내한다
+const BENEFITS = ['긴급 상황에 보호자에게 위치 알림', 'AI 상담 이력 저장', '건강 프로필 관리'];
 
 export default function LoginRequiredSheet({ visible, onClose }: Props) {
   const navigation = useNavigation<Nav>();
@@ -39,39 +32,14 @@ export default function LoginRequiredSheet({ visible, onClose }: Props) {
         <Pressable style={styles.sheet} onPress={() => {}}>
           <View style={styles.handle} />
 
-          <View style={styles.iconCircle}>
-            <Ionicons name="shield-checkmark" size={28} color={colors.primary} />
-          </View>
           <Text style={styles.title}>로그인하면 이런 기능이 더해져요</Text>
-          <Text style={styles.subtitle}>
-            지금도 상담·병원 찾기·약물 정보는 바로 쓸 수 있어요.{'\n'}로그인하면 보호자 알림과 기록 저장까지 이어져요.
-          </Text>
+          <Text style={styles.subtitle}>상담·병원 찾기·약물 정보는 로그인 없이도 쓸 수 있어요.</Text>
 
-          <View style={styles.table}>
-            <View style={styles.tableRow}>
-              <View style={styles.labelCell} />
-              <View style={styles.markCell}>
-                <Text style={styles.colTitle}>로그인 없이</Text>
-              </View>
-              <View style={[styles.markCell, styles.loginCell, styles.loginCellTop]}>
-                <Text style={[styles.colTitle, styles.colTitleLogin]}>로그인</Text>
-              </View>
-            </View>
-            {FEATURES.map(([label, guestOk], i) => (
-              <View key={label} style={styles.tableRow}>
-                <View style={styles.labelCell}>
-                  <Text style={styles.featureText}>{label}</Text>
-                </View>
-                <View style={styles.markCell}>
-                  {guestOk ? (
-                    <Ionicons name="checkmark" size={18} color={colors.textSub} />
-                  ) : (
-                    <Ionicons name="close" size={18} color={colors.disabled} />
-                  )}
-                </View>
-                <View style={[styles.markCell, styles.loginCell, i === FEATURES.length - 1 && styles.loginCellBottom]}>
-                  <Ionicons name="checkmark" size={18} color={colors.primary} />
-                </View>
+          <View style={styles.list}>
+            {BENEFITS.map((b) => (
+              <View key={b} style={styles.row}>
+                <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+                <Text style={styles.rowText}>{b}</Text>
               </View>
             ))}
           </View>
@@ -99,37 +67,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     paddingBottom: spacing.xxl,
-    alignItems: 'center',
   },
-  handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: spacing.lg },
-  iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FCE9E7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
+  handle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    marginBottom: spacing.xl,
   },
-  title: { fontSize: font.h3, fontWeight: '800', color: colors.text, marginBottom: spacing.sm },
-  subtitle: {
-    fontSize: font.sub,
-    color: colors.textSub,
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: spacing.lg,
-  },
-  table: { width: '100%', marginBottom: spacing.lg },
-  tableRow: { flexDirection: 'row', alignItems: 'center', minHeight: 38 },
-  labelCell: { flex: 1, paddingLeft: spacing.xs },
-  markCell: { width: 84, height: 38, alignItems: 'center', justifyContent: 'center' },
-  loginCell: { backgroundColor: colors.primaryLight },
-  loginCellTop: { borderTopLeftRadius: radius.md, borderTopRightRadius: radius.md },
-  loginCellBottom: { borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md },
-  colTitle: { fontSize: font.caption, color: colors.textSub, fontWeight: '700' },
-  colTitleLogin: { color: colors.primary },
-  featureText: { fontSize: font.body, color: colors.text, fontWeight: '600' },
-  buttonRow: { width: '100%', flexDirection: 'row', gap: spacing.sm },
+  title: { fontSize: font.h3, fontWeight: '800', color: colors.text },
+  subtitle: { fontSize: font.sub, color: colors.textSub, marginTop: spacing.sm },
+  list: { gap: spacing.md, marginTop: spacing.xl, marginBottom: spacing.xl },
+  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  rowText: { fontSize: font.body, color: colors.text },
+  buttonRow: { flexDirection: 'row', gap: spacing.sm },
   guestBtn: {
     flex: 1,
     height: 52,
@@ -142,9 +94,9 @@ const styles = StyleSheet.create({
   guestText: { color: colors.text, fontSize: font.body, fontWeight: '700' },
   loginBtn: {
     flex: 1.2,
-    backgroundColor: colors.primary,
     height: 52,
     borderRadius: radius.md,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
