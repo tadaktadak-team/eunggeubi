@@ -10,7 +10,10 @@ export function getPermitStatusLabel(cancelName?: string | null): string | null 
     case '유효기간만료':
       return '허가 만료';
     case '행정(취소)':
+    case '취소':
       return '허가 취소';
+    case '폐업':
+      return '업체 폐업';
     default:
       return `허가 ${cancelName}`;
   }
