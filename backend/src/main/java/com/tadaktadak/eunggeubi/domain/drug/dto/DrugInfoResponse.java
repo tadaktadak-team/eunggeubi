@@ -25,6 +25,7 @@ public class DrugInfoResponse {
     private String caution;   // 주의사항 (평문 — e약은요 등 짧은 소스용)
     private List<CautionSection> cautionSections; // 주의사항 (항목별 구조화 — 의약품 제품 허가정보 소스용)
     private String drugType;  // 약품구분
+    private String cancelName; // 허가 상태(정상/취하/유효기간만료/행정(취소) 등, null=미확인)
     private String itemImage; // 알약 이미지 URL
 
     //DB에서 꺼낸 Entity를 프론트엔드용 DTO 상자로 변환해주는 메서드
@@ -40,6 +41,7 @@ public class DrugInfoResponse {
                 .caution(drugInfo.getCaution())
                 .cautionSections(parseCautionSections(drugInfo.getItemSeq(), drugInfo.getCautionSections()))
                 .drugType(drugInfo.getDrugType())
+                .cancelName(drugInfo.getCancelName())
                 .itemImage(drugInfo.getItemImage())
                 .build();
     }

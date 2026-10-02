@@ -15,4 +15,5 @@ public class PrmsnDetailResponse {
     // 수만 자에 달해서 그대로 평문으로 보여주면 가독성이 떨어진다는 피드백에 따른 구조화.
     private String cautionSectionsJson;
     private String drugType;   // 전문/일반 구분 (ETC_OTC_CODE)
+    private String cancelName; // 허가 상태 (CANCEL_NAME: 정상/취하/유효기간만료/행정(취소) 등)
 }

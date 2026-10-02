@@ -70,6 +70,7 @@ public class DrugService {
                 .color(summary.getColor())
                 .imprint(summary.getImprint())
                 .drugType(summary.getDrugType())
+                .cancelName(summary.getCancelName())
                 .itemImage(summary.getItemImage())
                 .efficacy(summary.getEfficacySnippet())
                 .build();

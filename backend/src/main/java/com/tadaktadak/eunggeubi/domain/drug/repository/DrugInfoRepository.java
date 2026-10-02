@@ -19,7 +19,7 @@ public interface DrugInfoRepository extends JpaRepository<DrugInfo, String> {
     // efficacy는 200자로 잘라 미리보기만 받고 useInfo/caution은 아예 안 받는다(DrugSearchSummary
     // 주석 참고 — 무거운 LONGTEXT 컬럼을 목록 조회에서 빼서 속도를 확보).
     @Query(value = "SELECT d.itemSeq AS itemSeq, d.name AS name, d.shape AS shape, d.color AS color, " +
-            "d.imprint AS imprint, d.drugType AS drugType, d.itemImage AS itemImage, " +
+            "d.imprint AS imprint, d.drugType AS drugType, d.cancelName AS cancelName, d.itemImage AS itemImage, " +
             "SUBSTRING(d.efficacy, 1, 200) AS efficacySnippet " +
             "FROM DrugInfo d WHERE d.name LIKE CONCAT('%', :name, '%') ORDER BY d.name ASC",
             countQuery = "SELECT COUNT(d) FROM DrugInfo d WHERE d.name LIKE CONCAT('%', :name, '%')")

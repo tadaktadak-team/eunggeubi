@@ -57,6 +57,13 @@ public class DrugInfo {
     @Column(name = "drug_type", length = 20)
     private String drugType; // 약품구분
 
+    // 의약품 제품 허가정보 API의 CANCEL_NAME 원문("정상", "취하", "유효기간만료", "행정(취소)" 등).
+    // null은 아직 확인 못 한 행(허가정보 배치가 안 거쳤거나 해당 페이지가 실패한 경우)이라 "정상"으로
+    // 취급해 숨기지 않는다. 숨기는 대신 화면에서 상태 배지로 표시한다(집에 남아있는 예전 약을
+    // 검색하는 경우가 있어서, 검색에서 지우면 오히려 "없는 약"으로 보여 곤란함).
+    @Column(name = "cancel_name", length = 30)
+    private String cancelName;
+
     @Column(name = "entp_name", length = 100)
     private String entpName; // 제조/수입 업체명 - 낱알검색
 

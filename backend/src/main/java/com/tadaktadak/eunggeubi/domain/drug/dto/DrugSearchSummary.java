@@ -11,6 +11,7 @@ public interface DrugSearchSummary {
     String getColor();
     String getImprint();
     String getDrugType();
+    String getCancelName();
     String getItemImage();
     String getEfficacySnippet();
 }

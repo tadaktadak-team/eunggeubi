@@ -121,6 +121,8 @@ public class DrugPrmsnIndexingRunner implements CommandLineRunner {
     // DB에 이미 있는 행 중, 비어있는 필드가 하나라도 있고 이번 응답이 그걸 채울 수 있을 때만
     // 병합한 엔티티를 반환한다. 이미 값이 있는 필드는 절대 덮어쓰지 않는다. 채울 게 없으면 null
     // 반환(저장 대상에서 제외돼 불필요한 쓰기를 줄인다).
+    // 단 허가 상태(cancelName)는 예외다 — 효능 같은 정적 텍스트와 달리 나중에 취하/만료로 바뀔 수
+    // 있는 정보라서, 다른 필드가 이미 다 채워진 행이어도 값이 다르면 항상 최신으로 갱신한다.
     private DrugInfo mergeIfNeeded(DrugInfo info, PrmsnDetailResponse prmsn) {
         if (prmsn == null) {
             return null;
@@ -131,12 +133,16 @@ public class DrugPrmsnIndexingRunner implements CommandLineRunner {
         // 평문 caution은 더 이상 이 배치가 채우지 않는다 — 구조화된 cautionSections로 대체됨.
         boolean canFillCautionSections = info.getCautionSections() == null && prmsn.getCautionSectionsJson() != null;
         boolean canFillDrugType = info.getDrugType() == null && prmsn.getDrugType() != null;
+        boolean cancelNameChanged = prmsn.getCancelName() != null
+                && !prmsn.getCancelName().equals(info.getCancelName());
 
-        if (!canFillEfficacy && !canFillUseInfo && !canFillCautionSections && !canFillDrugType) {
+        if (!canFillEfficacy && !canFillUseInfo && !canFillCautionSections && !canFillDrugType
+                && !cancelNameChanged) {
             return null;
         }
 
         DrugInfo.DrugInfoBuilder builder = info.toBuilder();
+        if (cancelNameChanged) builder.cancelName(prmsn.getCancelName());
         if (canFillEfficacy) builder.efficacy(prmsn.getEfficacy());
         if (canFillUseInfo) builder.useInfo(prmsn.getUseInfo());
         if (canFillCautionSections) builder.cautionSections(prmsn.getCautionSectionsJson());

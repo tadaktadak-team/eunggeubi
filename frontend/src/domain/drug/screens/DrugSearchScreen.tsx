@@ -18,6 +18,7 @@ import { searchDrugsByName, DrugInfoResponse } from '../api/drug';
 import { addRecentSearch } from '../storage/recentSearches';
 import { stripHtmlTags } from '../../../shared/utils/html';
 import { getDrugFormIconName } from '../utils/drugIcon';
+import { getPermitStatusLabel } from '../utils/drugStatus';
 
 const NUM_OF_ROWS = 10;
 
@@ -207,10 +208,19 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
                 <Text style={styles.itemName} numberOfLines={1}>
                   {item.name}
                 </Text>
-                {item.drugType && (
-                  <Text style={styles.drugType} numberOfLines={1}>
-                    {item.drugType}
-                  </Text>
+                {(item.drugType || getPermitStatusLabel(item.cancelName)) && (
+                  <View style={styles.typeRow}>
+                    {item.drugType && (
+                      <Text style={styles.drugType} numberOfLines={1}>
+                        {item.drugType}
+                      </Text>
+                    )}
+                    {getPermitStatusLabel(item.cancelName) && (
+                      <View style={styles.statusBadge}>
+                        <Text style={styles.statusBadgeText}>{getPermitStatusLabel(item.cancelName)}</Text>
+                      </View>
+                    )}
+                  </View>
                 )}
                 {item.efficacy && (
                   <Text style={styles.efcyText} numberOfLines={2}>
@@ -281,7 +291,15 @@ const styles = StyleSheet.create({
   },
   cardInfo: { flex: 1, justifyContent: 'center' },
   itemName: { fontSize: font.body + 1, fontWeight: 'bold', color: colors.text, marginBottom: 2 },
-  drugType: { fontSize: font.sub, color: colors.primaryDark, marginBottom: spacing.xs },
+  typeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+  drugType: { fontSize: font.sub, color: colors.primaryDark },
+  statusBadge: {
+    backgroundColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+  },
+  statusBadgeText: { fontSize: font.caption, fontWeight: 'bold', color: colors.textSub },
   efcyText: { fontSize: font.sub, color: colors.textSub, lineHeight: 18 },
 });
 

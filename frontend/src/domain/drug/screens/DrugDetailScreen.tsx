@@ -7,6 +7,7 @@ import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { getDrugDetail, DrugInfoResponse } from '../api/drug';
 import { stripHtmlTags } from '../../../shared/utils/html';
 import { getDrugFormIconName } from '../utils/drugIcon';
+import { getPermitStatusLabel } from '../utils/drugStatus';
 
 // 우리 DB에 효능/용법/주의사항이 비어있거나 요약돼 있어도, 식약처 원문(의약품안전나라)은
 // itemSeq(cacheSeq)만 있으면 모든 약에 대해 항상 조회 가능 — 공백을 메우는 안전망으로 제공.
@@ -72,6 +73,7 @@ const DrugDetailScreen = ({ route }: any) => {
   // 전문의약품의 효능/용법/주의사항은 식약처 허가정보 원문(임상시험 수치, 금기 목록 등 규제
   // 문서 그대로)이라 일반의약품(e약은요, 짧은 소비자용 문구)과 결이 너무 달라 화면에서는
   // 생략하고 외형정보 + 식약처 원문 링크만 보여준다. DB에는 그대로 보관돼 있음(향후 활용 대비).
+  const permitStatusLabel = getPermitStatusLabel(drug.cancelName);
   const isPrescription = drug.drugType === '전문의약품' || drug.drugType === '전문,희귀';
 
   const handleOpenMfds = () => {
@@ -98,11 +100,18 @@ const DrugDetailScreen = ({ route }: any) => {
             </View>
           )}
           <Text style={styles.drugName}>{drug.name}</Text>
-          {drug.drugType && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{drug.drugType}</Text>
-            </View>
-          )}
+          <View style={styles.badgeRow}>
+            {drug.drugType && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{drug.drugType}</Text>
+              </View>
+            )}
+            {permitStatusLabel && (
+              <View style={styles.statusBadge}>
+                <Text style={styles.statusBadgeText}>{permitStatusLabel}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* 외형 정보 */}
@@ -211,6 +220,23 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: spacing.sm + 2,
     textAlign: 'center',
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: spacing.sm,
+  },
+  statusBadge: {
+    backgroundColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: radius.md,
+  },
+  statusBadgeText: {
+    fontSize: font.caption,
+    fontWeight: 'bold',
+    color: colors.textSub,
   },
   badge: {
     backgroundColor: colors.primaryLight,

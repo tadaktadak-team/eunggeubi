@@ -111,6 +111,7 @@ public class DrugPrmsnService {
                 .useInfo(extractDocText(getTextOrNull(item, "UD_DOC_DATA")))
                 .cautionSectionsJson(extractCautionSectionsJson(getTextOrNull(item, "NB_DOC_DATA")))
                 .drugType(getTextOrNull(item, "ETC_OTC_CODE"))
+                .cancelName(getTextOrNull(item, "CANCEL_NAME"))
                 .build();
     }
 
