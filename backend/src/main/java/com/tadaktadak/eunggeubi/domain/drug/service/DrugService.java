@@ -48,7 +48,7 @@ public class DrugService {
      */
     public DrugSearchPageResponse searchDrugsByName(String keyword, int pageNo, int numOfRows) {
         Pageable pageable = PageRequest.of(pageNo - 1, numOfRows);
-        Page<DrugSearchSummary> page = drugInfoRepository.findSummaryByNameContaining(keyword, pageable);
+        Page<DrugSearchSummary> page = drugInfoRepository.findSummaryByNameContaining(LikeEscaper.escape(keyword), pageable);
 
         List<DrugInfoResponse> items = page.getContent().stream()
                 .map(this::toDrugInfoResponse)

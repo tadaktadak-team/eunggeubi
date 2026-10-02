@@ -21,8 +21,8 @@ public interface DrugInfoRepository extends JpaRepository<DrugInfo, String> {
     @Query(value = "SELECT d.itemSeq AS itemSeq, d.name AS name, d.shape AS shape, d.color AS color, " +
             "d.imprint AS imprint, d.drugType AS drugType, d.cancelName AS cancelName, d.itemImage AS itemImage, " +
             "SUBSTRING(d.efficacy, 1, 200) AS efficacySnippet " +
-            "FROM DrugInfo d WHERE d.name LIKE CONCAT('%', :name, '%') ORDER BY d.name ASC",
-            countQuery = "SELECT COUNT(d) FROM DrugInfo d WHERE d.name LIKE CONCAT('%', :name, '%')")
+            "FROM DrugInfo d WHERE d.name LIKE CONCAT('%', :name, '%') ESCAPE '!' ORDER BY d.name ASC",
+            countQuery = "SELECT COUNT(d) FROM DrugInfo d WHERE d.name LIKE CONCAT('%', :name, '%') ESCAPE '!'")
     Page<DrugSearchSummary> findSummaryByNameContaining(@Param("name") String name, Pageable pageable);
 
     // 낱알 특징(모양/색상/각인) 검색. 조건은 전부 선택사항이라 null이면 그 조건은 건너뛴다.
@@ -33,7 +33,7 @@ public interface DrugInfoRepository extends JpaRepository<DrugInfo, String> {
             "FROM DrugInfo d WHERE " +
             "(:shape IS NULL OR d.shape = :shape) AND " +
             "(:color IS NULL OR d.color = :color) AND " +
-            "(:imprint IS NULL OR d.imprint LIKE %:imprint%)")
+            "(:imprint IS NULL OR d.imprint LIKE CONCAT('%', :imprint, '%') ESCAPE '!')")
     List<PillSearchSummary> searchByAppearance(
             @Param("shape") String shape,
             @Param("color") String color,

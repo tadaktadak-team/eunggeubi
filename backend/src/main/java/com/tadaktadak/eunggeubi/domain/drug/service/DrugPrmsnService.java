@@ -249,12 +249,14 @@ public class DrugPrmsnService {
         if (text == null) {
             return null;
         }
+        // &amp;는 반드시 마지막에 치환한다. 먼저 치환하면 원문에 이미 이스케이프돼 있던
+        // "&amp;lt;"(= 글자 그대로의 "&lt;")가 "&lt;"를 거쳐 "<"로 두 번 디코딩돼 깨진다.
         return text.replace("&nbsp;", " ")
-                .replace("&amp;", "&")
                 .replace("&lt;", "<")
                 .replace("&gt;", ">")
                 .replace("&quot;", "\"")
                 .replace("&apos;", "'")
+                .replace("&amp;", "&")
                 .trim();
     }
 

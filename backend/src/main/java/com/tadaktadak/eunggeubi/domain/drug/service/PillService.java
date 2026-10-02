@@ -48,7 +48,7 @@ public class PillService {
         List<PillSearchSummary> results = drugInfoRepository.searchByAppearance(
                 blankToNull(request.getDrugShape()),
                 blankToNull(request.getColorClass()),
-                blankToNull(request.getImprint())
+                LikeEscaper.escape(blankToNull(request.getImprint()))
         );
 
         return results.stream()
