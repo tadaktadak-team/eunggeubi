@@ -18,11 +18,14 @@ function stripTrailingParens(name: string): string {
   return stripped;
 }
 
-// 제형 키워드 뒤에는 문자열이 끝나거나("정", "캡슐") 용량 숫자가 바로 붙는다
-// ("산160밀리그램"). 뒤에 다른 한글 글자가 더 이어지면(예: "염산염"의 "산" 다음 "염")
-// 성분명 일부일 뿐이라 제형이 아니다.
+// 제형 키워드는 문자열 끝에 오거나, 그 뒤에 "용량(숫자+단위)"만 붙은 형태여야 한다
+// ("산160밀리그램", "액 5%"). 숫자 하나만 보고 통과시키면 "가상산5mg정"처럼 성분 뒤에
+// 용량이 오고 진짜 제형("정")이 뒤따르는 이름도 가루로 오탐되므로, 끝까지(`$`) 이어지는지 확인한다.
+// 뒤에 다른 한글 글자가 더 이어지면(예: "염산염"의 "산" 다음 "염") 성분명 일부라 제형이 아니다.
+const DOSE_UNITS = '밀리그램|밀리그람|마이크로그램|킬로그램|그램|단위|밀리리터|리터|mg|mcg|ug|g|ml|㎎|㎖|%';
+
 function endsWithForm(core: string, keywords: string): boolean {
-  return new RegExp(`(${keywords})(?:[0-9]|$)`).test(core);
+  return new RegExp(`(?:${keywords})(?:[0-9][0-9.,/~ -]*(?:${DOSE_UNITS})*)?$`).test(core);
 }
 
 export function getDrugFormIconName(name?: string): IconName {
