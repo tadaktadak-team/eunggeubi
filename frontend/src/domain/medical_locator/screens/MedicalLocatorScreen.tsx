@@ -21,6 +21,7 @@ import { EmergencyBed } from "../types/emergencyBed";
 import { getNearbyHospitals, getNearbyPharmacies } from "../api/medicalFacility";
 import { MedicalFacility } from "../types/medicalFacility";
 import CharacterSlot from "../../../shared/components/CharacterSlot";
+import { colors } from "../../../shared/theme/theme";
 import { isInKorea } from "../../../shared/utils/geo";
 
 type FilterType = "all" | "hospital" | "pharmacy" | "emergency";
@@ -700,13 +701,15 @@ export default function MedicalLocatorScreen() {
       {/* 한국 밖이면 화면 위에 반투명 안내를 덮어 뒤 화면이 비쳐 보이게 한다 */}
       {outOfKorea && (
         <View style={styles.outOfKoreaOverlay}>
-          <CharacterSlot />
-          <Text style={styles.notice}>
-            응급이는 대한민국 안에서만{"\n"}주변 병원·약국·응급실을 찾을 수 있어요.
-          </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={loadInitialData}>
-            <Text style={styles.retryText}>위치 다시 확인</Text>
-          </TouchableOpacity>
+          <View style={styles.outOfKoreaCard}>
+            <CharacterSlot />
+            <Text style={styles.notice}>
+              응급이는 대한민국 안에서만{"\n"}주변 병원·약국·응급실을 찾을 수 있어요.
+            </Text>
+            <TouchableOpacity style={styles.retryButton} onPress={loadInitialData}>
+              <Text style={styles.retryText}>위치 다시 확인</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </SafeAreaView>
@@ -835,7 +838,21 @@ const styles = StyleSheet.create({
     bottom: 0,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.88)",
+    backgroundColor: "rgba(255,255,255,0.45)",
+  },
+
+  outOfKoreaCard: {
+    alignItems: "center",
+    marginHorizontal: 32,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.95)",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
 
   mapPlaceholder: {
@@ -851,15 +868,15 @@ const styles = StyleSheet.create({
   },
 
   retryButton: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: "#f0f0f0",
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
   },
 
   retryText: {
-    color: "#1E88E5",
+    color: colors.white,
     fontWeight: "700",
   },
 
