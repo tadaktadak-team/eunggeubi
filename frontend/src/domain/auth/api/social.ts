@@ -1,10 +1,9 @@
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-
+import { API_BASE_URL } from '../../../shared/api/config';
 import { api } from '../../../shared/api/client';
 import { Gender, LoginResponse } from '../types';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
 
 type SocialProvider = 'naver' | 'kakao'| 'google';
 
