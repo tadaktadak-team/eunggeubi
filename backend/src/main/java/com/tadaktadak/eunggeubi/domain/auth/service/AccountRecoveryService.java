@@ -3,6 +3,7 @@ package com.tadaktadak.eunggeubi.domain.auth.service;
 import com.tadaktadak.eunggeubi.domain.auth.entity.Purpose;
 import com.tadaktadak.eunggeubi.domain.auth.repository.RefreshTokenRepository;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
+import com.tadaktadak.eunggeubi.domain.user.entity.UserStatus;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -22,10 +23,12 @@ public class AccountRecoveryService {
     private final RefreshTokenService refreshTokenService;
 
     // 아이디(이메일) 찾기: 이름 + 인증된 전화번호 → 마스킹된 이메일
-    @Transactional(readOnly = true)
+    // consumeVerified 가 인증을 소비(쓰기)하므로 readOnly 면 안됨
+    // - readOnly 트랜잭션은 flush 를 생략해서 소비 처리가 조용히 사라짐
+    @Transactional
     public String findEmail(String name, String phone) {
-        phoneVerificationService.ensureVerified(phone, Purpose.FIND_ID);
-        User user = userRepository.findByNameAndPhone(name, phone)
+        phoneVerificationService.consumeVerified(phone, Purpose.FIND_ID);
+        User user = userRepository.findTopByNameAndPhoneAndStatusNotOrderByIdDesc(name, phone, UserStatus.WITHDRAWN)
                 .orElseThrow(() -> new IllegalArgumentException("일치하는 회원 정보가 없습니다."));
         return maskEmail(user.getEmail());
     }
@@ -33,7 +36,7 @@ public class AccountRecoveryService {
     // 비밀번호 재설정: 이메일 + 인증된 전화번호 → 새 비밀번호 저장
     @Transactional
     public void resetPassword(String email, String phone, String newPassword) {
-        phoneVerificationService.ensureVerified(phone, Purpose.FIND_PW);
+        phoneVerificationService.consumeVerified(phone, Purpose.FIND_PW);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("일치하는 회원 정보가 없습니다."));
 

@@ -52,4 +52,10 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ResponseEntity<ErrorResponse> handleExternalApi(ExternalApiException e) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new ErrorResponse(e.getMessage()));
     }
+
+    // 소셜 로그인 이메일이 기존 계정과 겹침 -> 409
+    @ExceptionHandler(SocialEmailConflictException.class)
+    public ResponseEntity<ErrorResponse> handleSocialEmailConflict(SocialEmailConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(e.getMessage()));
+    }
 }

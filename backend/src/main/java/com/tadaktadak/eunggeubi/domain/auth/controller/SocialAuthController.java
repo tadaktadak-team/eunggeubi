@@ -1,14 +1,17 @@
 package com.tadaktadak.eunggeubi.domain.auth.controller;
-
 import com.tadaktadak.eunggeubi.domain.auth.dto.LoginResponse;
+import com.tadaktadak.eunggeubi.domain.auth.dto.SocialLoginExchangeRequest;
 import com.tadaktadak.eunggeubi.domain.auth.dto.SocialProfile;
 import com.tadaktadak.eunggeubi.domain.auth.dto.SocialSignupCompleteRequest;
 import com.tadaktadak.eunggeubi.domain.auth.entity.Provider;
+import com.tadaktadak.eunggeubi.domain.auth.service.AppRedirectValidator;
 import com.tadaktadak.eunggeubi.domain.auth.service.KakaoOAuthClient;
 import com.tadaktadak.eunggeubi.domain.auth.service.GoogleOAuthClient;
 import com.tadaktadak.eunggeubi.domain.auth.service.NaverOAuthClient;
 import com.tadaktadak.eunggeubi.domain.auth.service.SocialAuthService;
 import com.tadaktadak.eunggeubi.domain.auth.service.SocialAuthStateStore;
+import com.tadaktadak.eunggeubi.domain.auth.service.SocialLoginTicketStore;
+import com.tadaktadak.eunggeubi.global.exception.SocialEmailConflictException;
 import com.tadaktadak.eunggeubi.domain.auth.service.SocialSignupTicketStore;
 import jakarta.validation.Valid;
 import java.net.URI;
@@ -36,6 +39,8 @@ public class SocialAuthController {
     private final SocialAuthService socialAuthService;
     private final SocialAuthStateStore stateStore;
     private final SocialSignupTicketStore ticketStore;
+    private final AppRedirectValidator appRedirectValidator;
+    private final SocialLoginTicketStore loginTicketStore;
 
     // ===== 네이버 =====
     @GetMapping("/naver/authorize")
@@ -92,9 +97,21 @@ public class SocialAuthController {
                 request.phone(), request.birthDate(), request.gender());
         return ResponseEntity.ok(result);
     }
+    // 콜백에서 받은 loginTicket 을 실제 토큰으로 교환한다(1회용, 60초).
+    // 토큰을 리다이렉트 URL 에 싣지 않기 위한 단계다.
+    @PostMapping("/exchange")
+    public ResponseEntity<LoginResponse> exchange(@Valid @RequestBody SocialLoginExchangeRequest request) {
+        LoginResponse tokens = loginTicketStore.consume(request.ticket());
+        if (tokens == null) {
+            throw new IllegalArgumentException("만료되었거나 유효하지 않은 로그인 요청입니다. 다시 시도해주세요.");
+        }
+        return ResponseEntity.ok(tokens);
+    }
 
-    // state 생성 + 저장
+    // state 생성 + 저장. 저장 전에 appRedirect 가 우리 앱 주소인지 반드시 검증한다
+    // (검증 없이 저장하면 콜백에서 그 주소로 토큰을 그대로 보내게 된다).
     private String newState(String appRedirect) {
+        appRedirectValidator.validate(appRedirect);
         String state = UUID.randomUUID().toString().replace("-", "");
         stateStore.save(state, appRedirect);
         return state;
@@ -114,16 +131,27 @@ public class SocialAuthController {
         return ResponseEntity.status(HttpStatus.FOUND).location(URI.create(url)).build();
     }
 
-    // 콜백 공통: 기존 회원이면 토큰, 신규면 ticket 을 담아 앱으로 302
+    // 콜백 공통: 기존 회원이든 신규든 1회용 ticket 만 앱으로 넘긴다(토큰은 URL 에 싣지 않는다).
     private ResponseEntity<Void> redirectToApp(Provider provider, String appRedirect, SocialProfile profile) {
-        Optional<LoginResponse> existing = socialAuthService.loginIfExisting(provider, profile);
+        Optional<LoginResponse> existing;
+        try {
+            existing = socialAuthService.loginIfExisting(provider, profile);
+        } catch (SocialEmailConflictException e) {
+            // 여기는 인앱 브라우저가 열고 있는 콜백 화면이라, 예외를 던지면 사용자가 날 JSON 을 보게 된다.
+            // 앱으로 되돌려 보내고 앱이 안내 문구를 띄우게 한다.
+            return redirect(UriComponentsBuilder.fromUriString(appRedirect)
+                    .queryParam("error", "email_taken")
+                    .encode().build().toUriString());
+        }
         String redirect;
         if (existing.isPresent()) {
-            LoginResponse t = existing.get();
+            // eunggeubi:// 는 소유권 검증이 없는 커스텀 스킴이라 다른 앱이 가로챌 수 있고,
+            // URL 은 OS 로그에도 남는다. 그래서 토큰 대신 60초짜리 1회용 티켓만 넘기고
+            // 앱이 POST /api/auth/social/exchange 로 본문에서 토큰을 받아간다.
+            String loginTicket = UUID.randomUUID().toString().replace("-", "");
+            loginTicketStore.save(loginTicket, existing.get());
             redirect = UriComponentsBuilder.fromUriString(appRedirect)
-                    .queryParam("userId", t.userId())
-                    .queryParam("accessToken", t.accessToken())
-                    .queryParam("refreshToken", t.refreshToken())
+                    .queryParam("loginTicket", loginTicket)
                     .encode().build().toUriString();
         } else {
             String ticket = UUID.randomUUID().toString().replace("-", "");

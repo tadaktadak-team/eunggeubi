@@ -92,7 +92,11 @@ export default function SignupScreen() {
         agreeSensitiveInfo: agreeSensitive,
       });
       if (res.guardianConsentRequired) {
-        navigation.navigate('GuardianConsent', { userId: res.userId, email: email.trim() });
+        navigation.navigate('GuardianConsent', {
+          consentToken: res.consentToken!,
+          email: email.trim(),
+        });
+
         return;
       }
       navigation.navigate('SignupComplete', { email: email.trim() });

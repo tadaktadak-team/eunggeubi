@@ -19,6 +19,7 @@ export interface SignupResponse {
   userId: number;
   status: UserStatus;
   guardianConsentRequired: boolean;
+  consentToken?: string; // PENDING 일 때만 내려온다
 }
 
 export interface LoginResponse {
@@ -35,7 +36,7 @@ export interface FindEmailResponse {
 export type Relationship = 'PARENT' | 'GRANDPARENT' | 'SIBLING' | 'OTHER';
 
 export interface GuardianRequest {
-  userId: number;
+  consentToken: string;
   name: string;
   phone: string;
   relationship: Relationship;

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 public record GuardianRequest(
-        @NotNull Long userId,               // 회원가입 응답에서 받은 userId
+        @NotBlank String consentToken,      // 회원가입 응답에서 받은 보호자 동의 전용 토큰
         @NotBlank String name,              // 보호자 이름
         @NotBlank String phone,             // 보호자 연락처
         @NotNull Relationship relationship  // PARENT / GRANDPARENT / SIBLING / OTHER

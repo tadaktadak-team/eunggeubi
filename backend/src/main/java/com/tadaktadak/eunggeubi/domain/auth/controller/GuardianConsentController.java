@@ -27,16 +27,10 @@ public class GuardianConsentController {
         return ResponseEntity.ok(guardianConsentService.requestConsent(request));
     }
 
-    // 보호자가 문자 링크 클릭 → 동의 확정 (브라우저에 안내 문구 표시)
-    @GetMapping("/confirm")
-    public ResponseEntity<String> confirm(@RequestParam String token) {
-        guardianConsentService.confirmConsent(token);
-        return ResponseEntity.ok("보호자 동의가 완료되었습니다. 이제 앱에서 로그인할 수 있어요.");
-    }
 
     // 동의 완료 여부 확인 (앱의 '발송 대기' 화면용)
     @GetMapping("/status")
-    public ResponseEntity<ConsentStatusResponse> status(@RequestParam Long userId) {
-        return ResponseEntity.ok(guardianConsentService.getStatus(userId));
+    public ResponseEntity<ConsentStatusResponse> status(@RequestParam String consentToken) {
+        return ResponseEntity.ok(guardianConsentService.getStatus(consentToken));
     }
 }
