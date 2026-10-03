@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawRegeneratedAnswer;
@@ -20,6 +21,7 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.AiConsultatio
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ChecklistRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ChecklistResponseRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ReferenceSourceRepository;
+import com.tadaktadak.eunggeubi.domain.first_aid.service.FirstAidGuideService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,11 +40,12 @@ class ConsultationRegenerationServiceTest {
     private final ReferenceSourceRepository referenceSourceRepository = mock(ReferenceSourceRepository.class);
     private final RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
     private final ChatClient chatClient = mock(ChatClient.class);
+    private final FirstAidGuideService firstAidGuideService = mock(FirstAidGuideService.class);
     private final AtomicLong idSequence = new AtomicLong(1000);
 
     private final ConsultationRegenerationService service = new ConsultationRegenerationService(
             aiConsultationRepository, checklistRepository, checklistResponseRepository,
-            referenceSourceRepository, ragRetrievalService, chatClient);
+            referenceSourceRepository, ragRetrievalService, chatClient, firstAidGuideService);
 
     @Test
     void 본인_상담이_아니면_예외() {
@@ -51,6 +54,29 @@ class ConsultationRegenerationServiceTest {
 
         assertThatThrownBy(() -> service.regenerate(50L, null, "내guest"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void 비회원은_같은_답변을_두_번_재생성할_수_없다() {
+        AiConsultation aiMessage = baseAiMessage(55L, "g1");
+        when(aiConsultationRepository.findById(55L)).thenReturn(Optional.of(aiMessage));
+        when(aiConsultationRepository.existsByBasedOnResponseId(55L)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.regenerate(55L, null, "g1"))
+                .isInstanceOf(GuestLimitExceededException.class);
+        verifyNoInteractions(ragRetrievalService, chatClient);
+    }
+
+    @Test
+    void 로그인_사용자는_가져오지_않은_비회원_기록도_여러_번_재생성할_수_있다() {
+        AiConsultation aiMessage = baseAiMessage(56L, "g1");
+        when(aiConsultationRepository.findById(56L)).thenReturn(Optional.of(aiMessage));
+        when(aiConsultationRepository.existsByBasedOnResponseId(56L)).thenReturn(true);
+        stubSave();
+        when(checklistRepository.findTopByConsultationIdOrderByCreatedAtDesc(56L)).thenReturn(Optional.empty());
+        when(ragRetrievalService.retrieve(anyString())).thenReturn(List.of());
+
+        assertThat(service.regenerate(56L, 1L, "g1")).isNotNull();
     }
 
     @Test

@@ -55,6 +55,7 @@ public class SecurityConfig {
                         // 배포 스크립트가 보는 상태 프로브.
                         .requestMatchers("/actuator/health/**").permitAll()
                         .requestMatchers("/api/ai-consultations/**").permitAll()  // AI 증상 상담: 비로그인도 이용 가능
+                        .requestMatchers("/api/first-aid/**").permitAll()         // 응급처치 가이드: 비로그인도 열람 가능
                         .anyRequest().authenticated()                  // 나머지는 토큰 필수
                 )
 

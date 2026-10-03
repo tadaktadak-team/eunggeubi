@@ -32,6 +32,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
             new Rule("/api/auth/social/exchange",  20)
     );
 
+    // 비회원 guestCode 발급 제한이 같은 IP 기준을 쓰도록 request 에 실어 보낸다(AiConsultationController).
+    public static final String CLIENT_IP_ATTR = "clientIp";
     private static final long WINDOW_MS = 60_000;
 
     // 요청 경로에 적용할 규칙. 없으면 null = 이 필터가 관여하지 않는다.
@@ -71,9 +73,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
         long now = System.currentTimeMillis();
         cleanupIfDue(now);
 
+        String ip = clientIp(request);
+        // 비회원 guestCode 발급 제한(AiConsultationController)도 같은 IP 기준을 쓰도록 넘겨준다.
+        request.setAttribute(CLIENT_IP_ATTR, ip);
+
         // 엔드포인트마다 버킷을 따로 쓴다. 로그인 시도가 AI 상담 할당량을 깎으면 안 된다.
-        String key = rule.pathPrefix() + "|" + clientIp(request);
+        String key = rule.pathPrefix() + "|" + ip;
         int countAfterThisRequest = windows.compute(key, (k, window) ->
+
                 (window == null || now - window.windowStartMs >= WINDOW_MS)
                         ? new Window(now, 1)
                         : window.increment()

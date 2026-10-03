@@ -3,7 +3,6 @@ package com.tadaktadak.eunggeubi.domain.ai_consultations.service;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.ConsultationRequest;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.ConsultationResponse;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawAnswer;
-import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawSearchQuery;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.AiConsultation;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.ReferenceSource;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.entity.SenderType;
@@ -11,8 +10,11 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.AiConsultatio
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ReferenceSourceRepository;
 import com.tadaktadak.eunggeubi.domain.health.entity.HealthProfile;
 import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -34,13 +36,31 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AiConsultationService {
 
-    // 모델이 119 안내 규칙(AiConsultationPrompts.CONSULT_PROMPT 5번)을 놓쳐도, 사용자 입력에 명백한
+    // 모델이 119 안내 규칙(AiConsultationPrompts.CONSULT_PROMPT 6번)을 놓쳐도, 사용자 입력에 명백한
     // 응급 징후(EmergencySignalGuard)가 있으면 이 문장을 코드가 강제로 답변 맨 앞에 붙인다.
     private static final ConsultationResponse.AnswerSegment FORCED_EMERGENCY_NOTICE =
             new ConsultationResponse.AnswerSegment("지금 말씀하신 증상은 응급 상황일 수 있습니다. 즉시 119에 신고해주세요.", List.of());
 
     // 후속 질문에 맥락을 얼마나 태울지 - 프롬프트 길이/비용을 생각해서 최근 몇 개(=몇 턴)로 제한한다.
     private static final int MAX_HISTORY_MESSAGES = 6;
+
+    // ChecklistService.generateItemsWithRetry와 같은 이유 - 타임아웃/429 같은 호출 자체 실패도
+    // 재시도 대상이다. 안 잡으면 일시적인 오류 한 번에 전체 요청이 500으로 끝난다.
+    private static final int MAX_ATTEMPTS = 3;
+
+    // 비회원이 보낼 수 있는 질문 메시지 수. 초과하면 GuestLimitExceededException(403).
+    public static final int GUEST_MESSAGE_LIMIT = 10;
+
+    // IP 하나가 하루에 새로 받을 수 있는 guestCode 수. guestCode를 버리고(=비우거나 지어낸 값을 보내고)
+    // 새로 받는 식으로 위 10회 제한을 초기화하는 걸 막는다. 모바일망(CGNAT)은 수많은 사용자가 공인 IP
+    // 하나를 공유하므로 작게 잡으면 처음 쓰는 사람이 첫 질문부터 막힌다 - 넉넉하게 두고 남용은 RateLimitFilter가 늦춘다.
+    static final int GUEST_CODES_PER_IP_PER_DAY = 10;
+
+    // ponytail: 인스턴스 로컬 메모리 카운터(RateLimitFilter와 같은 한계) - 재시작하면 초기화되고 스케일아웃하면
+    // 인스턴스 수만큼 허용량이 늘어난다. 여러 대로 늘리면 Redis 등 공유 저장소로 옮길 것.
+    // 아래 두 필드는 synchronized 메서드(checkGuestCodeIssueAllowed/recordGuestCodeIssue)에서만 만진다.
+    private final Map<String, Integer> guestCodesIssuedToday = new HashMap<>();
+    private LocalDate guestCodeDay = LocalDate.now();
 
     private final RagRetrievalService ragRetrievalService;
     private final ChatClient chatClient;
@@ -52,19 +72,35 @@ public class AiConsultationService {
     // 그동안 DB 커넥션을 잡고 있으면 동시 요청 몇 개만으로 커넥션 풀이 고갈된다. 저장(save)은 Spring
     // Data가 호출마다 개별 트랜잭션으로 처리하므로 그대로 안전하다. 대신 LLM 실패 시 이미 저장된
     // userMessage가 롤백되지 않고 남을 수 있다(응답 없는 사용자 메시지) - 감내 가능한 트레이드오프.
-    public ConsultationResponse consult(ConsultationRequest request, Long userId) {
-        boolean isNewSession = isBlank(request.sessionId());
-        String sessionId = isNewSession ? UUID.randomUUID().toString() : request.sessionId();
-
-        // 게스트가 새 세션을 시작할 때만 guest_code를 새로 발급한다 - 세션을 이어가는 요청이면
-        // 클라이언트가 이미 갖고 있는 값을 그대로 쓴다 (재발급하면 이전 메시지와 소유권이 끊어짐).
-        boolean guestCodeIssued = userId == null && isBlank(request.guestCode());
+    public ConsultationResponse consult(ConsultationRequest request, Long userId, String clientIp) {
+        // 게스트는 이미 쓰던 guestCode가 있으면 그대로 쓰고(재발급하면 이전 메시지와 소유권이 끊어짐),
+        // 없으면 새로 발급한다. 메시지가 하나도 없는 코드(지어낸 값, 가입으로 계정에 이전돼 비워진 값)도
+        // 새 발급으로 취급한다 - 안 그러면 아무 값이나 보내서 횟수 제한을 초기화할 수 있다.
+        long guestUsed = userId == null && !isBlank(request.guestCode())
+                ? aiConsultationRepository.countByGuestCodeAndSenderType(request.guestCode(), SenderType.USER)
+                : 0;
+        if (guestUsed >= GUEST_MESSAGE_LIMIT) {
+            throw new GuestLimitExceededException();
+        }
+        boolean guestCodeIssued = userId == null && guestUsed == 0;
+        if (guestCodeIssued) {
+            checkGuestCodeIssueAllowed(clientIp);
+        }
         String guestCode = userId != null ? null : (guestCodeIssued ? generateGuestCode() : request.guestCode());
+
+        // 이어가려는 세션이 없거나 요청자 것이 아니면(남의 sessionId, 가입으로 계정에 이전된 세션을
+        // 비회원 상태로 이어가기 등) 새 세션으로 시작한다 - 거부 대신 새로 여는 건, 가입 직후 같은
+        // 화면에서 계속 질문해도 에러 없이 이어지게 하려는 것. 남의 대화가 LLM 컨텍스트로 새지는 않는다.
+        List<AiConsultation> existing = isBlank(request.sessionId())
+                ? List.of()
+                : aiConsultationRepository.findBySessionIdOrderByCreatedAtAsc(request.sessionId());
+        boolean isNewSession = existing.isEmpty() || !existing.get(0).isOwnedBy(userId, guestCode);
+        String sessionId = isNewSession ? UUID.randomUUID().toString() : request.sessionId();
 
         // 후속 질문("그럼 며칠 지나면 병원 가야해요?")은 이전 대화를 알아야 뭘 묻는지 이해가 된다 -
         // 새 세션이면 이전 대화가 없으니 빈 목록, 아니면 이번 사용자 메시지를 저장하기 전에(=순수하게
         // "이전" 턴만) 최근 것만 잘라서 가져온다.
-        List<AiConsultation> priorTurns = isNewSession ? List.of() : recentTurns(sessionId);
+        List<AiConsultation> priorTurns = isNewSession ? List.of() : recentTurns(existing);
 
         AiConsultation userMessage = aiConsultationRepository.save(AiConsultation.builder()
                 .userId(userId)
@@ -76,14 +112,26 @@ public class AiConsultationService {
                 .regenerated(false)
                 .build());
 
-        String searchQuery = buildSearchQuery(priorTurns, rewriteQueryForSearch(request.query()));
-        List<Document> docs = ragRetrievalService.retrieve(searchQuery);
+        // 동시 요청 대비 재확인: 위의 횟수 검사와 저장 사이에 같은 코드의 다른 요청이 끼면 둘 다 통과한다.
+        // 저장 뒤 다시 세서 넘쳤으면 방금 저장한 걸 지우고 막는다. 동시에 넘친 요청은 둘 다 막힐 수도
+        // 있지만(한도보다 적게 허용) 넘치는 쪽은 없다 - 락 없이 서버가 여러 대여도 성립한다.
+        if (guestCode != null
+                && aiConsultationRepository.countByGuestCodeAndSenderType(guestCode, SenderType.USER) > GUEST_MESSAGE_LIMIT) {
+            aiConsultationRepository.delete(userMessage);
+            throw new GuestLimitExceededException();
+        }
+
+        String searchQuery = buildSearchQuery(priorTurns, ragRetrievalService.rewriteForSearch(request.query()));
+        List<List<Document>> docGroups = ragRetrievalService.retrieveGrouped(searchQuery);
+        List<Document> docs = docGroups.stream().flatMap(List::stream).toList();
         // 검색어에는 안 넣는다 - "복통, 고혈압" 같은 병명이 섞이면 지금 증상과 무관한 문서를 끌어올 수
         // 있다. 프롬프트에만 참고 정보로 얹어서, 관련 있을 때만 모델이 알아서 반영하게 한다.
         String healthProfileSummary = buildHealthProfileSummary(userId);
         GenerationResult result = docs.isEmpty()
                 ? GenerationResult.noResult()
-                : generate(request.query(), docs, buildConversationHistory(priorTurns), healthProfileSummary);
+                : ensureMultiInterpretationCoverage(
+                        generate(request.query(), docs, buildConversationHistory(priorTurns), healthProfileSummary),
+                        docGroups, docs);
 
         AiConsultation aiMessage = aiConsultationRepository.save(AiConsultation.builder()
                 .userId(userId)
@@ -100,6 +148,12 @@ public class AiConsultationService {
         saveReferenceSources(aiMessage.getId(), result.citedSources());
 
         List<ConsultationResponse.AnswerSegment> answer = buildAnswer(request.query(), result.segments());
+
+        // 발급 횟수는 응답까지 성공했을 때만 센다 - LLM 오류 등으로 실패하면 클라이언트는 코드를 못 받았는데
+        // IP 한도만 깎이게 된다.
+        if (guestCodeIssued) {
+            recordGuestCodeIssue(clientIp);
+        }
 
         return new ConsultationResponse(
                 answer, result.citedSources(), aiMessage.getId(), sessionId,
@@ -120,49 +174,28 @@ public class AiConsultationService {
             return segments;
         }
 
-        // 마지막 방어선 실제 발동 - 모델이 119 규칙(CONSULT_PROMPT 5번)을 놓쳤다.
+        // 마지막 방어선 실제 발동 - 모델이 119 규칙(CONSULT_PROMPT 6번)을 놓쳤다.
         log.warn("응급 징후 감지했으나 모델 응답에 119 안내가 없어 코드가 강제로 추가했습니다. query=\"{}\"", query);
         return Stream.concat(Stream.of(FORCED_EMERGENCY_NOTICE), segments.stream()).toList();
     }
 
     // 세션의 최근 대화를 시간순으로 가져온다(이번 사용자 메시지 저장 전이라 "이전" 턴만 잡힌다).
     // 길게 이어진 세션이라도 프롬프트/검색어에 태울 건 최근 몇 개로만 자른다(MAX_HISTORY_MESSAGES).
-    private List<AiConsultation> recentTurns(String sessionId) {
-        List<AiConsultation> all = aiConsultationRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
+    private List<AiConsultation> recentTurns(List<AiConsultation> all) {
         return all.size() > MAX_HISTORY_MESSAGES
                 ? all.subList(all.size() - MAX_HISTORY_MESSAGES, all.size())
                 : all;
     }
 
     // 후속 질문만 그대로 벡터 검색하면 증상 키워드가 없어서 엉뚱한 문서가 걸린다. 이전 사용자
-    // 발화들을 검색어에 같이 넣어서 보정한다. currentQuery는 이미 rewriteQueryForSearch를 거친
-    // 검색용 문구다.
+    // 발화들을 검색어에 같이 넣어서 보정한다. currentQuery는 이미 ragRetrievalService.rewriteForSearch를
+    // 거친 검색용 문구다.
     private String buildSearchQuery(List<AiConsultation> priorTurns, String currentQuery) {
         String priorUserText = priorTurns.stream()
                 .filter(m -> m.getSenderType() == SenderType.USER)
                 .map(AiConsultation::getContent)
                 .collect(Collectors.joining(" "));
         return priorUserText.isBlank() ? currentQuery : priorUserText + " " + currentQuery;
-    }
-
-    // 사용자의 일상어 증상 표현을 검색용 의학 용어로 바꾼다(예: "발이 부어요" -> "부종 다리 발목 붓기") -
-    // 실제로 이렇게 안 바꾸면 "부종" 문서가 top 5는커녕 top 20 밖으로 밀려서 검색이 아예 안 됐다.
-    // 최종 답변 생성 프롬프트의 [질문]에는 원래 사용자 문장을 그대로 쓴다 - 검색에만 쓰는 용도다.
-    // LLM 호출이라 실패할 수 있어서, 실패하면 원래 질문 그대로 검색하도록 폴백한다.
-    private String rewriteQueryForSearch(String query) {
-        try {
-            RawSearchQuery raw = chatClient.prompt()
-                    .system(AiConsultationPrompts.QUERY_REWRITE_PROMPT)
-                    .user(query)
-                    .call()
-                    .entity(RawSearchQuery.class);
-            if (raw != null && raw.searchTerms() != null && !raw.searchTerms().isBlank()) {
-                return raw.searchTerms();
-            }
-        } catch (Exception e) {
-            log.warn("검색어 재작성 호출이 실패했습니다. 원래 질문으로 검색합니다. query=\"{}\"", query, e);
-        }
-        return query;
     }
 
     // 모델이 후속 질문에 자연스럽게 이어 답하도록 최근 대화를 프롬프트에 텍스트로 준다.
@@ -198,6 +231,55 @@ public class AiConsultationService {
         return s != null && !s.isBlank();
     }
 
+    // RagRetrievalService.retrieveGrouped가 "|"로 해석을 나눈 경우(예: "목"→목뼈 계통/인후 계통),
+    // CONSULT_PROMPT(규칙 10)에 "두 계통 다 언급하라"고 지시해뒀지만 LLM이 실제로 따르는 건
+    // 확률적이다(실측 3회 중 1회만 반영). 그래서 모델이 한쪽 계통을 answer에서 아예 안 다뤘으면
+    // 코드가 문장을 강제로 덧붙인다. 해석이 하나뿐이거나(docGroups.size() <= 1), 애초에 아무것도
+    // 인용 안 된 답변(noResult/생성실패/진단가드 폴백)이면 건드리지 않는다 - 안전 문구에 억지로
+    // 질병명을 덧붙이면 오히려 혼란을 준다.
+    private GenerationResult ensureMultiInterpretationCoverage(
+            GenerationResult result, List<List<Document>> docGroups, List<Document> docs) {
+        if (docGroups.size() <= 1 || result.citedSources().isEmpty()) {
+            return result;
+        }
+
+        Set<String> citedDiseases = result.citedSources().stream()
+                .map(ConsultationResponse.Source::disease)
+                .collect(Collectors.toSet());
+
+        List<ConsultationResponse.AnswerSegment> extraSegments = new ArrayList<>();
+        List<ConsultationResponse.Source> extraSources = new ArrayList<>();
+        for (List<Document> group : docGroups) {
+            if (group.isEmpty()) {
+                continue;
+            }
+            Document top = group.get(0); // 그룹 안에서 가장 점수 높은 문서 - search()가 이미 점수순으로 준다.
+            String disease = (String) top.getMetadata().get("disease");
+            if (citedDiseases.contains(disease)) {
+                continue; // 모델이 이미 이 계통을 언급함
+            }
+            int index = docs.indexOf(top) + 1; // buildContext의 [번호]와 맞춘다(1-based)
+            extraSegments.add(new ConsultationResponse.AnswerSegment(
+                    "%s이(가) 원인일 가능성도 있습니다. 증상이 이어지거나 다른 양상이면 병원에서 감별 진료를 받아보세요."
+                            .formatted(disease),
+                    List.of(index)));
+            extraSources.add(toSource(index, top));
+        }
+
+        if (extraSegments.isEmpty()) {
+            return result;
+        }
+
+        List<ConsultationResponse.AnswerSegment> segments =
+                Stream.concat(result.segments().stream(), extraSegments.stream()).toList();
+        List<ConsultationResponse.Source> citedSources =
+                Stream.concat(result.citedSources().stream(), extraSources.stream()).toList();
+        String plainText = segments.stream()
+                .map(ConsultationResponse.AnswerSegment::text)
+                .collect(Collectors.joining(" "));
+        return new GenerationResult(segments, citedSources, plainText, result.symptomKeyword());
+    }
+
     private GenerationResult generate(
             String query, List<Document> docs, String conversationHistory, String healthProfileSummary) {
         StringBuilder userPrompt = new StringBuilder();
@@ -210,16 +292,8 @@ public class AiConsultationService {
         userPrompt.append("[참고자료]\n").append(ragRetrievalService.buildContext(docs))
                 .append("\n\n[질문]\n").append(query);
 
-        RawAnswer raw = chatClient.prompt()
-                .system(AiConsultationPrompts.CONSULT_PROMPT)
-                .user(userPrompt.toString())
-                .call()
-                .entity(RawAnswer.class);
-
-        // 모델이 스키마를 벗어난 JSON(예: segments 누락)을 내놓는 경우가 실제로 있었다 -
-        // LLM 출력은 신뢰할 수 없는 입력이므로 여기서 막지 않으면 NPE로 그대로 500이 난다.
-        if (raw == null || raw.segments() == null) {
-            log.warn("LLM 구조화 출력이 예상 스키마를 벗어났습니다. query=\"{}\", raw={}", query, raw);
+        RawAnswer raw = generateRawAnswer(query, userPrompt.toString());
+        if (raw == null) {
             return GenerationResult.generationFailed();
         }
 
@@ -232,10 +306,16 @@ public class AiConsultationService {
 
         // 모델이 규칙을 어기고 존재하지 않는 번호를 인용해도(환각) 조용히 걸러낸다 -
         // 최악의 경우 "근거 없는 문장"이 될 뿐, 잘못된 출처가 붙는 일은 없다.
+        // segments 배열 자체는 위에서 확인했지만, 개별 원소는 LLM이 스키마를 어기고 text/sourceIndexes를
+        // null로 줄 수 있다 - text가 없으면 보여줄 내용이 없으니 걸러내고, sourceIndexes가 없으면
+        // (그대로 .stream() 호출 시 NPE) 인용 없는 문장으로 취급한다.
         List<ConsultationResponse.AnswerSegment> segments = raw.segments().stream()
+                .filter(segment -> segment != null && segment.text() != null && !segment.text().isBlank())
                 .map(segment -> new ConsultationResponse.AnswerSegment(
                         segment.text(),
-                        segment.sourceIndexes().stream().filter(validIndexes::contains).toList()))
+                        segment.sourceIndexes() == null
+                                ? List.of()
+                                : segment.sourceIndexes().stream().filter(validIndexes::contains).toList()))
                 .toList();
 
         // 검색은 됐지만 실제 답변 문장에서 한 번도 인용되지 않은 문서는 "출처"로 보여주지 않는다.
@@ -268,6 +348,31 @@ public class AiConsultationService {
         return new GenerationResult(segments, citedSources, plainText, symptomKeyword);
     }
 
+    // LLM 호출 자체가 실패(타임아웃/429/네트워크 오류)하거나 스키마를 벗어난 JSON(예: segments 누락)을
+    // 내놓는 경우가 실제로 있었다 - 둘 다 재시도 대상으로 묶는다(ChecklistService.generateItemsWithRetry
+    // 와 같은 구조). 모두 실패하면 null을 돌려주고, 호출부가 GenerationResult.generationFailed()로 처리한다.
+    private RawAnswer generateRawAnswer(String query, String userPrompt) {
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            RawAnswer raw;
+            try {
+                raw = chatClient.prompt()
+                        .system(AiConsultationPrompts.CONSULT_PROMPT)
+                        .user(userPrompt)
+                        .call()
+                        .entity(RawAnswer.class);
+            } catch (Exception e) {
+                log.warn("1차 답변 LLM 호출이 실패했습니다 (시도 {}/{}). query=\"{}\"", attempt, MAX_ATTEMPTS, query, e);
+                continue;
+            }
+            if (raw != null && raw.segments() != null) {
+                return raw;
+            }
+            log.warn("1차 답변 LLM 구조화 출력이 예상 스키마를 벗어났습니다 (시도 {}/{}). query=\"{}\", raw={}",
+                    attempt, MAX_ATTEMPTS, query, raw);
+        }
+        return null;
+    }
+
     private void saveReferenceSources(Long consultationId, List<ConsultationResponse.Source> sources) {
         for (ConsultationResponse.Source source : sources) {
             referenceSourceRepository.save(ReferenceSource.builder()
@@ -285,6 +390,31 @@ public class AiConsultationService {
                 (String) doc.getMetadata().get("section"),
                 (String) doc.getMetadata().get("source"),
                 (String) doc.getMetadata().get("cntntsSn"));
+    }
+
+    // 여기선 검사만 하고, 실제 카운트는 consult 성공 시점에 올린다.
+    // ponytail: 검사와 카운트 사이가 벌어져서 같은 IP의 동시 첫 요청 몇 개는 한도를 살짝 넘길 수 있다 - 비용 방어용 느슨한 상한이라 감수.
+    // synchronized: 날짜 전환(clear)과 카운트 갱신이 섞이면 자정 무렵 카운트가 샌다. 새 guestCode 발급
+    // 요청에서만 불리고 맵 연산 몇 개뿐이라 락 비용은 무시할 수준.
+    private synchronized void checkGuestCodeIssueAllowed(String clientIp) {
+        rollGuestCodeDay();
+        if (guestCodesIssuedToday.getOrDefault(clientIp, 0) >= GUEST_CODES_PER_IP_PER_DAY) {
+            throw new GuestLimitExceededException();
+        }
+    }
+
+    private synchronized void recordGuestCodeIssue(String clientIp) {
+        rollGuestCodeDay();
+        guestCodesIssuedToday.merge(clientIp, 1, Integer::sum);
+    }
+
+    // 날짜가 바뀌면 통째로 비운다(IP별 만료 관리 대신) - 맵이 distinct IP 수만큼 계속 자라지 않게.
+    private void rollGuestCodeDay() {
+        LocalDate today = LocalDate.now();
+        if (!today.equals(guestCodeDay)) {
+            guestCodesIssuedToday.clear();
+            guestCodeDay = today;
+        }
     }
 
     private String generateGuestCode() {
