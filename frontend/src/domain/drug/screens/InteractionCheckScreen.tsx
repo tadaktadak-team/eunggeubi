@@ -1,38 +1,41 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
-import { DrugInfoResponse } from '../api/drug';
 import { checkInteractions, InteractionResponse } from '../api/interaction';
 import { getDrugFormIconName } from '../utils/drugIcon';
 
 type SelectedDrug = { itemSeq: string; name: string };
 
-const InteractionCheckScreen = ({ navigation }: any) => {
+const InteractionCheckScreen = ({ navigation, route }: any) => {
   const [selectedDrugs, setSelectedDrugs] = useState<SelectedDrug[]>([]);
   const [results, setResults] = useState<InteractionResponse[]>([]);
   const [checking, setChecking] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
 
-  // 검색화면을 "선택 모드"로 열어서 실제 약을 고르게 한다.
+  // 검색화면을 "선택 모드"로 열어서 실제 약을 고르게 한다. 고른 약은 콜백 함수가 아니라
+  // 검색화면이 popTo로 돌아오면서 넘겨주는 route.params.selectedDrug(값)로 받는다.
+  // (함수를 화면 파라미터로 넘기면 네비게이션 상태가 직렬화되지 않아 경고가 나고, 상태 복원 등에서
+  // 문제가 생길 수 있다.)
   const handleAddDrug = () => {
-    navigation.navigate('DrugSearch', {
-      selectMode: true,
-      onSelect: (drug: DrugInfoResponse) => {
-        setSelectedDrugs((prev) => {
-          if (prev.some((d) => d.itemSeq === drug.itemSeq)) {
-            // 이미 골라둔 약이면 그대로 둔다 (자기 자신끼리 비교되는 걸 방지)
-            return prev;
-          }
-          return [...prev, { itemSeq: drug.itemSeq, name: drug.name }];
-        });
-        setHasChecked(false);
-        setResults([]);
-      },
-    });
+    navigation.navigate('DrugSearch', { selectMode: true });
   };
+
+  const selectedFromSearch: SelectedDrug | undefined = route?.params?.selectedDrug;
+  useEffect(() => {
+    if (!selectedFromSearch) return;
+    // 받은 약을 목록에 추가하고, 같은 값을 다시 처리하지 않도록 파라미터를 비운다.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 화면 파라미터로 전달된 값을 1회 반영
+    setSelectedDrugs((prev) =>
+      // 이미 골라둔 약이면 그대로 둔다 (자기 자신끼리 비교되는 걸 방지)
+      prev.some((d) => d.itemSeq === selectedFromSearch.itemSeq) ? prev : [...prev, selectedFromSearch],
+    );
+    setHasChecked(false);
+    setResults([]);
+    navigation.setParams({ selectedDrug: undefined });
+  }, [selectedFromSearch, navigation]);
 
   const handleRemoveDrug = (itemSeq: string) => {
     setSelectedDrugs((prev) => prev.filter((d) => d.itemSeq !== itemSeq));
@@ -119,10 +122,17 @@ const InteractionCheckScreen = ({ navigation }: any) => {
             ]}
           >
             {results.length === 0 ? (
-              <View style={styles.resultHeader}>
-                <Ionicons name="checkmark-circle-outline" size={22} color={colors.success} />
-                <Text style={[styles.resultTitle, { color: colors.success }]}>병용 가능</Text>
-              </View>
+              <>
+                <View style={styles.resultHeader}>
+                  <Ionicons name="information-circle-outline" size={22} color={colors.textSub} />
+                  <Text style={[styles.resultTitle, { color: colors.text }]}>
+                    병용금기 목록에는 해당하지 않아요
+                  </Text>
+                </View>
+                <Text style={styles.resultFooter}>
+                  다른 상호작용은 의사·약사와 상의하세요.
+                </Text>
+              </>
             ) : (
               <>
                 <View style={styles.resultHeader}>
@@ -133,8 +143,13 @@ const InteractionCheckScreen = ({ navigation }: any) => {
                   <View key={`${r.itemSeqA}_${r.itemSeqB}`} style={index > 0 ? styles.resultItem : undefined}>
                     <Text style={styles.resultDesc}>
                       <Text style={styles.boldText}>&lsquo;{r.itemNameA}&rsquo;</Text>과{' '}
-                      <Text style={styles.boldText}>&lsquo;{r.itemNameB}&rsquo;</Text>: {r.reason}
+                      <Text style={styles.boldText}>&lsquo;{r.itemNameB}&rsquo;</Text>
                     </Text>
+                    {r.reasons.map((reason) => (
+                      <Text key={reason} style={styles.reasonText}>
+                        • {reason}
+                      </Text>
+                    ))}
                   </View>
                 ))}
                 <Text style={styles.resultFooter}>전문가(의사/약사)와 상의 후 복용을 권장합니다.</Text>
@@ -229,10 +244,10 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
   },
+  // "금기 목록에 없음"은 안전하다는 보증이 아니라서 초록(안전) 대신 중립 색을 쓴다.
   resultSectionSafe: {
-    // 테마에 연한 초록이 따로 없어서 success(#22C55E) 기반 연한 배경을 직접 지정
-    backgroundColor: '#E9F9EF',
-    borderColor: '#E9F9EF',
+    backgroundColor: colors.inputBg,
+    borderColor: colors.border,
   },
   resultSectionWarning: {
     backgroundColor: colors.primaryLight,
@@ -264,6 +279,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     fontSize: font.sub,
     color: colors.textSub,
+  },
+  reasonText: {
+    marginTop: spacing.xs,
+    fontSize: font.sub,
+    lineHeight: 20,
+    color: colors.text,
   },
   boldText: {
     fontWeight: 'bold',

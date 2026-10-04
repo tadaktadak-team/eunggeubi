@@ -6,7 +6,7 @@ export interface InteractionResponse {
   itemNameA: string;
   itemSeqB: string;
   itemNameB: string;
-  reason: string;
+  reasons: string[];   // 같은 쌍의 금기 사유가 여러 개일 수 있음
 }
 
 /*

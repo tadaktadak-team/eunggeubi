@@ -17,8 +17,10 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -38,7 +40,8 @@ public class DurService {
     /**
      * 선택된 약들(itemSeq 목록) 중 서로 병용금기인 쌍을 찾는다. 실시간 API 호출 없이
      * DurInteractionIndexingRunner가 미리 적재해둔 DB만 조회한다.
-     * A-B, B-A가 원본 데이터에 둘 다 있을 수 있어서 정렬된 쌍 키로 한 번만 반환한다.
+     * A-B, B-A가 원본 데이터에 둘 다 있을 수 있고, 같은 쌍도 성분별로 사유가 다른 여러 행으로
+     * 들어있어서, 정렬된 쌍 키로 묶고 사유는 공백을 정리한 뒤 중복 없이 모두 모아서 반환한다.
      */
     public List<InteractionResponse> checkInteractions(List<String> itemSeqs) {
         if (itemSeqs == null || itemSeqs.size() < 2) {
@@ -47,18 +50,27 @@ public class DurService {
 
         List<DrugInteraction> rows = drugInteractionRepository.findConflictsWithin(itemSeqs);
 
-        Map<String, InteractionResponse> deduped = new LinkedHashMap<>();
+        Map<String, DrugInteraction> firstRowByPair = new LinkedHashMap<>();
+        Map<String, Set<String>> reasonsByPair = new LinkedHashMap<>();
         for (DrugInteraction row : rows) {
             String key = pairKey(row.getItemSeq(), row.getMixtureItemSeq());
-            deduped.putIfAbsent(key, InteractionResponse.builder()
-                    .itemSeqA(row.getItemSeq())
-                    .itemNameA(row.getItemName())
-                    .itemSeqB(row.getMixtureItemSeq())
-                    .itemNameB(row.getMixtureItemName())
-                    .reason(row.getProhbtContent())
-                    .build());
+            firstRowByPair.putIfAbsent(key, row);
+            Set<String> reasons = reasonsByPair.computeIfAbsent(key, k -> new LinkedHashSet<>());
+            String reason = row.getProhbtContent() == null ? "" : row.getProhbtContent().trim();
+            if (!reason.isEmpty()) {
+                reasons.add(reason);
+            }
         }
-        return new ArrayList<>(deduped.values());
+
+        List<InteractionResponse> result = new ArrayList<>();
+        firstRowByPair.forEach((key, row) -> result.add(InteractionResponse.builder()
+                .itemSeqA(row.getItemSeq())
+                .itemNameA(row.getItemName())
+                .itemSeqB(row.getMixtureItemSeq())
+                .itemNameB(row.getMixtureItemName())
+                .reasons(List.copyOf(reasonsByPair.get(key)))
+                .build()));
+        return result;
     }
 
     private String pairKey(String a, String b) {

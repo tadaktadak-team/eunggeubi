@@ -7,18 +7,17 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
-  Image,
   Alert,
 } from 'react-native';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchDrugsByName, DrugInfoResponse } from '../api/drug';
 import { addRecentSearch } from '../storage/recentSearches';
 import { stripHtmlTags } from '../../../shared/utils/html';
-import { getDrugFormIconName } from '../utils/drugIcon';
-import { getPermitStatusLabel } from '../utils/drugStatus';
+import { getPermitStatusLabel, isPrescriptionDrug } from '../utils/drugStatus';
+import DrugImage from '../components/DrugImage';
 
 const NUM_OF_ROWS = 10;
 
@@ -36,9 +35,10 @@ const dedupeByItemSeq = (items: DrugInfoResponse[]) => {
 const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const initialKeyword: string = route?.params?.initialKeyword ?? '';
   // 상호작용 체크 화면 등에서 "약 고르기" 용도로 이 화면을 열었을 때 켜는 모드.
-  // 켜져 있으면 결과 탭 시 상세화면으로 가는 대신 고른 약을 onSelect로 돌려주고 뒤로 간다.
+  // 켜져 있으면 결과 탭 시 상세화면으로 가는 대신, 고른 약을 이전 화면의 파라미터(selectedDrug)로
+  // 넘기며 돌아간다. 함수를 파라미터로 넘기면 네비게이션 상태가 직렬화되지 않아 경고가 나므로
+  // 값(itemSeq, name)만 전달한다.
   const selectMode: boolean = route?.params?.selectMode ?? false;
-  const onSelect: ((drug: DrugInfoResponse) => void) | undefined = route?.params?.onSelect;
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [searchedKeyword, setSearchedKeyword] = useState('');
@@ -180,8 +180,11 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
               onPress={() => {
                 if (selectMode) {
                   // 상호작용 체크용으로 잠깐 고르는 것뿐이라 최근 검색엔 남기지 않는다.
-                  onSelect?.(item);
-                  navigation.goBack();
+                  navigation.popTo(
+                    'InteractionCheck',
+                    { selectedDrug: { itemSeq: item.itemSeq, name: item.name } },
+                    { merge: true },
+                  );
                   return;
                 }
                 addRecentSearch({
@@ -193,17 +196,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
                 navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
               }}
             >
-              {item.itemImage ? (
-                <Image source={{ uri: item.itemImage }} style={styles.drugImage} />
-              ) : (
-                <View style={styles.noImage}>
-                  <MaterialCommunityIcons
-                    name={getDrugFormIconName(item.name)}
-                    size={28}
-                    color={colors.primary}
-                  />
-                </View>
-              )}
+              <DrugImage uri={item.itemImage} name={item.name} size={70} style={styles.cardImage} />
               <View style={styles.cardInfo}>
                 <Text style={styles.itemName} numberOfLines={1}>
                   {item.name}
@@ -222,7 +215,9 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
                     )}
                   </View>
                 )}
-                {item.efficacy && (
+                {/* 전문의약품은 상세 화면에서도 본문을 보여주지 않고 원문 링크만 안내하므로,
+                    목록에서도 정리되지 않은 허가정보 효능 문구를 미리보기로 노출하지 않는다. */}
+                {!isPrescriptionDrug(item.drugType) && item.efficacy && (
                   <Text style={styles.efcyText} numberOfLines={2}>
                     {stripHtmlTags(item.efficacy)}
                   </Text>
@@ -279,16 +274,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  drugImage: { width: 70, height: 70, borderRadius: radius.sm, marginRight: spacing.md },
-  noImage: {
-    width: 70,
-    height: 70,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
+  cardImage: { marginRight: spacing.md },
   cardInfo: { flex: 1, justifyContent: 'center' },
   itemName: { fontSize: font.body + 1, fontWeight: 'bold', color: colors.text, marginBottom: 2 },
   typeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
