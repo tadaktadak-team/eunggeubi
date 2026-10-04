@@ -18,3 +18,8 @@ export function getPermitStatusLabel(cancelName?: string | null): string | null 
       return `허가 ${cancelName}`;
   }
 }
+
+// 전문의약품 구분. 상세 화면의 본문 숨김, 목록의 효능 미리보기 숨김이 같은 기준을 써야 해서 한 곳에 둔다.
+export function isPrescriptionDrug(drugType?: string | null): boolean {
+  return drugType === '전문의약품' || drugType === '전문,희귀';
+}

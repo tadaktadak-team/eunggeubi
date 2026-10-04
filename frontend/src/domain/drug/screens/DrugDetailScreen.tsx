@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Image, TouchableOpacity, Linking, Alert } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Linking, Alert } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { getDrugDetail, DrugInfoResponse } from '../api/drug';
 import { stripHtmlTags } from '../../../shared/utils/html';
-import { getDrugFormIconName } from '../utils/drugIcon';
-import { getPermitStatusLabel } from '../utils/drugStatus';
+import { getPermitStatusLabel, isPrescriptionDrug } from '../utils/drugStatus';
+import DrugImage from '../components/DrugImage';
 
 // 우리 DB에 효능/용법/주의사항이 비어있거나 요약돼 있어도, 식약처 원문(의약품안전나라)은
 // itemSeq(cacheSeq)만 있으면 모든 약에 대해 항상 조회 가능 — 공백을 메우는 안전망으로 제공.
@@ -74,7 +74,10 @@ const DrugDetailScreen = ({ route }: any) => {
   // 문서 그대로)이라 일반의약품(e약은요, 짧은 소비자용 문구)과 결이 너무 달라 화면에서는
   // 생략하고 외형정보 + 식약처 원문 링크만 보여준다. DB에는 그대로 보관돼 있음(향후 활용 대비).
   const permitStatusLabel = getPermitStatusLabel(drug.cancelName);
-  const isPrescription = drug.drugType === '전문의약품' || drug.drugType === '전문,희귀';
+  const isPrescription = isPrescriptionDrug(drug.drugType);
+  // 낱알식별에만 있고 e약은요·허가정보에는 없는 일반의약품은 본문(효능/용법/주의)이 하나도 없다.
+  // 이때 외형 정보와 링크만 덩그러니 보이면 정보가 빠진 건지 알 수 없어서 안내 문구를 보여준다.
+  const hasNoGuideText = !isPrescription && !drug.efficacy && !drug.useInfo && !drug.caution;
 
   const handleOpenMfds = () => {
     Linking.openURL(buildMfdsUrl(drug.itemSeq)).catch(() =>
@@ -89,16 +92,9 @@ const DrugDetailScreen = ({ route }: any) => {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 약물 요약 카드 */}
         <View style={styles.summaryCard}>
-          {/* 식약처 실측 사진은 자 눈금까지 찍힌 가로로 긴 사진이라, 아이콘 대체용 정사각형
-              박스에 넣으면 여백이 어색하게 남는다. 사진이 있을 땐 비율 그대로 넓게 보여주고,
-              없을 때만 정사각형 아이콘 박스를 쓴다. */}
-          {drug.itemImage ? (
-            <Image source={{ uri: drug.itemImage }} style={styles.drugPhoto} resizeMode="contain" />
-          ) : (
-            <View style={styles.iconContainer}>
-              <MaterialCommunityIcons name={getDrugFormIconName(drug.name)} size={56} color={colors.primary} />
-            </View>
-          )}
+          {/* 식약처 약 사진은 전부 같은 가로세로 비율이라, 그 비율로 꽉 채워 흰 여백 없이 보여준다.
+              사진이 없거나 못 불러오면 제형 아이콘 박스로 대체한다(DrugImage). */}
+          <DrugImage variant="hero" uri={drug.itemImage} name={drug.name} />
           <Text style={styles.drugName}>{drug.name}</Text>
           <View style={styles.badgeRow}>
             {drug.drugType && (
@@ -161,6 +157,16 @@ const DrugDetailScreen = ({ route }: any) => {
           </View>
         )}
 
+        {hasNoGuideText && (
+          <View style={styles.prescriptionNotice}>
+            <Feather name="info" size={16} color={colors.textSub} style={{ marginRight: spacing.xs }} />
+            <Text style={styles.prescriptionNoticeText}>
+              이 약은 식약처 허가정보에 효능·용법·주의사항이 등록되어 있지 않아요. 복용 전 의사·약사와
+              상담하거나 식약처 원문을 확인해 주세요.
+            </Text>
+          </View>
+        )}
+
         <TouchableOpacity style={styles.mfdsLink} onPress={handleOpenMfds} activeOpacity={0.7}>
           <Feather name="external-link" size={16} color={colors.textSub} style={{ marginRight: spacing.xs }} />
           <Text style={styles.mfdsLinkText}>식약처에서 원문 보기</Text>
@@ -196,23 +202,6 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
     alignItems: 'center',
     marginBottom: spacing.xl,
-  },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: radius.lg + 8,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    overflow: 'hidden',
-  },
-  drugPhoto: {
-    width: '100%',
-    height: 140,
-    borderRadius: radius.lg,
-    backgroundColor: colors.white,
-    marginBottom: spacing.md,
   },
   drugName: {
     fontSize: font.h2,
