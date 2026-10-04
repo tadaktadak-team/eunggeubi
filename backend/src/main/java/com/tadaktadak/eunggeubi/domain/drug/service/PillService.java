@@ -2,6 +2,7 @@ package com.tadaktadak.eunggeubi.domain.drug.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchPageResponse;
 import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchRequest;
 import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchResponse;
 import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchSummary;
@@ -10,6 +11,8 @@ import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -27,6 +30,8 @@ public class PillService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private static final int MAX_NUM_OF_ROWS = 100;
+
     private final DrugInfoRepository drugInfoRepository;
 
     @Value("${openapi.pill-ident.url}")
@@ -44,16 +49,24 @@ public class PillService {
      * 그래서 PillInfoIndexingRunner가 전체 데이터를 미리 DrugInfo 테이블에 적재해두고,
      * 검색은 그 테이블에서 하도록 바꿨다.
      */
-    public List<PillSearchResponse> searchPills(PillSearchRequest request) {
-        List<PillSearchSummary> results = drugInfoRepository.searchByAppearance(
+    public PillSearchPageResponse searchPills(PillSearchRequest request) {
+        // 비정상 값(0, 음수, 너무 큰 값)이 와도 쿼리가 터지거나 한 번에 수천 건을 읽지 않도록 범위를 제한한다.
+        int pageNo = Math.max(request.getPageNo(), 1);
+        int numOfRows = Math.min(Math.max(request.getNumOfRows(), 1), MAX_NUM_OF_ROWS);
+
+        Page<PillSearchSummary> page = drugInfoRepository.searchByAppearance(
                 blankToNull(request.getDrugShape()),
-                blankToNull(request.getColorClass()),
-                LikeEscaper.escape(blankToNull(request.getImprint()))
+                LikeEscaper.escape(blankToNull(request.getColorClass())),
+                LikeEscaper.escape(blankToNull(request.getImprint())),
+                PageRequest.of(pageNo - 1, numOfRows)
         );
 
-        return results.stream()
-                .map(this::toPillSearchResponse)
-                .toList();
+        return PillSearchPageResponse.builder()
+                .items(page.getContent().stream().map(this::toPillSearchResponse).toList())
+                .pageNo(pageNo)
+                .numOfRows(numOfRows)
+                .totalCount((int) page.getTotalElements())
+                .build();
     }
 
     private String blankToNull(String value) {

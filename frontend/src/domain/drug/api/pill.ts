@@ -16,13 +16,24 @@ export interface PillSearchParams {
   drugShape?: string;
   colorClass?: string;
   imprint?: string;
+  pageNo?: number;
+  numOfRows?: number;
 }
 
-export const searchPills = async (params: PillSearchParams): Promise<PillSearchResponse[]> => {
+export interface PillSearchPageResponse {
+  items: PillSearchResponse[];
+  pageNo: number;
+  numOfRows: number;
+  totalCount: number;
+}
+
+export const searchPills = async (params: PillSearchParams): Promise<PillSearchPageResponse> => {
   const query = new URLSearchParams();
   if (params.drugShape) query.set('drugShape', params.drugShape);
   if (params.colorClass) query.set('colorClass', params.colorClass);
   if (params.imprint) query.set('imprint', params.imprint);
+  if (params.pageNo) query.set('pageNo', String(params.pageNo));
+  if (params.numOfRows) query.set('numOfRows', String(params.numOfRows));
 
-  return api.get<PillSearchResponse[]>(`/api/drugs/pills/identification?${query.toString()}`);
+  return api.get<PillSearchPageResponse>(`/api/drugs/pills/identification?${query.toString()}`);
 };

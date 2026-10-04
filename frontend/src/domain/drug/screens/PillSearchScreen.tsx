@@ -7,16 +7,37 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Image,
   Alert,
 } from 'react-native';
-import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchPills, PillSearchResponse } from '../api/pill';
 import { addRecentSearch } from '../storage/recentSearches';
-import { getDrugFormIconName } from '../utils/drugIcon';
+import DrugImage from '../components/DrugImage';
+
+const NUM_OF_ROWS = 20;
+
+// 모양/색상 칩. 식약처 낱알식별 데이터에 실제로 존재하는 값 전체를 빠짐없이 둔다(없으면 그 값을
+// 가진 약은 낱알 특징으로는 찾을 수 없다). 색상은 "노랑, 투명"처럼 여러 색이 한 값에 들어있는
+// 약도 있어 서버가 포함(LIKE) 방식으로 찾는다.
+const SHAPES = [
+  '원형', '타원형', '장방형', '반원형', '삼각형', '사각형', '마름모형', '오각형', '육각형', '팔각형', '기타',
+];
+const COLORS = [
+  '하양', '노랑', '주황', '분홍', '빨강', '갈색', '연두', '초록', '청록', '파랑', '남색', '자주', '보라', '회색', '검정', '투명',
+];
+
+// 스크롤 중 같은 페이지가 두 번 붙어도 FlatList key(itemSeq)가 중복되지 않도록 걸러냄
+const dedupeByItemSeq = (items: PillSearchResponse[]) => {
+  const seen = new Set<string>();
+  return items.filter((d) => {
+    if (seen.has(d.itemSeq)) return false;
+    seen.add(d.itemSeq);
+    return true;
+  });
+};
 
 const PillSearchScreen = ({ navigation }: any) => {
   const [printText, setPrintText] = useState('');
@@ -24,18 +45,25 @@ const PillSearchScreen = ({ navigation }: any) => {
   const [selectedColor, setSelectedColor] = useState('');
 
   const [results, setResults] = useState<PillSearchResponse[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [pageNo, setPageNo] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  // 다음 페이지를 이어 받을 때는 검색 버튼을 누른 시점의 조건을 그대로 써야 한다(그 사이 사용자가
+  // 칩을 바꿔도 이미 보여준 결과와 섞이면 안 됨). 늦게 도착한 이전 응답은 requestId로 버린다.
+  const appliedQueryRef = useRef<{ drugShape?: string; colorClass?: string; imprint?: string }>({});
+  const fetchingMoreRef = useRef(false);
+  const requestIdRef = useRef(0);
+  // 새 검색이 끝났을 때만 결과 영역으로 자동 스크롤한다(추가 페이지를 붙일 때는 스크롤하지 않음).
+  const shouldScrollRef = useRef(false);
 
   // 필터(식별문자/모양/색상)가 길어서, 검색 버튼을 눌러도 결과가 화면 아래쪽에 있어 바로 안
   // 보이고 직접 스크롤해야 하는 문제가 있었다. 검색이 끝나면 필터 영역 높이만큼 자동으로 스크롤해
   // 결과(또는 "결과 없음" 안내)가 바로 보이게 한다.
   const listRef = useRef<FlatList<PillSearchResponse>>(null);
   const headerHeightRef = useRef(0);
-
-  // 필터 옵션 데이터
-  const shapes = ['원형', '타원형', '장방형', '삼각형', '사각형', '기타'];
-  const colorOptions = ['하양', '노랑', '주황', '분홍', '빨강', '갈색', '연두', '초록', '파랑'];
 
   const handleReset = () => {
     setPrintText('');
@@ -48,27 +76,60 @@ const PillSearchScreen = ({ navigation }: any) => {
       Alert.alert('조건 필요', '모양, 색상, 식별문자 중 하나는 입력해주세요.');
       return;
     }
+    requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
+    const query = {
+      drugShape: selectedShape || undefined,
+      colorClass: selectedColor || undefined,
+      imprint: printText.trim() || undefined,
+    };
     try {
       setLoading(true);
       setSearched(true);
-      const data = await searchPills({
-        drugShape: selectedShape || undefined,
-        colorClass: selectedColor || undefined,
-        imprint: printText.trim() || undefined,
-      });
-      setResults(data);
+      const data = await searchPills({ ...query, pageNo: 1, numOfRows: NUM_OF_ROWS });
+      if (requestId !== requestIdRef.current) return; // 그 사이 더 새로운 검색이 시작됐으면 버림
+      appliedQueryRef.current = query;
+      setResults(dedupeByItemSeq(data.items));
+      setTotalCount(data.totalCount);
+      setPageNo(1);
+      shouldScrollRef.current = true;
     } catch (error) {
       console.error('낱알 특징 검색 오류:', error);
       Alert.alert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  };
+
+  // 스크롤이 끝에 닿으면 다음 페이지를 이어붙임
+  const loadMore = async () => {
+    if (loading || fetchingMoreRef.current) return;
+    if (results.length === 0 || pageNo * NUM_OF_ROWS >= totalCount) return;
+
+    const requestId = requestIdRef.current;
+    const nextPage = pageNo + 1;
+    fetchingMoreRef.current = true;
+    try {
+      setLoadingMore(true);
+      const data = await searchPills({ ...appliedQueryRef.current, pageNo: nextPage, numOfRows: NUM_OF_ROWS });
+      if (requestId !== requestIdRef.current) return;
+      setResults((prev) => dedupeByItemSeq([...prev, ...data.items]));
+      setTotalCount(data.totalCount);
+      setPageNo(nextPage);
+    } catch (error) {
+      console.error('낱알 특징 검색 추가 로딩 오류:', error);
+      Alert.alert('불러오기 실패', '추가 결과를 불러오지 못했습니다. 다시 스크롤해 재시도해 주세요.');
+    } finally {
+      fetchingMoreRef.current = false;
+      setLoadingMore(false);
     }
   };
 
   // loading이 false로 바뀌어 헤더가 최종 상태("검색 결과 (N)")로 다시 그려진 뒤에 스크롤해야
   // 해서, onLayout으로 측정된 높이를 약간의 지연 후에 사용한다(레이아웃이 먼저 안정되도록).
   useEffect(() => {
-    if (!searched || loading) return;
+    if (!searched || loading || !shouldScrollRef.current) return;
+    shouldScrollRef.current = false;
     const timer = setTimeout(() => {
       listRef.current?.scrollToOffset({ offset: headerHeightRef.current, animated: true });
     }, 50);
@@ -103,7 +164,7 @@ const PillSearchScreen = ({ navigation }: any) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>모양</Text>
         <View style={styles.chipContainer}>
-          {shapes.map((shape) => (
+          {SHAPES.map((shape) => (
             <TouchableOpacity
               key={shape}
               style={[styles.chip, selectedShape === shape && styles.chipSelected]}
@@ -121,7 +182,7 @@ const PillSearchScreen = ({ navigation }: any) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>색상</Text>
         <View style={styles.chipContainer}>
-          {colorOptions.map((color) => (
+          {COLORS.map((color) => (
             <TouchableOpacity
               key={color}
               style={[styles.chip, selectedColor === color && styles.chipSelected]}
@@ -142,7 +203,7 @@ const PillSearchScreen = ({ navigation }: any) => {
       )}
 
       {!loading && searched && (
-        <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>검색 결과 ({results.length})</Text>
+        <Text style={[styles.sectionTitle, { marginBottom: spacing.md }]}>검색 결과 ({totalCount.toLocaleString()})</Text>
       )}
     </View>
   );
@@ -159,6 +220,11 @@ const PillSearchScreen = ({ navigation }: any) => {
         ListHeaderComponent={renderFilters}
         ListEmptyComponent={
           !loading && searched ? <Text style={styles.emptyText}>조건에 맞는 약을 찾지 못했습니다.</Text> : null
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={styles.footerLoading} /> : null
         }
         // 결과가 수천 건까지 나올 수 있어 초기/배치 렌더링 양을 보수적으로 잡고 화면 밖 항목은
         // 뷰 자체를 비워(removeClippedSubviews) 메모리·렉을 줄인다.
@@ -179,17 +245,7 @@ const PillSearchScreen = ({ navigation }: any) => {
               navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
             }}
           >
-            {item.itemImage ? (
-              <Image source={{ uri: item.itemImage }} style={styles.resultImage} />
-            ) : (
-              <View style={styles.resultNoImage}>
-                <MaterialCommunityIcons
-                  name={getDrugFormIconName(item.itemName)}
-                  size={26}
-                  color={colors.primary}
-                />
-              </View>
-            )}
+            <DrugImage uri={item.itemImage} name={item.itemName} size={56} style={styles.resultImage} />
             <View style={styles.resultInfo}>
               <Text style={styles.resultName} numberOfLines={1}>
                 {item.itemName}
@@ -315,19 +371,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   resultImage: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.sm,
     marginRight: spacing.md,
   },
-  resultNoImage: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.sm,
-    backgroundColor: colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
+  footerLoading: {
+    marginVertical: spacing.lg,
   },
   resultInfo: {
     flex: 1,

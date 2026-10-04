@@ -25,19 +25,28 @@ public interface DrugInfoRepository extends JpaRepository<DrugInfo, String> {
             countQuery = "SELECT COUNT(d) FROM DrugInfo d WHERE d.name LIKE CONCAT('%', :name, '%') ESCAPE '!'")
     Page<DrugSearchSummary> findSummaryByNameContaining(@Param("name") String name, Pageable pageable);
 
-    // 낱알 특징(모양/색상/각인) 검색. 조건은 전부 선택사항이라 null이면 그 조건은 건너뛴다.
+    // 낱알 특징(모양/색상/각인) 검색(페이지네이션). 조건은 전부 선택사항이라 null이면 그 조건은 건너뛴다.
     // "원형"처럼 흔한 모양 하나만 줘도 9,837건이 매칭돼서(efficacy 등 LONGTEXT 컬럼까지 같이
     // 읽어오면 극도로 느려짐 — 실측: fetch가 타임아웃될 정도) 필요한 필드만 받는 프로젝션을 쓴다.
-    @Query("SELECT d.itemSeq AS itemSeq, d.name AS name, d.entpName AS entpName, d.shape AS shape, " +
+    // 색상은 "노랑, 투명"처럼 여러 색이 한 값에 쉼표로 같이 들어있는 약이 있어(실측: 노랑+투명 182건)
+    // 같다(=)가 아니라 포함(LIKE)으로 찾는다. 페이지 사이에 항목이 겹치거나 빠지지 않도록
+    // 정렬은 항상 name, itemSeq로 고정한다.
+    @Query(value = "SELECT d.itemSeq AS itemSeq, d.name AS name, d.entpName AS entpName, d.shape AS shape, " +
             "d.color AS color, d.imprint AS imprint, d.drugType AS drugType, d.itemImage AS itemImage " +
             "FROM DrugInfo d WHERE " +
             "(:shape IS NULL OR d.shape = :shape) AND " +
-            "(:color IS NULL OR d.color = :color) AND " +
-            "(:imprint IS NULL OR d.imprint LIKE CONCAT('%', :imprint, '%') ESCAPE '!')")
-    List<PillSearchSummary> searchByAppearance(
+            "(:color IS NULL OR d.color LIKE CONCAT('%', :color, '%') ESCAPE '!') AND " +
+            "(:imprint IS NULL OR d.imprint LIKE CONCAT('%', :imprint, '%') ESCAPE '!') " +
+            "ORDER BY d.name ASC, d.itemSeq ASC",
+            countQuery = "SELECT COUNT(d) FROM DrugInfo d WHERE " +
+                    "(:shape IS NULL OR d.shape = :shape) AND " +
+                    "(:color IS NULL OR d.color LIKE CONCAT('%', :color, '%') ESCAPE '!') AND " +
+                    "(:imprint IS NULL OR d.imprint LIKE CONCAT('%', :imprint, '%') ESCAPE '!')")
+    Page<PillSearchSummary> searchByAppearance(
             @Param("shape") String shape,
             @Param("color") String color,
-            @Param("imprint") String imprint
+            @Param("imprint") String imprint,
+            Pageable pageable
     );
 
 }
