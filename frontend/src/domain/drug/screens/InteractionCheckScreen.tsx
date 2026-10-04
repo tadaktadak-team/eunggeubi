@@ -139,19 +139,30 @@ const InteractionCheckScreen = ({ navigation, route }: any) => {
                   <Ionicons name="warning-outline" size={22} color={colors.danger} />
                   <Text style={styles.resultTitle}>병용 주의 필요 ({results.length}건)</Text>
                 </View>
-                {results.map((r, index) => (
-                  <View key={`${r.itemSeqA}_${r.itemSeqB}`} style={index > 0 ? styles.resultItem : undefined}>
-                    <Text style={styles.resultDesc}>
-                      <Text style={styles.boldText}>&lsquo;{r.itemNameA}&rsquo;</Text>과{' '}
-                      <Text style={styles.boldText}>&lsquo;{r.itemNameB}&rsquo;</Text>
-                    </Text>
-                    {r.reasons.map((reason) => (
-                      <Text key={reason} style={styles.reasonText}>
-                        • {reason}
+                {results.map((r, index) => {
+                  const reasons = r.reasons ?? [];
+                  return (
+                    <View key={`${r.itemSeqA}_${r.itemSeqB}`} style={index > 0 ? styles.resultItem : undefined}>
+                      <Text style={styles.resultDesc}>
+                        <Text style={styles.boldText}>&lsquo;{r.itemNameA}&rsquo;</Text>과{' '}
+                        <Text style={styles.boldText}>&lsquo;{r.itemNameB}&rsquo;</Text>
                       </Text>
-                    ))}
-                  </View>
-                ))}
+                      {reasons.length > 0 ? (
+                        reasons.map((reason) => (
+                          <Text key={reason} style={styles.reasonText}>
+                            • {reason}
+                          </Text>
+                        ))
+                      ) : (
+                        // 병용금기 쌍이라는 경고는 유지하되, 원본에 사유가 없는 경우 빈 칸으로 두지 않고
+                        // 사유가 없다는 것과 확인 방법을 알려준다(사유 목록과 구분되도록 • 없이 보조 색으로).
+                        <Text style={styles.reasonMissingText}>
+                          금기 사유가 제공되지 않았어요. 복용 전 의사·약사와 상담하세요.
+                        </Text>
+                      )}
+                    </View>
+                  );
+                })}
                 <Text style={styles.resultFooter}>전문가(의사/약사)와 상의 후 복용을 권장합니다.</Text>
               </>
             )}
@@ -285,6 +296,12 @@ const styles = StyleSheet.create({
     fontSize: font.sub,
     lineHeight: 20,
     color: colors.text,
+  },
+  reasonMissingText: {
+    marginTop: spacing.xs,
+    fontSize: font.sub,
+    lineHeight: 20,
+    color: colors.textSub,
   },
   boldText: {
     fontWeight: 'bold',
