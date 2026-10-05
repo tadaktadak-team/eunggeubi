@@ -4,7 +4,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { colors, radius } from '../../../shared/theme/theme';
 import { getDrugFormIconName } from '../utils/drugIcon';
-import { imageLoadQueue, IMAGE_RETRY_DELAY_MS } from '../utils/imageLoadQueue';
+import { imageLoadQueue } from '../utils/imageLoadQueue';
 
 // 식약처 약 사진은 전부 가로세로 비율이 같다(표본 확인: 1299x709, 780x426 모두 약 1.83:1).
 // 상세 화면에서 이 비율을 그대로 쓰면 흰 여백 없이 꽉 차고 잘리는 부분도 없다.
@@ -26,7 +26,9 @@ interface DrugImageProps {
 //    끝나면 이미지가, 실패하면 계속 아이콘이 보인다.
 // 2) 이미지 요청은 imageLoadQueue를 거친다. 처음 몇 장은 바로, 그 뒤에는 일정한 속도로만
 //    서버에 요청해서 429를 피한다. 허가를 기다리는 동안에도 아이콘이 보인다.
-// 3) 실패하면(onError) 잠시 뒤 몇 번만 다시 시도하고, 그래도 안 되면 아이콘으로 둔다.
+// 3) 이미지가 실패하면(onError) 서버에서 거절당했을 수 있다고 보고, 대기열이 기기 전체의 새
+//    요청을 잠시(15초) 멈춘다. 쉬는 동안 아이콘이 유지되고, 쉬고 나면 실패한 이미지가 대기열로
+//    돌아와 천천히 다시 받는다. 몇 번 더 실패하면 포기하고 아이콘으로 둔다.
 //    (RN의 onError는 HTTP 상태를 알려주지 않아 429와 404를 구분할 수 없다.)
 const DrugImage = ({ uri, name, variant = 'thumb', size = 56, style }: DrugImageProps) => {
   // "허가받은 URL"과 "실패한 URL"을 저장한다. 값이 아니라 URL을 저장하면 uri가 바뀌었을 때
@@ -34,7 +36,7 @@ const DrugImage = ({ uri, name, variant = 'thumb', size = 56, style }: DrugImage
   const [grantedUri, setGrantedUri] = useState<string | null>(null);
   const [failedUri, setFailedUri] = useState<string | null>(null);
   const [retryTick, setRetryTick] = useState(0);
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelResumeRef = useRef<(() => void) | null>(null);
   const priority = variant === 'hero' ? 'high' : 'normal';
 
   useEffect(() => {
@@ -81,7 +83,7 @@ const DrugImage = ({ uri, name, variant = 'thumb', size = 56, style }: DrugImage
 
   useEffect(
     () => () => {
-      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      if (cancelResumeRef.current) cancelResumeRef.current();
     },
     [],
   );
@@ -93,14 +95,15 @@ const DrugImage = ({ uri, name, variant = 'thumb', size = 56, style }: DrugImage
   const handleError = () => {
     if (!uri) return;
     imageLoadQueue.forgetGranted(uri);
-    imageLoadQueue.recordFailure(uri);
+    // 실패를 알리면 대기열이 정지에 들어간다. 정지가 끝나는 시점에 이 이미지를 다시 대기열에 올린다.
+    imageLoadQueue.reportFailure(uri);
     setFailedUri(uri);
     if (!imageLoadQueue.hasGivenUp(uri)) {
-      retryTimerRef.current = setTimeout(() => {
+      cancelResumeRef.current = imageLoadQueue.onResume(() => {
         setFailedUri(null);
         setGrantedUri(null);
         setRetryTick((tick) => tick + 1);
-      }, IMAGE_RETRY_DELAY_MS);
+      });
     }
   };
 
