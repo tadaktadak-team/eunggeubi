@@ -4,17 +4,21 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tadaktadak.eunggeubi.domain.drug.dto.DrugInfoResponse;
 import com.tadaktadak.eunggeubi.domain.drug.dto.DrugSearchPageResponse;
+import com.tadaktadak.eunggeubi.domain.drug.dto.DrugSearchSummary;
+import com.tadaktadak.eunggeubi.domain.drug.entity.DrugInfo;
+import com.tadaktadak.eunggeubi.domain.drug.repository.DrugInfoRepository;
 import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,6 +29,7 @@ public class DrugService {
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
+    private final DrugInfoRepository drugInfoRepository;
 
     @Value("${openapi.e-drug.url}")
     private String apiUrl;
@@ -33,115 +38,91 @@ public class DrugService {
     private String serviceKey;
 
     /**
-     * 1. 약품명 키워드 검색 API 연동 (페이지네이션)
+     * 1. 약품명 키워드 검색. 낱알식별+e약은요+의약품 제품 허가정보가 모두 적재된 DrugInfo
+     * 테이블(27,000여 건, 전문의약품 포함) 하나만 조회한다. 예전엔 e약은요를 실시간 호출해 OTC
+     * 위주로만 찾고 로컬 DB로 보완했지만, 이제 로컬 DB 자체가 세 소스를 합친 상태라 실시간 외부
+     * API 의존 없이 이 결과로 완결된다.
+     * 목록 조회라 useInfo/caution은 안 가져오고 efficacy도 미리보기용 200자만 받는다 — 행당 평균
+     * 2만 자에 달하는 LONGTEXT 컬럼들을 그대로 긁어오면 LIKE 검색(인덱스 못 타는 풀스캔)마다
+     * 그 무거운 데이터까지 디스크에서 다 읽어와 응답이 10초 넘게 걸리는 문제가 실측으로 확인됨.
      */
     public DrugSearchPageResponse searchDrugsByName(String keyword, int pageNo, int numOfRows) {
-        List<DrugInfoResponse> resultList = new ArrayList<>();
-        int totalCount = 0;
+        Pageable pageable = PageRequest.of(pageNo - 1, numOfRows);
+        Page<DrugSearchSummary> page = drugInfoRepository.findSummaryByNameContaining(LikeEscaper.escape(keyword), pageable);
 
-        try {
-            // e약은요 API의 itemName은 등록된 약품명 문자열과의 부분일치 검색이라 공백까지 그대로 비교한다.
-            // 그런데 실제 약품명(예: "어린이타이레놀산...")에는 공백이 없어서, 사용자가 "어린이 타이레놀"처럼
-            // 띄어 검색하면 아예 매칭되지 않는다. 검색어의 공백을 제거해 실제 약품명 표기와 맞춰준다.
-            String sanitizedKeyword = keyword.replaceAll("\\s+", "");
-
-            // URLEncoder는 공백을 '+'로 인코딩하는데, build(true)는 이미 인코딩된 값으로 보고 그대로 전송한다.
-            // 혹시 모를 공백이 남더라도 '+'가 아니라 '%20'으로 전달되도록 방어적으로 치환한다.
-            String encodedKeyword = URLEncoder.encode(sanitizedKeyword, StandardCharsets.UTF_8.toString())
-                    .replace("+", "%20");
-
-            URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
-                    .queryParam("serviceKey", serviceKey)
-                    .queryParam("itemName", encodedKeyword)
-                    .queryParam("type", "json")
-                    .queryParam("pageNo", pageNo)
-                    .queryParam("numOfRows", numOfRows)
-                    .build(true)
-                    .toUri();
-
-            String responseString = restTemplate.getForObject(uri, String.class);
-            JsonNode rootNode = objectMapper.readTree(responseString);
-
-            // 💡 추가된 부분: 본문을 열어보기 전에 게이트웨이/서비스 에러 검증
-            validateApiResponse(rootNode);
-
-            JsonNode bodyNode = rootNode.path("body");
-            totalCount = bodyNode.path("totalCount").asInt(0);
-            JsonNode itemsNode = bodyNode.path("items");
-
-            if (itemsNode.isArray()) {
-                for (JsonNode item : itemsNode) {
-                    resultList.add(mapToDrugInfoResponse(item));
-                }
-            }
-        } catch (ExternalApiException e) {
-            throw e; // 검증 로직에서 발생한 커스텀 에러는 그대로 던짐
-        } catch (Exception e) {
-            log.error("e약은요 Open API 검색 실패: {}", e.getMessage(), e);
-            throw new ExternalApiException("e약은요 API 연동 중 오류가 발생했습니다.", e);
-        }
+        List<DrugInfoResponse> items = page.getContent().stream()
+                .map(this::toDrugInfoResponse)
+                .toList();
 
         return DrugSearchPageResponse.builder()
-                .items(resultList)
+                .items(items)
                 .pageNo(pageNo)
                 .numOfRows(numOfRows)
-                .totalCount(totalCount)
+                .totalCount((int) page.getTotalElements())
+                .build();
+    }
+
+    private DrugInfoResponse toDrugInfoResponse(DrugSearchSummary summary) {
+        return DrugInfoResponse.builder()
+                .itemSeq(summary.getItemSeq())
+                .name(summary.getName())
+                .shape(summary.getShape())
+                .color(summary.getColor())
+                .imprint(summary.getImprint())
+                .drugType(summary.getDrugType())
+                .cancelName(summary.getCancelName())
+                .itemImage(summary.getItemImage())
+                .efficacy(summary.getEfficacySnippet())
                 .build();
     }
 
     /**
-     * 2. 약품 상세 조회 API 연동 (itemSeq 기반 조회)
+     * 2. 약품 상세 조회. 검색과 같은 이유로 로컬 DB 하나만 본다.
      */
     public DrugInfoResponse getDrugDetail(String itemSeq) {
-        String responseString;
+        return drugInfoRepository.findById(itemSeq)
+                .map(DrugInfoResponse::from)
+                .orElseThrow(() -> new IllegalArgumentException("해당 약물 정보를 찾을 수 없습니다: " + itemSeq));
+    }
 
-        // 1) API 통신 처리
-        try {
-            String encodedItemSeq = URLEncoder.encode(itemSeq, StandardCharsets.UTF_8.toString());
+    /**
+     * e약은요 전체를 미리 DrugInfo 테이블에 적재하는 EDrugIndexingRunner용. 검색(searchDrugsByName)과
+     * 달리 itemName 없이 호출해 전체를 페이지 단위로 순회한다.
+     */
+    public DrugPage getAllDrugsPage(int pageNo, int numOfRows) {
+        URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
+                .queryParam("serviceKey", serviceKey)
+                .queryParam("type", "json")
+                .queryParam("pageNo", pageNo)
+                .queryParam("numOfRows", numOfRows)
+                .build(true)
+                .toUri();
 
-            URI uri = UriComponentsBuilder.fromHttpUrl(apiUrl)
-                    .queryParam("serviceKey", serviceKey)
-                    .queryParam("itemSeq", encodedItemSeq)
-                    .queryParam("type", "json")
-                    .queryParam("numOfRows", 1)
-                    .build(true)
-                    .toUri();
+        String responseString = restTemplate.getForObject(uri, String.class);
 
-            responseString = restTemplate.getForObject(uri, String.class);
-            log.debug("e약은요 API 상세조회 응답: {}", responseString);
-
-        } catch (Exception e) {
-            log.error("e약은요 Open API 상세조회 통신 실패: {}", e.getMessage(), e);
-            throw new ExternalApiException("e약은요 API 통신에 실패했습니다.", e);
-        }
-
-        // 2) 데이터 파싱 및 에러 검증 처리
         try {
             JsonNode rootNode = objectMapper.readTree(responseString);
-
-            // 💡 추가된 부분: 본문을 열어보기 전에 게이트웨이/서비스 에러 검증
             validateApiResponse(rootNode);
 
-            JsonNode itemsNode = rootNode.path("body").path("items");
+            JsonNode bodyNode = rootNode.path("body");
+            int totalCount = bodyNode.path("totalCount").asInt(0);
+            JsonNode itemsNode = bodyNode.path("items");
 
-            // 외부 API가 itemSeq를 부분일치로 찾으므로, 요청한 번호와 정확히 같은 품목만 인정한다
+            List<DrugInfoResponse> items = new ArrayList<>();
             if (itemsNode.isArray()) {
                 for (JsonNode item : itemsNode) {
-                    if (itemSeq.equals(getTextOrNull(item, "itemSeq"))) {
-                        return mapToDrugInfoResponse(item);
-                    }
+                    items.add(mapToDrugInfoResponse(item));
                 }
             }
+            return new DrugPage(items, totalCount);
         } catch (ExternalApiException e) {
-            throw e; // 검증 로직에서 발생한 커스텀 에러는 그대로 던짐
+            throw e;
         } catch (Exception e) {
-            log.error("e약은요 Open API 응답 파싱 실패: {}", e.getMessage(), e);
-            throw new ExternalApiException("e약은요 API 응답 파싱 중 오류가 발생했습니다.", e);
+            throw new ExternalApiException("e약은요 전체 조회 중 오류가 발생했습니다.", e);
         }
-
-        // 3) 통신 성공했으나 검색 결과가 없는 경우
-        throw new IllegalArgumentException("해당 약물 정보를 찾을 수 없습니다: " + itemSeq);
     }
+
+    public record DrugPage(List<DrugInfoResponse> items, int totalCount) {}
 
     // 💡 추가된 메서드: API 응답 에러 공통 검증 로직
     private void validateApiResponse(JsonNode rootNode) {

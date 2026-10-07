@@ -7,22 +7,22 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
-  Image,
   Alert,
 } from 'react-native';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchDrugsByName, DrugInfoResponse } from '../api/drug';
 import { addRecentSearch } from '../storage/recentSearches';
 import { stripHtmlTags } from '../../../shared/utils/html';
-import { getDrugFormIconName } from '../utils/drugIcon';
+import { getPermitStatusLabel, isPrescriptionDrug } from '../utils/drugStatus';
+import DrugImage from '../components/DrugImage';
 
 const NUM_OF_ROWS = 10;
 
 // 스크롤 중 같은 페이지가 두 번 붙거나 페이지 경계에서 같은 약이 겹쳐 내려와도
-// FlatList key(itemSeq)가 중복되지 않도록 itemSeq 기준으로 걸러낸다
+// FlatList key(itemSeq)가 중복되지 않도록 itemSeq 기준으로 걸러냄
 const dedupeByItemSeq = (items: DrugInfoResponse[]) => {
   const seen = new Set<string>();
   return items.filter((d) => {
@@ -34,6 +34,11 @@ const dedupeByItemSeq = (items: DrugInfoResponse[]) => {
 
 const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigation, route }) => {
   const initialKeyword: string = route?.params?.initialKeyword ?? '';
+  // 상호작용 체크 화면 등에서 "약 고르기" 용도로 이 화면을 열었을 때 켜는 모드.
+  // 켜져 있으면 결과 탭 시 상세화면으로 가는 대신, 고른 약을 이전 화면의 파라미터(selectedDrug)로
+  // 넘기며 돌아간다. 함수를 파라미터로 넘기면 네비게이션 상태가 직렬화되지 않아 경고가 나므로
+  // 값(itemSeq, name)만 전달한다.
+  const selectMode: boolean = route?.params?.selectMode ?? false;
 
   const [keyword, setKeyword] = useState(initialKeyword);
   const [searchedKeyword, setSearchedKeyword] = useState('');
@@ -44,8 +49,8 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
   const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
 
-  // state는 비동기로 갱신돼서 onEndReached가 연달아 호출되면 loadingMore 검사를 둘 다 통과한다.
-  // ref로 즉시 잠가서 같은 페이지를 두 번 요청하지 않게 하고, 새 검색이 시작되면 이전 요청 결과는 버린다.
+  // state는 비동기로 갱신돼서 onEndReached가 연달아 호출되면 loadingMore 검사를 둘 다 통과
+  // ref로 즉시 잠가서 같은 페이지를 두 번 요청하지 않게 하고, 새 검색이 시작되면 이전 요청 결과는 버림
   const fetchingMoreRef = useRef(false);
   const requestIdRef = useRef(0);
 
@@ -53,19 +58,25 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
   const runSearch = async (kw: string) => {
     if (!kw.trim()) return;
     requestIdRef.current += 1;
+    const requestId = requestIdRef.current;
     try {
       setLoading(true);
       setSearched(true);
       setSearchedKeyword(kw.trim());
+
       const result = await searchDrugsByName(kw.trim(), 1, NUM_OF_ROWS);
+      if (requestId !== requestIdRef.current) return; // 그 사이 더 새로운 검색이 시작됐으면 이 응답은 버림
       setDrugs(dedupeByItemSeq(result.items));
       setPageNo(1);
       setTotalCount(result.totalCount);
     } catch (error) {
       console.error('약품 검색 오류:', error);
       Alert.alert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
+      if (requestId !== requestIdRef.current) return; // 실패도 최신 요청 건일 때만 반영
+      setDrugs([]);
+      setTotalCount(0);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   };
 
@@ -87,6 +98,9 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
       setTotalCount(result.totalCount);
     } catch (error) {
       console.error('약품 검색 추가 로딩 오류:', error);
+      // runSearch와 달리 여기서 Alert가 없으면, 실패로 조용히 멈춘 게 "결과 끝"처럼 보여서
+      // 사용자가 재시도할 방법도 모른 채 더 있는 결과를 놓치게 된다.
+      Alert.alert('불러오기 실패', '추가 결과를 불러오지 못했습니다. 다시 스크롤해 재시도해 주세요.');
     } finally {
       fetchingMoreRef.current = false;
       setLoadingMore(false);
@@ -106,7 +120,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
 
   return (
     <View style={styles.container}>
-      <AppHeader title="약품명 검색" />
+      <AppHeader title={selectMode ? '약 선택' : '약품명 검색'} />
 
       <View style={styles.searchContainer}>
         <View style={styles.searchRow}>
@@ -164,6 +178,15 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
             <TouchableOpacity
               style={styles.card}
               onPress={() => {
+                if (selectMode) {
+                  // 상호작용 체크용으로 잠깐 고르는 것뿐이라 최근 검색엔 남기지 않는다.
+                  navigation.popTo(
+                    'InteractionCheck',
+                    { selectedDrug: { itemSeq: item.itemSeq, name: item.name } },
+                    { merge: true },
+                  );
+                  return;
+                }
                 addRecentSearch({
                   itemSeq: item.itemSeq,
                   name: item.name,
@@ -173,27 +196,28 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
                 navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
               }}
             >
-              {item.itemImage ? (
-                <Image source={{ uri: item.itemImage }} style={styles.drugImage} />
-              ) : (
-                <View style={styles.noImage}>
-                  <MaterialCommunityIcons
-                    name={getDrugFormIconName(item.name)}
-                    size={28}
-                    color={colors.placeholder}
-                  />
-                </View>
-              )}
+              <DrugImage uri={item.itemImage} name={item.name} size={70} style={styles.cardImage} />
               <View style={styles.cardInfo}>
                 <Text style={styles.itemName} numberOfLines={1}>
                   {item.name}
                 </Text>
-                {item.drugType && (
-                  <Text style={styles.drugType} numberOfLines={1}>
-                    {item.drugType}
-                  </Text>
+                {(item.drugType || getPermitStatusLabel(item.cancelName)) && (
+                  <View style={styles.typeRow}>
+                    {item.drugType && (
+                      <Text style={styles.drugType} numberOfLines={1}>
+                        {item.drugType}
+                      </Text>
+                    )}
+                    {getPermitStatusLabel(item.cancelName) && (
+                      <View style={styles.statusBadge}>
+                        <Text style={styles.statusBadgeText}>{getPermitStatusLabel(item.cancelName)}</Text>
+                      </View>
+                    )}
+                  </View>
                 )}
-                {item.efficacy && (
+                {/* 전문의약품은 상세 화면에서도 본문을 보여주지 않고 원문 링크만 안내하므로,
+                    목록에서도 정리되지 않은 허가정보 효능 문구를 미리보기로 노출하지 않는다. */}
+                {!isPrescriptionDrug(item.drugType) && item.efficacy && (
                   <Text style={styles.efcyText} numberOfLines={2}>
                     {stripHtmlTags(item.efficacy)}
                   </Text>
@@ -250,19 +274,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  drugImage: { width: 70, height: 70, borderRadius: radius.sm, marginRight: spacing.md },
-  noImage: {
-    width: 70,
-    height: 70,
-    borderRadius: radius.sm,
-    backgroundColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
+  cardImage: { marginRight: spacing.md },
   cardInfo: { flex: 1, justifyContent: 'center' },
   itemName: { fontSize: font.body + 1, fontWeight: 'bold', color: colors.text, marginBottom: 2 },
-  drugType: { fontSize: font.sub, color: colors.primaryDark, marginBottom: spacing.xs },
+  typeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+  drugType: { fontSize: font.sub, color: colors.primaryDark },
+  statusBadge: {
+    backgroundColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 1,
+    borderRadius: radius.sm,
+  },
+  statusBadgeText: { fontSize: font.caption, fontWeight: 'bold', color: colors.textSub },
   efcyText: { fontSize: font.sub, color: colors.textSub, lineHeight: 18 },
 });
 

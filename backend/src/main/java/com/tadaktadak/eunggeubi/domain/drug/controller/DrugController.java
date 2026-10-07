@@ -34,6 +34,7 @@ public class DrugController {
         DrugSearchPageResponse results = drugService.searchDrugsByName(keyword, pageNo, numOfRows);
         return ResponseEntity.ok(results);
     }
+
     @GetMapping("/{itemSeq}")
     public ResponseEntity<DrugInfoResponse> getDrugDetail(
             @PathVariable("itemSeq")

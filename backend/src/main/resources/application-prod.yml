@@ -1,0 +1,64 @@
+# 운영(EC2) 프로필. 서버에서 SPRING_PROFILES_ACTIVE=prod 로 실행한다.
+# 비밀값은 전부 서버 환경변수에서 주입한다 (application-local.yml 은 서버에 올리지 않는다).
+# 여기 없는 설정은 application.yml 공통 문서를 그대로 쓴다.
+
+server:
+  # Caddy 가 앞단에서 443 을 받아 127.0.0.1:8080 으로 넘긴다.
+  # 외부에서 8080 으로 직접 들어오는 경로를 막는다(보안그룹과 이중 방어).
+  address: 127.0.0.1
+  tomcat:
+    threads:
+      # AI 상담 요청 하나가 OpenAI 응답을 몇 초씩 붙잡는다. 기본 200 스레드를 다 쓰면
+      # 1GB 인스턴스에서 메모리가 위험해지므로 묶어둔다.
+      max: 50
+
+spring:
+  datasource:
+    # RDS 엔드포인트. 서버 .env 의 DB_HOST 로 주입한다.
+    # sslMode=REQUIRED: 전송 구간 암호화(민감정보를 다루므로). CA 검증까지는 하지 않아 추가 설정이 필요 없다.
+    url: jdbc:mysql://${DB_HOST}:3306/eunggeubi?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&sslMode=REQUIRED
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      # db.t4g.micro 의 max_connections 와 톰캣 스레드 수를 고려한 보수적인 값
+      maximum-pool-size: 10
+      connection-timeout: 10000
+
+  jpa:
+    hibernate:
+      # 첫 배포 때 RDS 에 스키마를 만들어준다.
+      # 운영이 안정되면 Flyway + validate 로 바꾸는 게 맞다(컬럼 삭제·타입 변경은 update 가 반영하지 않는다).
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+
+jwt:
+  # 운영에서는 기본값을 두지 않는다 - 환경변수가 없으면 기동이 실패해야 한다.
+  # (공개된 개발용 키로 토큰이 위조되는 걸 막기 위해)
+  secret: ${JWT_SECRET}
+
+app:
+  # 보호자 동의 SMS 링크에 들어가는 서버 공개 주소
+  base-url: ${APP_BASE_URL:https://eunggeubi.duckdns.org}
+
+  rate-limit:
+    # Caddy(리버스 프록시) 뒤에 있으므로 X-Forwarded-For 를 신뢰한다
+    trust-proxy: true
+
+  # 운영에서 소셜 로그인 후 되돌아갈 수 있는 앱 주소. 기본은 앱 스킴만 허용한다.
+  # Expo Go 로 운영 서버를 테스트해야 하면, 서버 로그의
+  #   "[AUTH] 허용되지 않은 appRedirect 차단: exp://..."
+  # 를 보고 그 접두사만 APP_ALLOWED_REDIRECTS 에 추가할 것.
+  allowed-app-redirects: "${APP_ALLOWED_REDIRECTS:eunggeubi://}"
+
+  sms:
+    resend-cooldown-seconds: 60
+    daily-limit-per-phone: 5
+    # 운영 문자 요금 상한선. 데모 등으로 부족하면 이 값만 올린다.
+    daily-limit-total: 200
+
+logging:
+  level:
+    root: INFO
+    com.tadaktadak.eunggeubi: INFO

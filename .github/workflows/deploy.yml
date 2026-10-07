@@ -3,55 +3,78 @@ name: Deploy backend
 on:
   push:
     branches: [develop]
-    paths:                      # 백엔드나 이 파일이 바뀔 때만 실행 (프론트만 바뀌면 안 돎)
+    paths:
       - 'backend/**'
       - '.github/workflows/deploy.yml'
-  workflow_dispatch:            # Actions 탭 수동 실행 버튼 (파일이 main 에 있어야 보임)
+  workflow_dispatch:
+
+# 배포가 겹치면 릴리스 심볼릭 링크가 꼬인다. 앞 배포가 끝날 때까지 기다린다.
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+permissions:
+  id-token: write               # OIDC 토큰 발급 (없으면 AWS 인증 자체가 안 됨)
+  contents: read
+
+env:
+  AWS_REGION: ap-northeast-2
+  ROLE_ARN: arn:aws:iam::539839664793:role/eunggeubi-github-deploy
+  BUCKET: eunggeubi-artifacts-539839664793
+  INSTANCE_ID: i-0d7819d69a45699a2
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - uses: gradle/actions/setup-gradle@v4   # 의존성 캐시 → 빌드 시간 단축
+      - uses: gradle/actions/setup-gradle@v4
 
       - name: Build jar
         working-directory: backend
         run: chmod +x ./gradlew && ./gradlew clean bootJar -x test
 
-      - name: Upload jar to EC2
-        uses: appleboy/scp-action@v0.1.7
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: backend/build/libs/eunggeubi-0.0.1-SNAPSHOT.jar
-          target: /home/ubuntu/eunggeubi/
-          strip_components: 3                  # 폴더 경로 떼고 파일만 올림
+          role-to-assume: ${{ env.ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Restart service and health check
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
-            cd /home/ubuntu/eunggeubi
-            mv eunggeubi-0.0.1-SNAPSHOT.jar app.jar   # 돌고 있는 jar 를 직접 덮지 않고 교체
-            sudo systemctl restart eunggeubi
-            for i in $(seq 1 24); do
-              sleep 5
-              if curl -sf http://localhost:8080/health > /dev/null; then
-                echo "deploy OK"; exit 0
-              fi
-            done
-            echo "health check failed"
-            sudo journalctl -u eunggeubi -n 50 --no-pager
-            exit 1
+      - name: Upload jar to S3
+        run: |
+          set -euo pipefail
+          JAR=$(ls backend/build/libs/*.jar | grep -v -- '-plain\.jar$' | head -1)
+          [ -n "$JAR" ] || { echo "빌드 산출물을 찾지 못했습니다"; exit 1; }
+          KEY="releases/${GITHUB_SHA::7}.jar"
+          echo "KEY=$KEY" >> "$GITHUB_ENV"
+          aws s3 cp "$JAR" "s3://$BUCKET/$KEY"
+
+      - name: Deploy via SSM
+        run: |
+          set -euo pipefail
+          printf '{"commands":["sudo /usr/local/bin/eunggeubi-deploy.sh %s"]}\n' "$KEY" > /tmp/ssm-params.json
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" --document-name AWS-RunShellScript \
+            --comment "deploy ${GITHUB_SHA::7}" --timeout-seconds 600 \
+            --parameters file:///tmp/ssm-params.json \
+            --query 'Command.CommandId' --output text)
+          STATUS=Pending
+          for _ in $(seq 1 60); do
+            sleep 5
+            STATUS=$(aws ssm get-command-invocation --command-id "$CMD_ID" \
+              --instance-id "$INSTANCE_ID" --query Status --output text 2>/dev/null || echo Pending)
+            case "$STATUS" in Success|Failed|Cancelled|TimedOut) break;; esac
+          done
+          echo "::group::서버 출력"
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+            --query StandardOutputContent --output text
+          echo "::endgroup::"
+          echo "::group::서버 에러"
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+            --query StandardErrorContent --output text
+          echo "::endgroup::"
+          [ "$STATUS" = "Success" ] || { echo "배포 실패 ($STATUS). 서버는 자동 롤백됐습니다."; exit 1; }

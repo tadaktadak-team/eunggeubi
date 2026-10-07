@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
-import { RegeneratedAnswerChatMessage, RegeneratedSource } from '../types';
+import { FirstAidSituation, RegeneratedAnswerChatMessage, RegeneratedSource } from '../types';
 import AiAvatar from './AiAvatar';
 
 type Props = {
   message: RegeneratedAnswerChatMessage;
+  onPressAidGuide?: (situation: FirstAidSituation) => void;
 };
 
 // 같은 자료가 여러 인용 id로 저장돼있어도 출처 목록에는 한 번만 보여준다.
@@ -22,14 +23,23 @@ function dedupeSources(sources: RegeneratedSource[]): RegeneratedSource[] {
 
 // 체크리스트 응답을 반영해 재생성된 답변(POST /{id}/regenerate) 카드. 이 응답은 문장별 인용이 아니라
 // 메시지 전체 하나 + flat 출처 목록이라 AnswerCard와 구조가 달라서 별도 컴포넌트로 뒀다.
-export default function RegeneratedAnswerCard({ message }: Props) {
+export default function RegeneratedAnswerCard({ message, onPressAidGuide }: Props) {
   const sources = dedupeSources(message.sources);
+  const aidGuide = message.relatedAidGuide;
 
   return (
     <View style={styles.row}>
       <AiAvatar />
       <View style={styles.card}>
         <Text style={styles.body}>{message.message}</Text>
+
+        {aidGuide && (
+          <Pressable style={styles.aidGuideBanner} onPress={() => onPressAidGuide?.(aidGuide.situation)}>
+            <Ionicons name="alert-circle" size={16} color={colors.white} />
+            <Text style={styles.aidGuideBannerText}>{aidGuide.title} 바로보기</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.white} />
+          </Pressable>
+        )}
 
         {sources.length > 0 && (
           <View style={styles.sourceBox}>
@@ -61,6 +71,17 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   body: { fontSize: font.sub, color: colors.text, lineHeight: 20 },
+  aidGuideBanner: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.danger,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  aidGuideBannerText: { flex: 1, color: colors.white, fontSize: font.caption, fontWeight: '700' },
   sourceBox: {
     marginTop: spacing.md,
     paddingTop: spacing.md,

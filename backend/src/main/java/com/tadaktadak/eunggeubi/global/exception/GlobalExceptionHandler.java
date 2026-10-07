@@ -1,5 +1,6 @@
 package com.tadaktadak.eunggeubi.global.exception;
 
+import com.tadaktadak.eunggeubi.domain.ai_consultations.service.GuestLimitExceededException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -53,9 +54,21 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(500).body(new ErrorResponse("서버 오류가 발생했습니다."));
     }
 
+    // 비회원 AI 상담 횟수 초과 -> 403 (프론트가 회원가입 안내로 전환)
+    @ExceptionHandler(GuestLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleGuestLimit(GuestLimitExceededException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(e.getMessage(), "GUEST_LIMIT"));
+    }
+
     // 외부 API 호출 실패 -> 502
     @ExceptionHandler(ExternalApiException.class)
     public ResponseEntity<ErrorResponse> handleExternalApi(ExternalApiException e) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new ErrorResponse(e.getMessage()));
+    }
+
+    // 소셜 로그인 이메일이 기존 계정과 겹침 -> 409
+    @ExceptionHandler(SocialEmailConflictException.class)
+    public ResponseEntity<ErrorResponse> handleSocialEmailConflict(SocialEmailConflictException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse(e.getMessage()));
     }
 }

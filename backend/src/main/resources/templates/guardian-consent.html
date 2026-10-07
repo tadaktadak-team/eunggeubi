@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>응급이 보호자 동의</title>
+    <style>
+        body { margin:0; padding:24px; background:#fafafa; color:#222; line-height:1.6;
+            font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif; }
+        .wrap { max-width:480px; margin:0 auto; }
+        .brand { font-size:13px; font-weight:700; color:#e5392f; letter-spacing:.5px; }
+        h1 { font-size:22px; margin:8px 0 16px; }
+        .lead { font-size:16px; }
+        .box { background:#fff; border:1px solid #eee; border-radius:12px; padding:16px; margin:20px 0; }
+        .box div { display:flex; gap:12px; margin:8px 0; font-size:14px; }
+        .box b { flex:0 0 72px; color:#888; font-weight:600; }
+        button { width:100%; padding:16px; font-size:17px; font-weight:700;
+            color:#fff; background:#e5392f; border:0; border-radius:12px; }
+        .sub { font-size:13px; color:#888; text-align:center; margin-top:16px; }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="brand">응급이</div>
+
+    <!-- 동의 가능: 폼을 보여준다. 여기서는 아직 아무것도 확정되지 않았다. -->
+    <div th:if="${ready}">
+        <h1>보호자 동의 요청</h1>
+        <p class="lead" th:unless="${registration}"><b th:text="${childName}">자녀</b> 님이 응급이에 가입하려고 합니다.</p>
+        <p th:unless="${registration}">만 14세 미만 아동은 법정대리인의 동의가 필요합니다.</p>
+        <p class="lead" th:if="${registration}"><b th:text="${childName}">회원</b> 님이 회원님을 응급 상황 알림을 받는 보호자로 등록했습니다.</p>
+        <p th:if="${registration}">동의하기 전에는 어떤 알림도 발송되지 않습니다. 모르는 분이라면 이 창을 닫으시면 됩니다.</p>
+
+        <div class="box">
+            <div><b>수집 항목</b><span>보호자 이름, 연락처, 자녀와의 관계</span></div>
+            <div><b>이용 목적</b><span>응급 상황 시 자녀의 위치·상황 알림 발송</span></div>
+            <div><b>보관 기간</b><span>자녀 회원 탈퇴 시까지</span></div>
+        </div>
+
+        <form method="post" action="/consent">
+            <input type="hidden" name="t" th:value="${token}">
+            <button type="submit">동의합니다</button>
+        </form>
+        <p class="sub">동의하지 않으시려면 이 창을 닫으시면 됩니다.</p>
+    </div>
+
+    <!-- 그 외 상태(완료/만료/잘못된 링크, 그리고 POST 결과) -->
+    <div th:unless="${ready}">
+        <h1 th:text="${title}">안내</h1>
+        <p class="lead" th:text="${detail}"></p>
+    </div>
+</div>
+</body>
+</html>

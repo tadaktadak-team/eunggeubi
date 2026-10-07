@@ -1,6 +1,5 @@
 import { clearTokens, getAccessToken, getRefreshToken, saveTokens } from '../storage/tokenStorage';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8080';
+import { API_BASE_URL } from './config';
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
 
@@ -96,7 +95,7 @@ async function request<T>(
   if (!response.ok) {
     //백엔드 에러 형식 { "message": "..." } 에서 메시지 추출
     const message = (data && data.message) || '요청에 실패했습니다.';
-    throw new Error(message);
+    throw Object.assign(new Error(message), { status: response.status, code: data?.code });
   }
 
   return data as T;
