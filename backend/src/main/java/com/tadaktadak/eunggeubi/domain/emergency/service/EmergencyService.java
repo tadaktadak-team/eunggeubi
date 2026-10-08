@@ -13,8 +13,10 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class EmergencyService {
@@ -22,6 +24,7 @@ public class EmergencyService {
     private final UserRepository userRepository;
     private final GuardianRepository guardianRepository;
     private final EmergencyAlertNotifier notifier;
+    private final EmergencyAlertThrottle throttle;
 
     private static final DateTimeFormatter SENT_AT_FORMAT =
             DateTimeFormatter.ofPattern("M월 d일 HH:mm");
@@ -49,15 +52,24 @@ public class EmergencyService {
                 + "시각: " + sentAt.format(SENT_AT_FORMAT) + "\n"
                 + where;
 
-        for (Guardian guardian : guardians) {
-            notifier.notifyGuardian(guardian.getPhone(), SMS_SUBJECT, message);
+        // 보낼 보호자가 없으면 횟수를 쓰지 않는다
+        EmergencyAlertThrottle.Result decision = guardians.isEmpty()
+                ? EmergencyAlertThrottle.Result.ALLOWED
+                : throttle.tryAcquire(userId, sentAt);
+        boolean send = decision == EmergencyAlertThrottle.Result.ALLOWED;
+        if (send) {
+            for (Guardian guardian : guardians) {
+                notifier.notifyGuardian(guardian.getPhone(), SMS_SUBJECT, message);
+            }
+        } else {
+            log.info("[EMERGENCY] 보호자 문자 생략 userId={} reason={}", userId, decision);
         }
 
         List<EmergencyAlertResponse.GuardianResult> results = guardians.stream()
-                .map(this::toSendingResult)
+                .map(guardian -> toResult(guardian, send ? "SENDING" : "SKIPPED"))
                 .toList();
 
-        return new EmergencyAlertResponse(sentAt, message, results);
+        return new EmergencyAlertResponse(sentAt, message, results, send ? null : decision.name());
     }
 
     // 응급 상황에서 주소가 길다는 이유로 알림이 막히면 안 되므로 거절하지 않고 한 줄 100자로 정리한다
@@ -69,13 +81,13 @@ public class EmergencyService {
         return oneLine.length() > ADDRESS_MAX_LENGTH ? oneLine.substring(0, ADDRESS_MAX_LENGTH) : oneLine;
     }
 
-    // 발송은 비동기라 응답 시점에는 결과를 알 수 없다. 접수 사실만 돌려준다.
-    private EmergencyAlertResponse.GuardianResult toSendingResult(Guardian guardian) {
+    // 발송은 비동기라 응답 시점에는 결과를 알 수 없다. 접수(SENDING) 또는 생략(SKIPPED)만 돌려준다.
+    private EmergencyAlertResponse.GuardianResult toResult(Guardian guardian, String status) {
         return new EmergencyAlertResponse.GuardianResult(
                 guardian.getName(),
                 guardian.getPhone(),
                 guardian.getRelationship(),
-                "SENDING"
+                status
         );
     }
 }

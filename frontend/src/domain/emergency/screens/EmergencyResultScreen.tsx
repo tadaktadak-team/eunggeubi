@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import AppHeader from '../../../shared/components/AppHeader';
 import EmergencyMapView from '../components/EmergencyMapView';
 import { RootStackParamList } from '../../../navigation/types';
-import { GuardianResult, Relationship } from '../types';
+import { GuardianResult, Relationship, SkipReason } from '../types';
 import { colors } from '../../../shared/theme/theme';
 
 const RELATIONSHIP_LABEL: Record<Relationship, string> = {
@@ -18,9 +18,7 @@ const RELATIONSHIP_LABEL: Record<Relationship, string> = {
 type ResultRoute = RouteProp<RootStackParamList, 'EmergencyResult'>;
 
 // 문자 발송이 비동기라 응답 시점에는 접수 여부까지만 알 수 있다. 갔다고 단정하지 않는다.
-function buildSummary(guardians: GuardianResult[]) {
-  const failed = guardians.filter((g) => g.status === 'FAILED').length;
-
+function buildSummary(guardians: GuardianResult[], skipReason: SkipReason | null) {
   if (guardians.length === 0) {
     return {
       ok: false,
@@ -29,25 +27,34 @@ function buildSummary(guardians: GuardianResult[]) {
       sub: '마이페이지 > 보호자 관리에서 보호자를 등록하고, 보호자의 문자 동의를 받아주세요.',
     };
   }
-  if (failed === guardians.length) {
+  // 발송 횟수 제한: 119 연결은 그대로 하고 보호자 문자만 생략했다
+  if (skipReason === 'RECENTLY_SENT') {
+    return {
+      ok: true,
+      icon: 'checkmark' as const,
+      title: '방금 보낸 알림이 있어 다시 보내지 않았어요',
+      sub: '1분 안에 다시 누르면 보호자에게 문자를 또 보내지 않아요.',
+    };
+  }
+  if (skipReason === 'DAILY_LIMIT') {
     return {
       ok: false,
-      icon: 'close-circle' as const,
-      title: '보호자에게 알림을 보내지 못했어요',
-      sub: '직접 연락하시거나 119로 전화해주세요.',
+      icon: 'alert-circle' as const,
+      title: '오늘 보낼 수 있는 알림 횟수를 넘었어요',
+      sub: '보호자에게 직접 연락하시거나 119로 전화해주세요.',
     };
   }
   return {
     ok: true,
     icon: 'checkmark' as const,
-    title: `보호자 ${guardians.length - failed}명에게 알림 발송 중`,
+    title: `보호자 ${guardians.length}명에게 알림 발송 중`,
     sub: '문자가 도착하기까지 몇 초 걸릴 수 있어요.',
   };
 }
 
 export default function EmergencyResultScreen() {
   const { params } = useRoute<ResultRoute>();
-  const { address, message, guardians, latitude, longitude } = params;
+  const { address, message, guardians, skipReason, latitude, longitude } = params;
 
   // 문자 원문에서 링크 줄은 뺀다 (위치는 지도로 직접 보여준다)
   const messagePreview = message
@@ -56,7 +63,7 @@ export default function EmergencyResultScreen() {
     .join('\n')
     .trim();
 
-  const summary = buildSummary(guardians);
+  const summary = buildSummary(guardians, skipReason ?? null);
   const accent = summary.ok ? colors.success : colors.danger;
 
   return (
@@ -94,8 +101,8 @@ export default function EmergencyResultScreen() {
             <Text style={styles.guardianName}>
               {g.name} ({RELATIONSHIP_LABEL[g.relationship]})
             </Text>
-            {g.status === 'FAILED' ? (
-              <Text style={styles.failed}>전송 실패</Text>
+            {g.status === 'SKIPPED' ? (
+              <Text style={styles.skipped}>보내지 않음</Text>
             ) : (
               <Text style={styles.sent}>발송 중</Text>
             )}
@@ -170,5 +177,5 @@ const styles = StyleSheet.create({
   },
   guardianName: { flex: 1, fontSize: 15, color: colors.text },
   sent: { color: colors.success, fontWeight: 'bold', fontSize: 13 },
-  failed: { color: colors.danger, fontWeight: 'bold', fontSize: 13 },
+  skipped: { color: colors.danger, fontWeight: 'bold', fontSize: 13 },
 });
