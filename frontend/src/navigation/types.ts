@@ -33,5 +33,7 @@ export type RootStackParamList = {
     longitude: number | null;
     availableBeds?: number | null;
     congestion?: number | null;
+    hasEmergency?: boolean;
+    category?: string;
   };
 };
