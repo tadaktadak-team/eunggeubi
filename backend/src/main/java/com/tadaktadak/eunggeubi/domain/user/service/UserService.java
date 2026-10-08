@@ -4,9 +4,13 @@ import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
 import com.tadaktadak.eunggeubi.domain.user.dto.ChangePasswordResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.MyInfoResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.UpdateMyInfoRequest;
+import com.tadaktadak.eunggeubi.domain.user.entity.Guardian;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
+import com.tadaktadak.eunggeubi.domain.user.repository.GuardianConsentRepository;
+import com.tadaktadak.eunggeubi.domain.user.repository.GuardianRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,6 +24,8 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final JwtProvider jwtProvider;
+    private final GuardianRepository guardianRepository;
+    private final GuardianConsentRepository guardianConsentRepository;
 
     @Transactional(readOnly = true)
     public MyInfoResponse getMyInfo(Long userId) {
@@ -87,5 +93,14 @@ public class UserService {
 
         user.withdraw();
         refreshTokenService.revokeAll(userId);
+
+        // 등록한 보호자(이름·전화번호)와 동의 기록을 함께 지운다. 탈퇴 화면에서도, 보호자가 받는 동의 화면에서도
+        // "탈퇴 시까지만 보관"한다고 안내하고 있다.
+        List<Guardian> guardians = guardianRepository.findByUserId(userId);
+        if (!guardians.isEmpty()) {   // 빈 목록으로 IN 조회를 하지 않는다
+            guardianConsentRepository.deleteByGuardianIdIn(guardians.stream().map(Guardian::getId).toList());
+        }
+        guardianConsentRepository.deleteByUserId(userId);
+        guardianRepository.deleteAll(guardians);
     }
 }
