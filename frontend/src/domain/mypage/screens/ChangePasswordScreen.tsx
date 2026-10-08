@@ -1,13 +1,13 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import AppHeader from '../../../shared/components/AppHeader';
 import { saveTokens } from '../../../shared/storage/tokenStorage';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { PASSWORD_RULE_TEXT, validatePassword } from '../../../shared/utils/password';
-import { changePassword } from '../api/user';
+import { changePassword, getMyInfo } from '../api/user';
 import { MyPageStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<MyPageStackParamList>;
@@ -19,12 +19,19 @@ export default function ChangePasswordScreen() {
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
+  const [userInfo, setUserInfo] = useState<{ email: string; phone: string }>();
 
-  //서버와 같은 규칙으로 검증, 프론트에서도 거름(가입·비밀번호 재설정과 같은 정책).
-  //이메일·전화번호 포함 여부는 이 화면에 그 값이 없어서 서버가 검사하고, 메시지는 아래 변경 실패 알림으로 보여준다
+  //이메일 아이디·전화번호가 들어간 비밀번호를 미리 거르려고 불러온다. 실패해도 서버가 같은 검사를 하니 화면은 그대로 쓴다
+  useEffect(() => {
+    getMyInfo()
+      .then((info) => setUserInfo({ email: info.email, phone: info.phone }))
+      .catch((e) => console.warn('내 정보 조회 실패(비밀번호 사전 검사 생략):', e));
+  }, []);
+
+  //서버와 같은 규칙으로 검증, 프론트에서도 거름(가입·비밀번호 재설정과 같은 정책)
   const validate = () => {
     if (!current || !next || !confirm) return '모든 항목을 입력해주세요.';
-    const policy = validatePassword(next);
+    const policy = validatePassword(next, userInfo);
     if (!policy.ok) return policy.message;
     if (next !== confirm) return '새 비밀번호가 서로 달라요.';
     if (next === current) return '현재 비밀번호와 다른 비밀번호를 입력해주세요.';
