@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.tadaktadak.eunggeubi.domain.user.entity.UserStatus;
+import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +17,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -22,8 +25,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
 
         // 토큰이 있고 유효하면 → "이 사람은 로그인된 회원"이라고 등록
-        if (token != null && jwtProvider.isAccessToken(token)) {
-            Long userId = jwtProvider.getUserId(token);
+        // 탈퇴한 회원의 access 토큰은 만료 전(최대 1시간)이어도 인증하지 않는다(탈퇴 직후 보호자·건강 프로필이 다시 생기는 것 방지)
+        Long userId = token != null && jwtProvider.isAccessToken(token) ? jwtProvider.getUserId(token) : null;
+        if (userId != null && userRepository.existsByIdAndStatus(userId, UserStatus.ACTIVE)) {
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(userId, null, List.of());
             SecurityContextHolder.getContext().setAuthentication(authentication);

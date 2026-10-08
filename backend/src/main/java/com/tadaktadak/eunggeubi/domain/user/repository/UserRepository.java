@@ -24,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Query("select u from User u where u.status = :status and coalesce(u.withdrawnAt, u.updatedAt) < :before")
     List<User> findWithdrawnBefore(@Param("status") UserStatus status, @Param("before") LocalDateTime before);
 
+    // 요청마다 토큰 주인이 아직 정상 회원인지 확인한다(탈퇴 직후 남은 access 토큰 차단)
+    boolean existsByIdAndStatus(Long id, UserStatus status);
+
     // 아이디(이메일) 찾기: 이름 + 전화번호로 조회.
     // 전화번호 중복 가입을 막지 않으므로 결과가 여러 건일 수 있다 - Optional 로 받으면
     // NonUniqueResultException 이 터져 500 이 되므로 Top(1건)으로 제한한다.
