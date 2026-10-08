@@ -7,11 +7,12 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import com.tadaktadak.eunggeubi.global.validation.ValidPassword;
 import java.time.LocalDate;
 
 public record SignupRequest(
         @NotBlank @Email @Size(max = 100, message = "이메일은 100자 이내로 입력해주세요.") String email,
-        @NotBlank @Size(min = 8, max = 64, message = "비밀번호는 8자 이상 64자 이하여야 합니다.") String password,
+        @NotBlank @ValidPassword String password,   // 길이(8~20)를 포함한 비밀번호 정책은 ValidPassword 가 검사한다
         @NotBlank @Size(max = 50, message = "이름은 50자 이내로 입력해주세요.") String name,
         @NotBlank @KoreanMobile String phone,
         @NotNull LocalDate birthDate,           // 프론트는 "1990-01-01" 형식으로 전송

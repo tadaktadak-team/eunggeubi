@@ -5,6 +5,7 @@ import com.tadaktadak.eunggeubi.domain.auth.repository.RefreshTokenRepository;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
 import com.tadaktadak.eunggeubi.domain.user.entity.UserStatus;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
+import com.tadaktadak.eunggeubi.global.validation.PasswordValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ public class AccountRecoveryService {
     // 비밀번호 재설정: 이메일 + 인증된 전화번호 → 새 비밀번호 저장
     @Transactional
     public void resetPassword(String email, String phone, String newPassword) {
+        PasswordValidator.ensureNotContainsUserInfo(newPassword, email, phone);
         phoneVerificationService.consumeVerified(phone, Purpose.FIND_PW);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("일치하는 회원 정보가 없습니다."));
