@@ -22,7 +22,8 @@ public record MedicationItem(
         if (names == null) {
             return List.of();
         }
-        return names.stream().map(n -> new MedicationItem(n, null)).toList();
+        // 목록 안에 null 이나 빈 값이 섞여 와도(예: [null]) 서버 오류 없이 걸러낸다
+        return names.stream().filter(n -> n != null && !n.isBlank()).map(n -> new MedicationItem(n, null)).toList();
     }
 
     // AI 상담이 읽는 콤마 문자열(이름만)에서 복원할 때 쓴다
@@ -61,6 +62,9 @@ public record MedicationItem(
     public static List<MedicationItem> distinct(List<MedicationItem> items) {
         Map<String, MedicationItem> unique = new LinkedHashMap<>();
         for (MedicationItem item : items) {
+            if (item == null || item.name() == null) {
+                continue;
+            }
             String name = item.name().trim();
             if (name.isEmpty()) {
                 continue;
