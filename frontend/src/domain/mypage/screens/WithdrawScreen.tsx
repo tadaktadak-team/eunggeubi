@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -6,6 +8,7 @@ import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { getMyInfo, withdraw } from '../api/user';
+import { MyPageStackParamList } from '../types';
 
 const NOTICES = [
   '등록한 보호자와 건강 프로필이 모두 삭제돼요.',
@@ -13,7 +16,10 @@ const NOTICES = [
   '탈퇴 후에는 같은 계정으로 다시 로그인할 수 없어요.',
 ];
 
+type Nav = NativeStackNavigationProp<MyPageStackParamList>;
+
 export default function WithdrawScreen() {
+  const navigation = useNavigation<Nav>();
   const { signOut } = useAuth();
 
   const [password, setPassword] = useState('');
@@ -42,8 +48,18 @@ export default function WithdrawScreen() {
     try {
       setSubmitting(true);
       await withdraw(socialOnly ? undefined : password);
+      // 로그아웃해도 탭 화면은 그대로 남아서(로그인 전후 모두 Tabs가 있음) 마이 탭이 이 화면에 머문다.
+      // 로그아웃을 먼저 끝내고 첫 화면으로 돌려야 비회원용 마이 화면이 보인다
+      // (먼저 돌리면 로그인 상태로 첫 화면이 열려 탈퇴한 계정의 정보를 다시 불러온다)
       Alert.alert('탈퇴 완료', '그동안 이용해주셔서 감사합니다.', [
-        { text: '확인', onPress: () => signOut() },
+        {
+          text: '확인',
+          onPress: () => {
+            signOut()
+              .catch(console.error)
+              .finally(() => navigation.popToTop());
+          },
+        },
       ]);
     } catch (e: any) {
       Alert.alert('탈퇴 실패', e?.message ?? '다시 시도해주세요.');
