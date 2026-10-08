@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
-import { toDigits } from '../../../shared/utils/phone';
+import { formatPhone, toDigits } from '../../../shared/utils/phone';
 import * as authApi from '../api/auth';
 import { Relationship } from '../types';
 
@@ -55,7 +55,7 @@ export default function GuardianConsentScreen() {
       const res = await authApi.requestGuardianConsent({
         consentToken,
         name: name.trim(),
-        phone: phone.trim(),
+        phone,   // 입력할 때 이미 숫자만 남긴다
         relationship,
       });
       navigation.navigate('GuardianWaiting', { consentToken, email, maskedPhone: res.maskedPhone });
@@ -100,10 +100,10 @@ export default function GuardianConsentScreen() {
           <Text style={styles.label}>보호자 전화번호</Text>
           <TextInput
             style={styles.input}
-            placeholder="'-' 없이 입력"
+            placeholder="010-0000-0000"
             placeholderTextColor={colors.placeholder}
             keyboardType="number-pad"
-            value={phone}
+            value={formatPhone(phone)}
             onChangeText={(v) => setPhone(toDigits(v))}
           />
 
