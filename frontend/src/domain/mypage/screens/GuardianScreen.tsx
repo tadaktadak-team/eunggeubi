@@ -72,8 +72,15 @@ export default function GuardianScreen() {
     Alert.alert(g.name, '작업을 선택하세요', [
       { text: '수정', onPress: () => navigation.navigate('GuardianForm', { guardian: g }) },
       ...(g.verified ? [] : [{ text: '동의 문자 다시 보내기', onPress: () => onResend(g) }]),
-      { text: '삭제', style: 'destructive', onPress: () => runDelete(g) },
+      { text: '삭제', style: 'destructive', onPress: () => confirmDelete(g) },
       { text: '취소', style: 'cancel' },
+    ]);
+
+  // 다시 등록하려면 보호자가 동의 문자를 새로 받아야 해서 한 번 더 묻는다
+  const confirmDelete = (g: Guardian) =>
+    Alert.alert('보호자 삭제', `${g.name}님을 보호자에서 삭제할까요?\n다시 등록하면 동의 문자를 새로 받아야 해요.`, [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: () => runDelete(g) },
     ]);
 
   return (
