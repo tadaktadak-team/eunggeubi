@@ -129,6 +129,12 @@ export default function GuardianConsentScreen() {
               color={agree ? colors.primary : colors.placeholder}
             />
             <Text style={styles.checkText}>[필수] 보호자 개인정보 수집·이용 동의</Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Legal', { tab: 'privacy', section: '제3조' })}
+              hitSlop={8}
+            >
+              <Text style={styles.checkLink}>보기</Text>
+            </TouchableOpacity>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -187,7 +193,8 @@ const styles = StyleSheet.create({
   relText: { fontSize: font.caption, color: colors.textSub, fontWeight: '600' },
   relTextActive: { color: colors.white },
   check: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, marginBottom: spacing.md },
-  checkText: { marginLeft: spacing.sm, fontSize: font.sub, color: colors.text },
+  checkText: { flex: 1, marginLeft: spacing.sm, fontSize: font.sub, color: colors.text },
+  checkLink: { fontSize: font.caption, color: colors.placeholder, textDecorationLine: 'underline' },
   sendBtn: {
     backgroundColor: colors.primary,
     height: 52,
