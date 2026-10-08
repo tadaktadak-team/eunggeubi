@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
+import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
 import com.tadaktadak.eunggeubi.domain.user.entity.Guardian;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
 import com.tadaktadak.eunggeubi.domain.user.repository.GuardianConsentRepository;
@@ -33,13 +34,14 @@ class UserServiceWithdrawTest {
     private final JwtProvider jwtProvider = mock(JwtProvider.class);
     private final GuardianRepository guardianRepository = mock(GuardianRepository.class);
     private final GuardianConsentRepository consentRepository = mock(GuardianConsentRepository.class);
+    private final HealthProfileRepository healthProfileRepository = mock(HealthProfileRepository.class);
     private UserService service;
     private User user;
 
     @BeforeEach
     void setUp() {
         service = new UserService(userRepository, passwordEncoder, refreshTokenService, jwtProvider,
-                guardianRepository, consentRepository);
+                guardianRepository, consentRepository, healthProfileRepository);
         user = mock(User.class);
         when(user.isWithdrawn()).thenReturn(false);
         when(user.getPassword()).thenReturn("hashed");
@@ -70,6 +72,15 @@ class UserServiceWithdrawTest {
     }
 
     @Test
+    void 탈퇴하면_건강_프로필도_함께_지워진다() {
+        when(guardianRepository.findByUserId(1L)).thenReturn(List.of());
+
+        service.withdraw(1L, "pw");
+
+        verify(healthProfileRepository).deleteByUserId(1L);
+    }
+
+    @Test
     void 보호자를_따로_지운_뒤_남은_동의_기록도_회원번호로_지운다() {
         when(guardianRepository.findByUserId(1L)).thenReturn(List.of());
 
@@ -86,6 +97,7 @@ class UserServiceWithdrawTest {
         assertThatThrownBy(() -> service.withdraw(1L, "wrong")).isInstanceOf(IllegalArgumentException.class);
 
         verify(user, never()).withdraw();
+        verify(healthProfileRepository, never()).deleteByUserId(any());
         verify(guardianRepository, never()).deleteAll(anyList());
         verify(consentRepository, never()).deleteByUserId(any());
         verify(consentRepository, never()).deleteByGuardianIdIn(anyCollection());

@@ -1,6 +1,7 @@
 package com.tadaktadak.eunggeubi.domain.user.service;
 
 import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
+import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
 import com.tadaktadak.eunggeubi.domain.user.dto.ChangePasswordResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.MyInfoResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.UpdateMyInfoRequest;
@@ -26,6 +27,7 @@ public class UserService {
     private final JwtProvider jwtProvider;
     private final GuardianRepository guardianRepository;
     private final GuardianConsentRepository guardianConsentRepository;
+    private final HealthProfileRepository healthProfileRepository;
 
     @Transactional(readOnly = true)
     public MyInfoResponse getMyInfo(Long userId) {
@@ -102,5 +104,8 @@ public class UserService {
         }
         guardianConsentRepository.deleteByUserId(userId);
         guardianRepository.deleteAll(guardians);
+
+        // 탈퇴 화면에서 "건강 프로필이 모두 삭제돼요"라고 안내한다(혈액형·병명·복용약·알레르기)
+        healthProfileRepository.deleteByUserId(userId);
     }
 }
