@@ -1,5 +1,5 @@
 package com.tadaktadak.eunggeubi.domain.auth.service;
-
+import com.tadaktadak.eunggeubi.domain.auth.dto.ConsentPageInfo;
 import com.tadaktadak.eunggeubi.domain.auth.dto.ConsentStatusResponse;
 import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianConsentResponse;
 import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianRequest;
@@ -12,6 +12,7 @@ import com.tadaktadak.eunggeubi.domain.user.repository.GuardianConsentRepository
 import com.tadaktadak.eunggeubi.domain.user.repository.GuardianRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.common.MessageType;
+import com.tadaktadak.eunggeubi.global.security.JwtProvider;
 import com.tadaktadak.eunggeubi.global.sms.SmsSender;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -30,6 +31,7 @@ public class GuardianConsentService {
     private final GuardianConsentRepository guardianConsentRepository;
     private final UserRepository userRepository;
     private final SmsSender smsSender;
+    private final JwtProvider jwtProvider;
 
     // 문자에 넣을 동의 링크의 서버 주소 (없으면 localhost 기본값)
     @Value("${app.base-url:http://localhost:8080}")
@@ -38,7 +40,7 @@ public class GuardianConsentService {
     @Transactional
     public GuardianConsentResponse requestConsent(GuardianRequest request) {
         // 1. 대상 회원 확인 (동의 대기 상태여야 함)
-        User user = userRepository.findById(request.userId())
+        User user = userRepository.findById(requireUserId(request.consentToken()))
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
         if (user.getStatus() != UserStatus.PENDING) {
             throw new IllegalArgumentException("보호자 동의가 필요한 상태가 아닙니다.");
@@ -68,7 +70,7 @@ public class GuardianConsentService {
                 .build());
 
         // 4. 보호자에게 동의 링크 문자 발송 (개발 중엔 콘솔에 찍힘)
-        String link = baseUrl + "/api/auth/guardian/confirm?token=" + token;
+        String link = baseUrl + "/consent?t=" + token;
         smsSender.send(request.phone(),
                 "[응급이] 자녀의 보호자 동의 요청입니다. 아래 링크를 눌러 동의해주세요.\n" + link);
 
@@ -101,12 +103,45 @@ public class GuardianConsentService {
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
         user.activate();
     }
+    // 동의 확정 전에 보여줄 안내 화면용 정보. 상태를 바꾸지 않는다(GET 은 부작용이 없어야 한다).
+    @Transactional(readOnly = true)
+    public ConsentPageInfo loadConsentPage(String token) {
+        GuardianConsent consent = guardianConsentRepository.findByConsentToken(token).orElse(null);
+        if (consent == null) {
+            return new ConsentPageInfo(ConsentPageInfo.State.INVALID, null);
+        }
+        if (consent.getStatus() == ConsentStatus.CONFIRMED) {
+            return new ConsentPageInfo(ConsentPageInfo.State.ALREADY_CONFIRMED, null);
+        }
+        if (consent.getExpiresAt() != null && consent.getExpiresAt().isBefore(LocalDateTime.now())) {
+            return new ConsentPageInfo(ConsentPageInfo.State.EXPIRED, null);
+        }
+        return new ConsentPageInfo(ConsentPageInfo.State.READY, childNameOf(consent));
+    }
+
+    // 동의 화면에 "누구의 보호자 동의인지" 보여주기 위한 자녀 이름
+    private String childNameOf(GuardianConsent consent) {
+        Guardian guardian = guardianRepository.findById(consent.getGuardianId()).orElse(null);
+        if (guardian == null) {
+            return null;
+        }
+        return userRepository.findById(guardian.getUserId()).map(User::getName).orElse(null);
+    }
 
     @Transactional(readOnly = true)
-    public ConsentStatusResponse getStatus(Long userId) {
-        User user = userRepository.findById(userId)
+    public ConsentStatusResponse getStatus(String consentToken) {
+        User user = userRepository.findById(requireUserId(consentToken))
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
         return new ConsentStatusResponse(user.getStatus() == UserStatus.ACTIVE);
+    }
+
+    // 가입 응답으로 받은 consentToken 에서 회원 id 를 꺼낸다.
+    // 서명이 검증되므로 남의 userId 를 임의로 지정할 수 없다.
+    private Long requireUserId(String consentToken) {
+        if (!jwtProvider.isConsentToken(consentToken)) {
+            throw new IllegalArgumentException("유효하지 않거나 만료된 요청입니다. 처음부터 다시 진행해주세요.");
+        }
+        return jwtProvider.getUserId(consentToken);
     }
 
     // 전화번호 뒤 4자리 가리기

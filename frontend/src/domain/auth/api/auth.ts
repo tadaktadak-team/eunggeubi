@@ -46,6 +46,8 @@ export function requestGuardianConsent(payload: GuardianRequest) {
   return api.post<GuardianConsentResponse>('/api/auth/guardian/request', payload);
 }
 
-export function getGuardianConsentStatus(userId: number) {
-  return api.get<ConsentStatusResponse>(`/api/auth/guardian/status?userId=${userId}`);
+export function getGuardianConsentStatus(consentToken: string) {
+  return api.get<ConsentStatusResponse>(
+    `/api/auth/guardian/status?consentToken=${encodeURIComponent(consentToken)}`,
+  );
 }

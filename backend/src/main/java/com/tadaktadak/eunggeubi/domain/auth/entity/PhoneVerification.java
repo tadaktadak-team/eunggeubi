@@ -54,6 +54,9 @@ public class PhoneVerification {
 
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
+    // 이 인증이 실제로 가입/비번재설정에 쓰인 시각. null 이면 아직 안 쓴 것.
+    @Column(name = "consumed_at")
+    private LocalDateTime consumedAt;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -82,5 +85,9 @@ public class PhoneVerification {
     public void markVerified(LocalDateTime verifiedAt) {
         this.status = VerificationStatus.VERIFIED;
         this.verifiedAt = verifiedAt;
+    }
+    // 가입/비번재설정에 실제로 사용 처리. 같은 인증을 두 번 쓰지 못하게 한다.
+    public void consume(LocalDateTime consumedAt) {
+        this.consumedAt = consumedAt;
     }
 }

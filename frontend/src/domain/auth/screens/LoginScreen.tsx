@@ -5,6 +5,7 @@ import { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -18,13 +19,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../hooks/useAuth';
-import { SocialLoginResult, startKakaoLogin, startNaverLogin, startGoogleLogin } from '../api/social';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+const SOCIAL_ICON_SIZE = 48;
+
+// key는 백엔드 Provider enum(KAKAO/NAVER/GOOGLE)과 동일하게 맞춤
+const SOCIAL_PROVIDERS = [
+  { key: 'KAKAO', label: '카카오', icon: require('../../../../assets/social/kakao.png') },
+  { key: 'NAVER', label: '네이버', icon: require('../../../../assets/social/naver.png') },
+  { key: 'GOOGLE', label: '구글', icon: require('../../../../assets/social/google.png') },
+] as const;
+
 export default function LoginScreen() {
   const navigation = useNavigation<Nav>();
-  const { signIn, signInWithTokens } = useAuth();
+  const { signIn } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,31 +56,7 @@ export default function LoginScreen() {
     }
   };
 
-  const handleSocial = async (start: () => Promise<SocialLoginResult>, label: string) => {
-    try {
-      const result = await start();
-      if (result.type === 'cancel') {
-        return;
-      }
-      if (result.type === 'signup') {
-        // 신규 → 정보 부족(카카오)이면 추가정보 화면, 아니면 약관만
-        if (result.needInfo) {
-          navigation.navigate('SocialExtraInfo', { ticket: result.ticket });
-        } else {
-          navigation.navigate('SocialConsent', { ticket: result.ticket });
-        }
-        return;
-      }
-      // result.type === 'login' → 이미 토큰 받음 → 바로 로그인 상태 전환
-      await signInWithTokens(result);
-    } catch (e: any) {
-      Alert.alert(`${label} 로그인 실패`, e?.message ?? '다시 시도해주세요.');
-    }
-  };
-
-  const onNaverLogin = () => handleSocial(startNaverLogin, '네이버');
-  const onKakaoLogin = () => handleSocial(startKakaoLogin, '카카오');
-  const onGoogleLogin = () => handleSocial(startGoogleLogin, '구글');
+  const notReady = () => Alert.alert('준비 중', '다음 단계에서 만들 거예요!');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -130,44 +115,46 @@ export default function LoginScreen() {
 
           <View style={styles.links}>
             <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-              <Text style={styles.link}>회원가입</Text>
+              <Text style={styles.linkPrimary}>회원가입</Text>
             </TouchableOpacity>
-            <Text style={styles.dot}>·</Text>
+
+            <View style={styles.linkGap} />
+
             <TouchableOpacity onPress={() => navigation.navigate('FindAccount', { tab: 'FIND_ID' })}>
               <Text style={styles.link}>아이디 찾기</Text>
             </TouchableOpacity>
-            <Text style={styles.dot}>·</Text>
+            <Text style={styles.bar}>|</Text>
             <TouchableOpacity onPress={() => navigation.navigate('FindAccount', { tab: 'FIND_PW' })}>
               <Text style={styles.link}>비밀번호 재설정</Text>
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={[styles.socialBtn, { backgroundColor: colors.kakao }]}
-            onPress={onKakaoLogin}
-          >
-            <Text style={[styles.socialText, { color: colors.kakaoText }]}>카카오로 시작하기</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.socialBtn, { backgroundColor: colors.naver }]}
-            onPress={onNaverLogin}
-          >
-            <Text style={[styles.socialText, { color: colors.white }]}>네이버로 시작하기</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.socialBtn, { backgroundColor: colors.white, borderWidth: 1, borderColor: colors.border }]}
-            onPress={onGoogleLogin}
-          >
-            <Text style={[styles.socialText, { color: colors.text }]}>Google로 시작하기</Text>
-          </TouchableOpacity>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>간편 로그인</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <View style={styles.socialRow}>
+            {SOCIAL_PROVIDERS.map((provider) => (
+              <TouchableOpacity
+                key={provider.key}
+                style={styles.socialBtn}
+                onPress={notReady}
+                accessibilityRole="button"
+                accessibilityLabel={`${provider.label}로 시작하기`}
+              >
+                <Image source={provider.icon} style={styles.socialIcon} />
+              </TouchableOpacity>
+            ))}
+          </View>
 
           <TouchableOpacity style={styles.guest} onPress={() => navigation.navigate('Tabs')}>
             <Text style={styles.guestText}>로그인 없이 이용하기</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.legal} onPress={() => navigation.navigate('Legal')}>
-            <Text style={styles.legalText}>이용약관 · 개인정보처리방침</Text>
-          </TouchableOpacity>
+          <Text style={styles.guestSub}>
+            일부 기능(보호자 알림·상담이력 저장)은{'\n'}로그인 후 사용 가능합니다
+          </Text>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -220,18 +207,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: spacing.lg,
   },
-  link: { color: colors.text, fontSize: font.sub, fontWeight: '600' },
-  dot: { color: colors.placeholder, marginHorizontal: spacing.sm },
-  socialBtn: {
-    height: 50,
-    borderRadius: radius.md,
-    alignItems: 'center',
+  linkPrimary: { color: colors.text, fontSize: font.sub, fontWeight: '700' },
+  link: { color: colors.textSub, fontSize: font.sub, fontWeight: '500' },
+  linkGap: { width: spacing.lg },
+  bar: { color: colors.placeholder, fontSize: font.sub, marginHorizontal: spacing.sm },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { color: colors.placeholder, fontSize: font.sub },
+  socialRow: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: spacing.md,
+    gap: spacing.xl,
+    marginTop: spacing.lg,
   },
-  socialText: { fontSize: font.body, fontWeight: '700' },
-  guest: { alignItems: 'center', marginTop: spacing.md },
+  socialBtn: { width: SOCIAL_ICON_SIZE, height: SOCIAL_ICON_SIZE },
+  socialIcon: { width: '100%', height: '100%', resizeMode: 'contain' },
+  guest: { alignItems: 'center', marginTop: spacing.xl },
   guestText: { color: colors.textSub, fontSize: font.sub, textDecorationLine: 'underline' },
-  legal: { alignItems: 'center', marginTop: spacing.lg },
-  legalText: { color: colors.placeholder, fontSize: font.caption, textDecorationLine: 'underline' },
+  guestSub: {
+    color: colors.placeholder,
+    fontSize: font.caption,
+    textAlign: 'center',
+    marginTop: spacing.xs,
+    lineHeight: 18,
+  },
 });

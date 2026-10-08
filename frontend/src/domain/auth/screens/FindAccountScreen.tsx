@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { formatPhone, toDigits } from '../../../shared/utils/phone';
+import { PASSWORD_RULE_TEXT, validatePassword } from '../../../shared/utils/password';
 import * as authApi from '../api/auth';
 import { Purpose } from '../types';
 
@@ -42,6 +43,7 @@ export default function FindAccountScreen() {
 
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,6 +57,7 @@ export default function FindAccountScreen() {
     setName('');
     setEmail('');
     setNewPassword('');
+    setNewPasswordConfirm('');
   };
 
   const purpose: Purpose = tab === 'FIND_ID' ? 'FIND_ID' : 'FIND_PW';
@@ -97,6 +100,11 @@ export default function FindAccountScreen() {
 
   const onResetPassword = async () => {
     if (!email || !newPassword) return Alert.alert('입력 확인', '이메일과 새 비밀번호를 입력해주세요.');
+    const pwCheck = validatePassword(newPassword, { email: email.trim(), phone: phone.trim() });
+    if (!pwCheck.ok) return Alert.alert('비밀번호 확인', pwCheck.message);
+    if (newPassword !== newPasswordConfirm) {
+      return Alert.alert('비밀번호 확인', '비밀번호가 일치하지 않습니다.');
+    }
     if (!phoneVerified) return Alert.alert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
     setSubmitting(true);
     try {
@@ -225,11 +233,20 @@ export default function FindAccountScreen() {
               {renderPhoneVerify()}
               <TextInput
                 style={styles.input}
-                placeholder="새 비밀번호 (8자 이상)"
+                placeholder="새 비밀번호"
                 placeholderTextColor={colors.placeholder}
                 secureTextEntry
                 value={newPassword}
                 onChangeText={setNewPassword}
+              />
+              <Text style={styles.hint}>{PASSWORD_RULE_TEXT}</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="새 비밀번호 확인"
+                placeholderTextColor={colors.placeholder}
+                secureTextEntry
+                value={newPasswordConfirm}
+                onChangeText={setNewPasswordConfirm}
               />
               <TouchableOpacity
                 style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
@@ -267,6 +284,7 @@ const styles = StyleSheet.create({
   tabTextActive: { color: colors.primary },
   tabUnderline: { position: 'absolute', bottom: -1, height: 2, width: '60%', backgroundColor: colors.primary },
   body: { padding: spacing.xl },
+  hint: { color: colors.textSub, fontSize: font.caption, marginBottom: spacing.md, marginTop: -spacing.xs },
   desc: { fontSize: font.sub, color: colors.textSub, marginBottom: spacing.lg },
   input: {
     backgroundColor: colors.inputBg,

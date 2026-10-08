@@ -5,12 +5,12 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import com.tadaktadak.eunggeubi.global.validation.ValidPassword;
 import java.time.LocalDate;
 
 public record SignupRequest(
         @NotBlank @Email String email,
-        @NotBlank @Size(min = 8, message = "비밀번호는 8자 이상이어야 합니다.") String password,
+        @NotBlank @ValidPassword String password,
         @NotBlank String name,
         @NotBlank String phone,
         @NotNull LocalDate birthDate,           // 프론트는 "1990-01-01" 형식으로 전송

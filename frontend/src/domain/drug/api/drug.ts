@@ -11,6 +11,7 @@ export interface DrugInfoResponse {
   useInfo?: string;      // 용법/용량
   caution?: string;      // 주의사항
   drugType?: string;     // 약품구분
+  cancelName?: string;   // 허가 상태(정상/취하/유효기간만료/행정(취소) 등, 없으면 미확인)
   itemImage?: string;    // 알약 이미지 URL
 }
 

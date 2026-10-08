@@ -16,6 +16,8 @@ import com.tadaktadak.eunggeubi.global.security.JwtProvider;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
+
+import com.tadaktadak.eunggeubi.global.validation.PasswordValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -38,12 +40,16 @@ public class AuthService {
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
+        // 0. 비밀번호에 개인정보가 섞였는지 (필드 레벨 검증이 못 보는 교차 검사)
+        PasswordValidator.ensureNotContainsUserInfo(
+                request.password(), request.email(), request.phone());
+
         // 1. 이메일 중복 확인
         if (userRepository.existsByEmail(request.email())) {
             throw new IllegalArgumentException("이미 가입된 이메일입니다.");
         }
         // 1-2. 휴대폰 인증 완료된 번호인지 확인 (인증 안 된 번호는 가입 불가)
-        phoneVerificationService.ensureVerified(request.phone(), Purpose.SIGNUP);
+        phoneVerificationService.consumeVerified(request.phone(), Purpose.SIGNUP);
 
         // 2. 만 14세 미만 판별 → 보호자 동의 필요 여부 & 회원 상태 결정
         boolean guardianConsentRequired =
@@ -66,7 +72,10 @@ public class AuthService {
         // 4. 약관 동의 이력 저장 (필수 3종)
         saveTermsAgreements(user.getId());
 
-        return new SignupResponse(user.getId(), status, guardianConsentRequired);
+        // 보호자 동의가 필요한 경우에만 전용 토큰을 발급한다.
+        // userId 를 그대로 받으면 아무나 남의 PENDING 계정에 보호자를 등록할 수 있다.
+        String consentToken = guardianConsentRequired ? jwtProvider.createConsentToken(user.getId()) : null;
+        return new SignupResponse(user.getId(), status, guardianConsentRequired, consentToken);
     }
 
     @Transactional

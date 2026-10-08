@@ -9,8 +9,8 @@ export type RootStackParamList = {
   Legal: { tab?: 'terms' | 'privacy'; section?: string } | undefined;
   Tabs: undefined;
   EditProfile: undefined;
-  GuardianConsent: { userId: number; email: string };
-  GuardianWaiting: { userId: number; email: string; maskedPhone: string };
+  GuardianConsent: { consentToken: string; email: string };
+  GuardianWaiting: { consentToken: string; email: string; maskedPhone: string };
   SocialConsent: { ticket: string };
   SocialExtraInfo: { ticket: string };
 

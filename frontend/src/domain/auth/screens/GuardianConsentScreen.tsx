@@ -34,7 +34,7 @@ const RELATIONSHIPS: { label: string; value: Relationship }[] = [
 export default function GuardianConsentScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<ConsentRoute>();
-  const { userId, email } = route.params;
+  const { consentToken, email } = route.params;
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -52,12 +52,12 @@ export default function GuardianConsentScreen() {
     setSubmitting(true);
     try {
       const res = await authApi.requestGuardianConsent({
-        userId,
+        consentToken,
         name: name.trim(),
         phone: phone.trim(),
         relationship,
       });
-      navigation.navigate('GuardianWaiting', { userId, email, maskedPhone: res.maskedPhone });
+      navigation.navigate('GuardianWaiting', { consentToken, email, maskedPhone: res.maskedPhone });
     } catch (e: any) {
       Alert.alert('발송 실패', e?.message ?? '다시 시도해주세요.');
     } finally {

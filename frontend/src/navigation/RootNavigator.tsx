@@ -13,7 +13,7 @@ import EditProfileScreen from '../domain/user/screens/EditProfileScreen';
 import GuardianConsentScreen from '../domain/auth/screens/GuardianConsentScreen';
 import GuardianWaitingScreen from '../domain/auth/screens/GuardianWaitingScreen';
 import EmergencyResultScreen from '../domain/emergency/screens/EmergencyResultScreen';
-import PlaceholderScreen from '../shared/components/PlaceholderScreen';
+import DrugNavigator from '../domain/drug/screens/DrugNavigator';
 import LegalScreen from '../shared/screens/LegalScreen';
 import TabBar from '../shared/components/TabBar';
 import { RootStackParamList } from './types';
@@ -35,9 +35,7 @@ function TabsNavigator() {
       <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
         <Tab.Screen name="AiChat" component={AiConsultationNavigator} options={{ title: 'AI상담' }} />
         <Tab.Screen name="Hospital" component={MedicalLocatorScreen} options={{ title: '병원찾기' }} />
-        <Tab.Screen name="Medicine" options={{ title: '약물정보' }}>
-          {() => <PlaceholderScreen name="약물정보" />}
-        </Tab.Screen>
+        <Tab.Screen name="Medicine" component={DrugNavigator} options={{ title: '약물정보' }} />
         <Tab.Screen name="My" component={MyPageNavigator} options={{ title: '마이' }} />
       </Tab.Navigator>
 
