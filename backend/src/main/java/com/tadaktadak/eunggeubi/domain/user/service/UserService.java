@@ -11,6 +11,7 @@ import com.tadaktadak.eunggeubi.domain.user.repository.GuardianConsentRepository
 import com.tadaktadak.eunggeubi.domain.user.repository.GuardianRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
+import com.tadaktadak.eunggeubi.global.validation.PasswordValidator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -54,6 +55,9 @@ public class UserService {
         if (passwordEncoder.matches(newPassword, user.getPassword())) {
             throw new IllegalArgumentException("현재 비밀번호와 다른 비밀번호를 입력해주세요.");
         }
+
+        // 가입·재설정과 같은 정책: 이메일 아이디나 전화번호 조각이 들어간 비밀번호는 막는다
+        PasswordValidator.ensureNotContainsUserInfo(newPassword, user.getEmail(), user.getPhone());
 
         user.changePassword(passwordEncoder.encode(newPassword));
 

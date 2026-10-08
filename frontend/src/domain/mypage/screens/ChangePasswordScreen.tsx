@@ -6,12 +6,11 @@ import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import AppHeader from '../../../shared/components/AppHeader';
 import { saveTokens } from '../../../shared/storage/tokenStorage';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { PASSWORD_RULE_TEXT, validatePassword } from '../../../shared/utils/password';
 import { changePassword } from '../api/user';
 import { MyPageStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<MyPageStackParamList>;
-
-const MIN_LENGTH = 8; // 서버 @Size(min = 8)과 맞춘 값
 
 export default function ChangePasswordScreen() {
   const navigation = useNavigation<Nav>();
@@ -21,10 +20,12 @@ export default function ChangePasswordScreen() {
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
 
-  //서버와 같은 규칙으로 검증, 프론트에서도 거름
+  //서버와 같은 규칙으로 검증, 프론트에서도 거름(가입·비밀번호 재설정과 같은 정책).
+  //이메일·전화번호 포함 여부는 이 화면에 그 값이 없어서 서버가 검사하고, 메시지는 아래 변경 실패 알림으로 보여준다
   const validate = () => {
     if (!current || !next || !confirm) return '모든 항목을 입력해주세요.';
-    if (next.length < MIN_LENGTH) return `새 비밀번호는 ${MIN_LENGTH}자 이상이어야 해요.`;
+    const policy = validatePassword(next);
+    if (!policy.ok) return policy.message;
     if (next !== confirm) return '새 비밀번호가 서로 달라요.';
     if (next === current) return '현재 비밀번호와 다른 비밀번호를 입력해주세요.';
     return null;
@@ -77,11 +78,12 @@ export default function ChangePasswordScreen() {
           style={styles.input}
           value={next}
           onChangeText={setNext}
-          placeholder={`${MIN_LENGTH}자 이상`}
+          placeholder="새 비밀번호"
           placeholderTextColor={colors.placeholder}
           secureTextEntry
           autoCapitalize="none"
         />
+        <Text style={styles.hint}>{PASSWORD_RULE_TEXT}</Text>
 
         <Text style={styles.label}>새 비밀번호 확인</Text>
         <TextInput
@@ -108,6 +110,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, gap: spacing.sm },
   label: { fontSize: font.sub, fontWeight: '700', color: colors.text, marginTop: spacing.md },
+  hint: { color: colors.textSub, fontSize: font.caption },
   input: {
     backgroundColor: colors.inputBg,
     borderRadius: radius.md,
