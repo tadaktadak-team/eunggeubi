@@ -71,7 +71,7 @@ public class ConsultationRegenerationService {
 
         String userPrompt = "[참고자료]\n%s\n\n[증상]\n%s\n\n[체크리스트에서 해당한다고 응답한 항목]\n%s".formatted(
                 ragRetrievalService.buildContext(docs), symptomText,
-                checkedItems.isEmpty() ? "없음" : String.join("\n", checkedItems));
+                checkedItems.isEmpty() ? "해당사항 없음" : String.join("\n", checkedItems));
         RawRegeneratedAnswer raw = generateRawAnswer(consultationId, userPrompt);
         if (raw == null) {
             return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of(), relatedAidGuide);
