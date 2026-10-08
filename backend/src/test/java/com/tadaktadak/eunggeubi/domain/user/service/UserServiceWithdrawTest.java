@@ -10,6 +10,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.tadaktadak.eunggeubi.domain.auth.service.PhoneVerificationService;
 import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
 import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
 import com.tadaktadak.eunggeubi.domain.user.entity.Guardian;
@@ -41,7 +42,7 @@ class UserServiceWithdrawTest {
     @BeforeEach
     void setUp() {
         service = new UserService(userRepository, passwordEncoder, refreshTokenService, jwtProvider,
-                guardianRepository, consentRepository, healthProfileRepository);
+                guardianRepository, consentRepository, healthProfileRepository, mock(PhoneVerificationService.class));
         user = mock(User.class);
         when(user.isWithdrawn()).thenReturn(false);
         when(user.getPassword()).thenReturn("hashed");

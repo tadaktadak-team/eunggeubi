@@ -1,5 +1,7 @@
 package com.tadaktadak.eunggeubi.domain.user.service;
 
+import com.tadaktadak.eunggeubi.domain.auth.entity.Purpose;
+import com.tadaktadak.eunggeubi.domain.auth.service.PhoneVerificationService;
 import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
 import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
 import com.tadaktadak.eunggeubi.domain.user.dto.ChangePasswordResponse;
@@ -11,6 +13,7 @@ import com.tadaktadak.eunggeubi.domain.user.repository.GuardianConsentRepository
 import com.tadaktadak.eunggeubi.domain.user.repository.GuardianRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
+import com.tadaktadak.eunggeubi.global.util.PhoneNumbers;
 import com.tadaktadak.eunggeubi.global.validation.PasswordValidator;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +32,7 @@ public class UserService {
     private final GuardianRepository guardianRepository;
     private final GuardianConsentRepository guardianConsentRepository;
     private final HealthProfileRepository healthProfileRepository;
+    private final PhoneVerificationService phoneVerificationService;
 
     @Transactional(readOnly = true)
     public MyInfoResponse getMyInfo(Long userId) {
@@ -74,7 +78,13 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
 
-        user.updateProfile(request.name().trim(), request.phone().trim(),
+        // 전화번호는 아이디 찾기·비밀번호 재설정에 쓰여서, 바꿀 때는 새 번호로 문자 인증을 받아야 한다.
+        // 인증 목적은 가입과 같은 SIGNUP 을 쓴다(DB의 purpose 칸이 enum 이라 새 값을 넣으려면 컬럼을 바꿔야 한다)
+        if (!PhoneNumbers.digitsOnly(user.getPhone()).equals(request.phone())) {
+            phoneVerificationService.consumeVerified(request.phone(), Purpose.SIGNUP);
+        }
+
+        user.updateProfile(request.name().trim(), request.phone(),
                 request.birthDate(), request.gender(),
                 request.address() == null ? null : request.address().trim());
 

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.tadaktadak.eunggeubi.domain.auth.service.PhoneVerificationService;
 import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
 import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
@@ -33,7 +34,8 @@ class UserServiceChangePasswordTest {
     @BeforeEach
     void setUp() {
         service = new UserService(userRepository, passwordEncoder, refreshTokenService, jwtProvider,
-                mock(GuardianRepository.class), mock(GuardianConsentRepository.class), mock(HealthProfileRepository.class));
+                mock(GuardianRepository.class), mock(GuardianConsentRepository.class), mock(HealthProfileRepository.class),
+                mock(PhoneVerificationService.class));
         user = mock(User.class);
         when(user.getPassword()).thenReturn("hashed");
         when(user.getEmail()).thenReturn("hong.gildong@example.com");
