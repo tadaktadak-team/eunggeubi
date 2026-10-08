@@ -2,7 +2,9 @@ package com.tadaktadak.eunggeubi.domain.first_aid.service;
 
 import com.tadaktadak.eunggeubi.domain.ai_consultations.service.RagRetrievalService;
 import com.tadaktadak.eunggeubi.domain.first_aid.dto.FirstAidGuideResponse;
+import com.tadaktadak.eunggeubi.domain.first_aid.dto.FirstAidSearchResponse;
 import com.tadaktadak.eunggeubi.domain.first_aid.dto.RawFirstAidGuide;
+import com.tadaktadak.eunggeubi.domain.first_aid.dto.RawStepOrder;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -11,6 +13,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -68,7 +71,7 @@ public class FirstAidGuideService {
     // 지적(실측 확인)이 있었다. topic 후보가 483개로 유한해서 무한정 커질 걱정은 없다.
     // ponytail: 재인덱싱(HealthInfoIndexingRunner)해도 이 캐시는 안 지워진다 - 앱을 재시작하기 전까지
     // 옛 내용이 남는다. 재인덱싱 직후 캐시를 비우는 관리용 엔드포인트가 필요해지면 그때 추가한다.
-    private final Map<String, RawFirstAidGuide> guideCache = new ConcurrentHashMap<>();
+    private final Map<String, Guide> guideCache = new ConcurrentHashMap<>();
 
     // AiConsultationService/ConsultationRegenerationService가 상담 원문에 응급처치로 안내할 만한
     // 상황이 있는지 확인할 때 쓴다 - 실제 가이드 생성 없이 상황명만 필요할 때.
@@ -80,11 +83,11 @@ public class FirstAidGuideService {
         String resolvedTopic = healthTopicResolver.resolve(situation)
                 .orElseThrow(() -> new IllegalArgumentException("해당 상황의 응급처치 정보를 찾을 수 없습니다."));
 
-        RawFirstAidGuide raw = guideFor(resolvedTopic)
+        Guide guide = guideFor(resolvedTopic)
                 .orElseThrow(() -> new IllegalArgumentException("해당 상황의 응급처치 정보를 찾을 수 없습니다."));
         // situation은 호출자가 준 원래 표현(예: 프론트 칩 라벨 "기도막힘")을 그대로 돌려준다 - 내부적으로만
         // resolvedTopic(코퍼스 문서명, 예: "심폐소생술(이물질에 의한 기도폐쇄의 처치)")으로 검색한다.
-        return FirstAidGuideResponse.of(situation, raw);
+        return FirstAidGuideResponse.of(situation, guide.raw(), guide.ordered());
     }
 
     // 자유 텍스트로 health_info 컬렉션을 검색해서, 현장 응급처치로 다룰 만한 내용이 있으면 그 자리에서
@@ -100,14 +103,25 @@ public class FirstAidGuideService {
         }
 
         return guideFor(resolvedTopic.get())
-                .map(raw -> FirstAidGuideResponse.of(resolvedTopic.get(), raw));
+                .map(guide -> FirstAidGuideResponse.of(resolvedTopic.get(), guide.raw(), guide.ordered()));
+    }
+
+    // 응급처치 검색창 전용. 가이드는 만들지 않고 후보 이름만 돌려준다 - 사용자가 고른 것만
+    // getBySituation으로 생성한다(후보마다 다 만들면 처음 보는 주제는 하나당 몇 초씩 걸려서 너무 느리다).
+    // 후보는 가이드가 실제로 만들어지는 주제만 모은 목록(first-aid-topics.txt)에서 고르므로 여기서 다시
+    // 가이드를 만들어 걸러내지 않는다 - 그렇게 하던 땐 검색이 37초까지 걸렸다. LLM 편차로 드물게 가이드
+    // 생성이 실패하면 프론트가 그 후보를 목록에서 빼고 안내한다.
+    public FirstAidSearchResponse searchCandidates(String text) {
+        return new FirstAidSearchResponse(healthTopicResolver.resolveCandidates(text).stream()
+                .map(healthTopicResolver::describe)
+                .toList());
     }
 
     // 캐시에 있으면 그대로 쓰고, 없으면 검색+생성 후 성공한 결과만 캐싱한다. 실패(참고자료 없음/현장
     // 조치 없음)는 캐싱하지 않는다 - 실패 원인(seed.csv 갱신, 재인덱싱)이 나중에 해소될 수 있어서
     // 매번 다시 시도하는 편이 안전하다.
-    private Optional<RawFirstAidGuide> guideFor(String topic) {
-        RawFirstAidGuide cached = guideCache.get(topic);
+    private Optional<Guide> guideFor(String topic) {
+        Guide cached = guideCache.get(topic);
         if (cached != null) {
             return Optional.of(cached);
         }
@@ -118,9 +132,37 @@ public class FirstAidGuideService {
         }
 
         return generateWithRetry(topic, docs).map(raw -> {
-            guideCache.put(topic, raw);
-            return raw;
+            Guide guide = new Guide(raw, classifyOrdered(topic, raw.steps()));
+            guideCache.put(topic, guide);
+            return guide;
         });
+    }
+
+    // 만들어진 steps를 순서대로 해야 하는지 따로 묻는다(RawStepOrder 참고). 한 단계뿐이면 순서라는 게
+    // 없어 LLM을 부르지 않는다. 실패하면 null(=번호 없음)로 둔다.
+    // ponytail: 판단 실패도 가이드와 함께 캐싱돼서 재시작 전까지 번호 없이 보인다 - 실패가 잦아지면
+    // 재시도를 붙이거나 판단 결과만 따로 캐싱한다.
+    private Boolean classifyOrdered(String topic, List<String> steps) {
+        if (steps.size() <= 1) {
+            return false;
+        }
+        String numbered = IntStream.rangeClosed(1, steps.size())
+                .mapToObj(i -> "%d. %s".formatted(i, steps.get(i - 1)))
+                .collect(Collectors.joining("\n"));
+        try {
+            RawStepOrder raw = chatClient.prompt()
+                    .system(FirstAidPrompts.STEP_ORDER_PROMPT)
+                    .user("[상황]\n%s\n\n[응급처치 단계]\n%s".formatted(topic, numbered))
+                    .call()
+                    .entity(RawStepOrder.class);
+            return raw == null ? null : raw.ordered();
+        } catch (Exception e) {
+            log.warn("응급처치 순서 판단 LLM 호출이 실패했습니다. topic=\"{}\"", topic, e);
+            return null;
+        }
+    }
+
+    private record Guide(RawFirstAidGuide raw, Boolean ordered) {
     }
 
     // steps가 빈 배열인 응답(FirstAidPrompts 규칙 3 - 참고자료에 현장 조치가 없다는 뜻)도 재시도

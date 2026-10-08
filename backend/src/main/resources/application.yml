@@ -64,6 +64,10 @@ kdca:
   health-info:
     base-url: https://api.kdca.go.kr/api/provide/healthInfo
     token: ${KDCA_TOKEN:}
+  first-aid:
+    # 응급처치 검색(후보 고르기·관련성 확인)에만 쓰는 모델. 위 spring.ai 기본 모델(gpt-4o-mini)로는
+    # 후보를 못 고르거나 엉뚱한 후보를 넣는 일이 잦아서(HealthTopicResolver 참고) 이 두 호출만 올렸다.
+    search-model: gpt-4.1
 
 app:
   rate-limit:

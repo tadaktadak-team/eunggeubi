@@ -10,7 +10,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.tadaktadak.eunggeubi.domain.ai_consultations.service.RagRetrievalService;
+import com.tadaktadak.eunggeubi.domain.first_aid.dto.FirstAidGuideResponse;
 import com.tadaktadak.eunggeubi.domain.first_aid.dto.RawFirstAidGuide;
+import com.tadaktadak.eunggeubi.domain.first_aid.dto.RawStepOrder;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -197,6 +199,20 @@ class FirstAidGuideServiceTest {
         service.search("화상 관련 텍스트");
 
         verify(ragRetrievalService, times(2)).retrieveByExactDisease("화상");
+    }
+
+    // 가이드 생성과 따로, 완성된 steps만 보고 순서 판단(RawStepOrder)을 물어 그 결과로 번호 여부를 정한다.
+    @Test
+    void 여러_단계_가이드는_순서판단_결과로_번호여부를_정한다() {
+        when(healthTopicResolver.resolve("코피가 나요")).thenReturn(Optional.of("코피"));
+        Document doc = new Document("코피 관련 내용", Map.of("disease", "코피"));
+        when(ragRetrievalService.retrieveByExactDisease(anyString())).thenReturn(List.of(doc));
+        when(ragRetrievalService.buildContext(List.of(doc))).thenReturn("[1] (코피) ...");
+        stubChatClientEntity(new RawFirstAidGuide("코피 응급처치", List.of("고개를 숙입니다.", "코를 쥡니다.")));
+        when(chatClient.prompt().system(anyString()).user(anyString()).call().entity(RawStepOrder.class))
+                .thenReturn(new RawStepOrder(true));
+
+        assertThat(service.search("코피가 나요")).get().extracting(FirstAidGuideResponse::ordered).isEqualTo(true);
     }
 
     @SuppressWarnings("unchecked")

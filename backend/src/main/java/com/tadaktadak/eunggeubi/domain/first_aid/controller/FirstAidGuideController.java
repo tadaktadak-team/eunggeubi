@@ -1,10 +1,10 @@
 package com.tadaktadak.eunggeubi.domain.first_aid.controller;
 
 import com.tadaktadak.eunggeubi.domain.first_aid.dto.FirstAidGuideResponse;
+import com.tadaktadak.eunggeubi.domain.first_aid.dto.FirstAidSearchResponse;
 import com.tadaktadak.eunggeubi.domain.first_aid.dto.SearchFirstAidGuideRequest;
 import com.tadaktadak.eunggeubi.domain.first_aid.service.FirstAidGuideService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,10 +25,9 @@ public class FirstAidGuideController {
         return firstAidGuideService.getBySituation(situation);
     }
 
-    // 매칭되는 상황이 없으면 프론트가 null을 기대하므로(FirstAidGuideDto | null), 404 대신 200 + null
-    // 본문으로 내려준다.
+    // 매칭되는 상황이 없어도 404 대신 200 + 빈 candidates로 내려준다 - 프론트가 "못 찾음" 안내를 띄운다.
     @PostMapping("/search")
-    public ResponseEntity<FirstAidGuideResponse> search(@RequestBody SearchFirstAidGuideRequest request) {
-        return ResponseEntity.ok(firstAidGuideService.search(request.text()).orElse(null));
+    public FirstAidSearchResponse search(@RequestBody SearchFirstAidGuideRequest request) {
+        return firstAidGuideService.searchCandidates(request.text());
     }
 }
