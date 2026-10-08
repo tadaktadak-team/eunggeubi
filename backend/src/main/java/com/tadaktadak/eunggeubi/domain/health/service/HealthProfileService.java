@@ -5,7 +5,9 @@ import com.tadaktadak.eunggeubi.domain.health.dto.MedicationItem;
 import com.tadaktadak.eunggeubi.domain.health.dto.HealthProfileResponse;
 import com.tadaktadak.eunggeubi.domain.health.entity.HealthProfile;
 import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -54,13 +56,18 @@ public class HealthProfileService {
         return HealthProfileResponse.from(profile);
     }
 
+    // 콤마로 이어 저장하므로 항목 안의 콤마("땅콩, 호두")는 미리 나눠 둔다. 그래야 다시 읽을 때와 결과가 같다
     private String toCsv(List<String> items) {
         if (items == null || items.isEmpty()) {
             return null;
         }
-        return items.stream()
+        String csv = items.stream()
+                .filter(Objects::nonNull)   // ["고혈압", null] 같은 요청이 서버 오류(500)가 되지 않게
+                .flatMap(s -> Arrays.stream(s.split(",")))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
+                .distinct()
                 .collect(Collectors.joining(","));
+        return csv.isEmpty() ? null : csv;
     }
 }

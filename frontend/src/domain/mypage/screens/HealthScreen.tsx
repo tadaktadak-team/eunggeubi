@@ -29,10 +29,11 @@ function TagSection({
   onRemove: (v: string) => void;
 }) {
   const [input, setInput] = useState('');
+  // 서버는 콤마로 이어 저장하므로 "땅콩, 호두"는 두 항목으로 나눠 넣는다(저장 후 다시 열어도 모양이 같게)
   const add = () => {
-    const v = input.trim();
-    if (!v) return;
-    onAdd(v);
+    const values = input.split(',').map((v) => v.trim()).filter(Boolean);
+    if (values.length === 0) return;
+    values.forEach(onAdd);
     setInput('');
   };
   return (
@@ -54,6 +55,7 @@ function TagSection({
           onChangeText={setInput}
           placeholder={`${title} 입력 후 추가`}
           placeholderTextColor={colors.placeholder}
+          maxLength={50}
           onSubmitEditing={add}
           returnKeyType="done"
         />
