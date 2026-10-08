@@ -51,7 +51,7 @@ export function useNearestEmergencyBed() {
       loadedAtRef.current = Date.now();
       done(nearest.length > 0 ? { status: 'ready', beds: nearest } : { status: 'empty' });
     } catch (e) {
-      console.log('가까운 응급실 조회 실패:', e);
+      console.error('가까운 응급실 조회 실패:', e);
       done({ status: 'error' });
     }
   }, []);

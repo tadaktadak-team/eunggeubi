@@ -153,7 +153,7 @@ export default function MedicalLocatorScreen() {
       loadPharmacies(latitude, longitude);
 
     } catch (e) {
-      console.log("위치 조회 실패:", e);
+      console.error("위치 조회 실패:", e);
 
       if (e instanceof Error) {
         setError(e.message);
@@ -231,7 +231,7 @@ export default function MedicalLocatorScreen() {
       const data = await getEmergencyBeds(latitude, longitude, stage1);
       setBeds(data);
     } catch (e) {
-      console.log("응급실 조회 실패:", e);
+      console.error("응급실 조회 실패:", e);
       setBeds([]);
       setBedsFailed(true);
     }
@@ -243,7 +243,7 @@ export default function MedicalLocatorScreen() {
       const data = await getNearbyHospitals(latitude, longitude);
       setHospitals(data);
     } catch (e) {
-      console.log("병원 조회 실패:", e);
+      console.error("병원 조회 실패:", e);
       setHospitals([]);
       setHospitalsFailed(true);
     }
@@ -255,7 +255,7 @@ export default function MedicalLocatorScreen() {
       const data = await getNearbyPharmacies(latitude, longitude);
       setPharmacies(data);
     } catch (e) {
-      console.log("약국 조회 실패:", e);
+      console.error("약국 조회 실패:", e);
       setPharmacies([]);
       setPharmaciesFailed(true);
     }
