@@ -105,12 +105,15 @@ export default function HealthScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<HealthRoute>();
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [bloodType, setBloodType] = useState<string | null>(null);
   const [diseases, setDiseases] = useState<string[]>([]);
   const [medications, setMedications] = useState<MedicationItem[]>([]);
   const [allergies, setAllergies] = useState<string[]>([]);
 
+  // 불러오기에 실패한 채 빈 화면으로 저장하면 기존 프로필이 지워지므로, 실패하면 저장 대신 다시 시도만 보여준다
   useEffect(() => {
     (async () => {
       try {
@@ -119,13 +122,20 @@ export default function HealthScreen() {
         setDiseases(p.diseases);
         setMedications(p.medicationItems ?? p.medications.map((name) => ({ name, itemSeq: null })));
         setAllergies(p.allergies);
+        setLoadFailed(false);
       } catch (e: any) {
-        Alert.alert('오류', e?.message ?? '불러오지 못했어요.');
+        console.error('건강 프로필 조회 실패:', e);
+        setLoadFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [attempt]);
+
+  const retry = () => {
+    setLoading(true);
+    setAttempt((n) => n + 1);
+  };
 
   // 약 검색 화면에서 고른 약을 받아 목록에 추가
   useFocusEffect(
@@ -161,6 +171,20 @@ export default function HealthScreen() {
       <View style={styles.container}>
         <AppHeader title="건강 프로필" />
         <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+      </View>
+    );
+  }
+
+  if (loadFailed) {
+    return (
+      <View style={styles.container}>
+        <AppHeader title="건강 프로필" />
+        <View style={styles.failBox}>
+          <Text style={styles.failText}>건강 프로필을 불러오지 못했어요.{'\n'}네트워크를 확인하고 다시 시도해주세요.</Text>
+          <Pressable style={styles.retryBtn} onPress={retry}>
+            <Text style={styles.saveText}>다시 시도</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -281,4 +305,14 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   saveText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  failBox: { alignItems: 'center', gap: spacing.lg, padding: spacing.xl, marginTop: spacing.xxl },
+  failText: { fontSize: font.body, color: colors.textSub, textAlign: 'center', lineHeight: 22 },
+  retryBtn: {
+    backgroundColor: colors.primary,
+    height: 48,
+    paddingHorizontal: spacing.xl,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
