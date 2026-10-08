@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -16,7 +17,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "social_accounts")
+@Table(name = "social_accounts", indexes = @Index(name = "idx_social_accounts_provider_user", columnList = "provider, provider_user_id"))
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class SocialAccount {
 

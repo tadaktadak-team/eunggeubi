@@ -2,7 +2,7 @@ package com.tadaktadak.eunggeubi.domain.auth.service;
 import com.tadaktadak.eunggeubi.domain.auth.dto.ConsentPageInfo;
 import com.tadaktadak.eunggeubi.domain.auth.dto.ConsentStatusResponse;
 import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianConsentResponse;
-import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianRequest;
+import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianConsentRequest;
 import com.tadaktadak.eunggeubi.domain.user.entity.ConsentStatus;
 import com.tadaktadak.eunggeubi.domain.user.entity.Guardian;
 import com.tadaktadak.eunggeubi.domain.user.entity.GuardianConsent;
@@ -38,7 +38,7 @@ public class GuardianConsentService {
     private String baseUrl;
 
     @Transactional
-    public GuardianConsentResponse requestConsent(GuardianRequest request) {
+    public GuardianConsentResponse requestConsent(GuardianConsentRequest request) {
         // 1. 대상 회원 확인 (동의 대기 상태여야 함)
         User user = userRepository.findById(requireUserId(request.consentToken()))
                 .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
