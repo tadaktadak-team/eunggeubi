@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
@@ -58,9 +58,6 @@ export default function SymptomChatScreen() {
     send(text);
   };
 
-  const showDisclaimer = () =>
-    Alert.alert('안내', '*참고용이며, 의료 전문가의 상담을 대체하지 않습니다.');
-
   return (
       <KeyboardAvoidingView
           style={styles.container}
@@ -75,11 +72,7 @@ export default function SymptomChatScreen() {
             <AiAvatar />
             <View style={styles.headerText}>
               <Text style={styles.headerTitle}>AI 증상 상담</Text>
-              <Text style={styles.headerSubtitle}>참고 정보만 제공해요 · 진단 아님</Text>
             </View>
-            <Pressable style={styles.side} onPress={showDisclaimer} hitSlop={8}>
-              <Ionicons name="alert-circle-outline" size={22} color={colors.textSub} />
-            </Pressable>
           </View>
         </View>
 
@@ -176,7 +169,6 @@ const styles = StyleSheet.create({
   side: { width: 32, alignItems: 'center', justifyContent: 'center' },
   headerText: { flex: 1 },
   headerTitle: { fontSize: font.h3, fontWeight: '700', color: colors.text },
-  headerSubtitle: { fontSize: font.caption, color: colors.textSub, marginTop: 2 },
   list: { flex: 1 },
   listContent: { padding: spacing.lg, gap: spacing.lg },
   typingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
