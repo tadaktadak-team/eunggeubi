@@ -7,6 +7,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface GuardianConsentRepository extends JpaRepository<GuardianConsent, Long> {
 
@@ -28,4 +31,13 @@ public interface GuardianConsentRepository extends JpaRepository<GuardianConsent
     void deleteByUserId(Long userId);
 
     void deleteByGuardianIdIn(Collection<Long> guardianIds);
+
+    void deleteByUserIdIn(Collection<Long> userIds);
+
+    // 삭제된 보호자의 발송 기록. 하루 발송 상한을 세는 데 쓰여서 보호자를 지울 때 바로 지우지 않고,
+    // 상한을 세는 기간이 지난 뒤 정리 작업이 지운다(바로 지우면 등록→삭제 반복으로 상한을 우회할 수 있다)
+    @Modifying
+    @Query("delete from GuardianConsent c where c.sentAt < :before"
+            + " and not exists (select g.id from Guardian g where g.id = c.guardianId)")
+    int deleteOrphanedSentBefore(@Param("before") LocalDateTime before);
 }
