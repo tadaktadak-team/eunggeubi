@@ -1,6 +1,7 @@
 package com.tadaktadak.eunggeubi.domain.health.dto;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -9,6 +10,8 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 // 복용약 한 건. itemSeq(품목일련번호)가 있으면 약 검색으로 고른 것, null이면 직접 입력한 것
 public record MedicationItem(
@@ -16,7 +19,10 @@ public record MedicationItem(
         @Size(max = 200, message = "약 이름은 200자 이내로 입력해주세요.") String name,
         @Pattern(regexp = "^\\d{1,20}$", message = "약 번호가 올바르지 않습니다.") String itemSeq
 ) {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Logger log = LoggerFactory.getLogger(MedicationItem.class);
+    // 나중에 항목(예: 용량)이 늘어난 데이터를 예전 서버가 읽어도 실패하지 않게, 모르는 필드는 무시한다
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     public static List<MedicationItem> fromNames(List<String> names) {
         if (names == null) {
@@ -34,11 +40,22 @@ public record MedicationItem(
         return fromNames(Arrays.stream(csv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList());
     }
 
-    public static List<MedicationItem> fromJson(String json) {
+    // DB에 저장된 복용약을 복원한다. 번호까지 담은 JSON(medication_items)이 있으면 그걸 쓰고,
+    // 없거나 읽을 수 없으면 이름만 담은 콤마 문자열(medications)로 복원한다.
+    // 읽기에 실패했을 때 빈 목록을 돌려주면 사용자에게는 복용약이 사라진 것처럼 보이고, 그 상태로 저장하면
+    // 실제로 지워진다. 그래서 이름이라도 되살리고, 원인을 찾을 수 있게 로그를 남긴다.
+    public static List<MedicationItem> fromStored(String json, String csv) {
+        if (json == null || json.isBlank()) {
+            return fromCsv(csv);
+        }
         try {
-            return MAPPER.readValue(json, new TypeReference<List<MedicationItem>>() { });
+            List<MedicationItem> items = MAPPER.readValue(json, new TypeReference<List<MedicationItem>>() { });
+            return items == null ? fromCsv(csv) : items;
         } catch (Exception e) {
-            return List.of();
+            // 예외 메시지에는 JSON 내용(건강 정보)의 일부가 들어갈 수 있어 종류와 길이만 남긴다
+            log.warn("복용약 JSON(medication_items)을 읽지 못해 이름만 복원합니다: {}, length={}",
+                    e.getClass().getSimpleName(), json.length());
+            return fromCsv(csv);
         }
     }
 

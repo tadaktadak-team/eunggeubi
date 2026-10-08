@@ -13,10 +13,8 @@ public record HealthProfileResponse(
         List<String> allergies
 ) {
     public static HealthProfileResponse from(HealthProfile p) {
-        // 번호까지 저장된 값이 있으면 그걸 쓰고, 예전에 이름만 저장한 프로필은 번호 없이 복원한다
-        List<MedicationItem> medicationItems = p.getMedicationItems() != null
-                ? MedicationItem.fromJson(p.getMedicationItems())
-                : MedicationItem.fromCsv(p.getMedications());
+        // 번호까지 저장된 값이 있으면 그걸 쓰고, 예전에 이름만 저장한 프로필(또는 읽을 수 없는 값)은 번호 없이 복원한다
+        List<MedicationItem> medicationItems = MedicationItem.fromStored(p.getMedicationItems(), p.getMedications());
         return new HealthProfileResponse(
                 p.getBloodType(),
                 toList(p.getDiseases()),
