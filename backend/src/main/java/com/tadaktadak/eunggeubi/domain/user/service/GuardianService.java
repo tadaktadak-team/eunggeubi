@@ -7,6 +7,7 @@ import com.tadaktadak.eunggeubi.domain.user.entity.Guardian;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
 import com.tadaktadak.eunggeubi.domain.user.repository.GuardianRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
+import com.tadaktadak.eunggeubi.global.exception.ResourceNotFoundException;
 import com.tadaktadak.eunggeubi.global.util.PhoneNumbers;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -100,11 +101,10 @@ public class GuardianService {
 
     // 내 보호자인지 확인 (남의 보호자 접근 차단)
     private Guardian findOwned(Long userId, Long guardianId) {
-        Guardian guardian = guardianRepository.findById(guardianId)
-                .orElseThrow(() -> new IllegalArgumentException("보호자를 찾을 수 없습니다."));
-        if (!guardian.getUserId().equals(userId)) {
-            throw new IllegalArgumentException("본인의 보호자만 접근할 수 있습니다.");
-        }
-        return guardian;
+        // 없는 보호자와 남의 보호자를 같은 응답(404)으로 돌려준다. 다르게 응답하면 번호를 바꿔 가며 어떤 보호자가
+        // 존재하는지 알아낼 수 있다.
+        return guardianRepository.findById(guardianId)
+                .filter(guardian -> guardian.getUserId().equals(userId))
+                .orElseThrow(() -> new ResourceNotFoundException("보호자를 찾을 수 없습니다."));
     }
 }
