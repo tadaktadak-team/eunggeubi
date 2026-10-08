@@ -32,8 +32,6 @@ public interface GuardianConsentRepository extends JpaRepository<GuardianConsent
 
     void deleteByGuardianIdIn(Collection<Long> guardianIds);
 
-    void deleteByUserIdIn(Collection<Long> userIds);
-
     // 삭제된 보호자의 발송 기록. 하루 발송 상한을 세는 데 쓰여서 보호자를 지울 때 바로 지우지 않고,
     // 상한을 세는 기간이 지난 뒤 정리 작업이 지운다(바로 지우면 등록→삭제 반복으로 상한을 우회할 수 있다)
     @Modifying
