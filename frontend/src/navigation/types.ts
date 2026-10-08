@@ -1,4 +1,4 @@
-import { GuardianResult } from '../domain/emergency/types';
+import { GuardianResult, SkipReason } from '../domain/emergency/types';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -21,6 +21,7 @@ export type RootStackParamList = {
     sentAt: string;
     message: string;
     guardians: GuardianResult[];
+    skipReason: SkipReason | null;
   };
 
    HospitalDetail: {

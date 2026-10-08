@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 // query는 길이 제한이 없으면 임베딩·LLM 호출 비용이 그대로 뚫려서 500자로 막는다(증상 설명 용도로 충분).
 public record ConsultationRequest(
         @NotBlank @Size(max = 500) String query,
-        String sessionId,
-        String guestCode
+        @Size(max = 64, message = "세션 정보가 올바르지 않습니다.") String sessionId,
+        @Size(max = 64, message = "세션 정보가 올바르지 않습니다.") String guestCode
 ) {
 }

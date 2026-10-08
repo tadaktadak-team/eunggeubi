@@ -8,10 +8,11 @@ public record GuardianResponse(
         String name,
         String phone,
         Relationship relationship,
-        boolean notifyEnabled
+        boolean notifyEnabled,
+        boolean verified
 ) {
     public static GuardianResponse from(Guardian g) {
         return new GuardianResponse(
-                g.getId(), g.getName(), g.getPhone(), g.getRelationship(), g.isNotifyEnabled());
+                g.getId(), g.getName(), g.getPhone(), g.getRelationship(), g.isNotifyEnabled(), g.isVerified());
     }
 }

@@ -3,6 +3,7 @@ package com.tadaktadak.eunggeubi.domain.drug.controller;
 import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchRequest;
 import com.tadaktadak.eunggeubi.domain.drug.dto.PillSearchPageResponse;
 import com.tadaktadak.eunggeubi.domain.drug.service.PillService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +20,7 @@ public class PillController {
     private final PillService pillService;
 
     @GetMapping("/identification")
-    public ResponseEntity<PillSearchPageResponse> searchPills(@ModelAttribute PillSearchRequest request) {
+    public ResponseEntity<PillSearchPageResponse> searchPills(@Valid @ModelAttribute PillSearchRequest request) {
         PillSearchPageResponse responses = pillService.searchPills(request);
         return ResponseEntity.ok(responses);
     }

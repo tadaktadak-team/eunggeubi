@@ -5,6 +5,7 @@ import MyPageHomeScreen from './MyPageHomeScreen';
 import GuardianScreen from './GuardianScreen';
 import GuardianFormScreen from './GuardianFormScreen';
 import HealthScreen from './HealthScreen';
+import MedicationPickerScreen from './MedicationPickerScreen';
 import ChangePasswordScreen from './ChangePasswordScreen';
 import AccountEditScreen from './AccountEditScreen';
 import WithdrawScreen from './WithdrawScreen';
@@ -22,6 +23,7 @@ export default function MyPageNavigator() {
       <Stack.Screen name="Guardian" component={GuardianScreen} />
       <Stack.Screen name="GuardianForm" component={GuardianFormScreen} />
       <Stack.Screen name="Health" component={HealthScreen} />
+      <Stack.Screen name="MedicationPicker" component={MedicationPickerScreen} />
       <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <Stack.Screen name="AccountEdit" component={AccountEditScreen} />
       <Stack.Screen name="Withdraw" component={WithdrawScreen} />

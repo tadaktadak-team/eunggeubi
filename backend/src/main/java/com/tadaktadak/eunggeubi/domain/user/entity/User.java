@@ -10,6 +10,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -51,6 +52,10 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private UserStatus status;
 
+    // 탈퇴 시각. 처리방침의 보관기간(탈퇴 후 30일)을 세는 기준이다. 이 칸이 생기기 전에 탈퇴한 회원은 비어 있다
+    @Column(name = "withdrawn_at")
+    private LocalDateTime withdrawnAt;
+
     @Builder
     private User(String email, String password, String name, String phone,
                  LocalDate birthDate, Gender gender, String address, UserStatus status) {
@@ -81,6 +86,7 @@ public class User extends BaseTimeEntity {
     // 회원 탈퇴 (상태를 WITHDRAWN으로 — 소프트 삭제)
     public void withdraw() {
         this.status = UserStatus.WITHDRAWN;
+        this.withdrawnAt = LocalDateTime.now();
     }
 
     public boolean isWithdrawn() {
