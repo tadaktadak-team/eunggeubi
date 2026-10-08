@@ -40,8 +40,11 @@ class ChangePasswordRequestTest {
     }
 
     @Test
-    void 비어_있으면_거절한다() {
+    void 비어_있으면_입력해달라는_메시지_하나만_나온다() {
+        // 길이 규칙 메시지가 섞이면 어떤 문장이 응답될지 정해지지 않는다
         assertThat(validate("")).extracting(ConstraintViolation::getMessage)
-                .contains("새 비밀번호를 입력해주세요.");
+                .containsExactly("새 비밀번호를 입력해주세요.");
+        assertThat(validate("   ")).extracting(ConstraintViolation::getMessage)
+                .containsExactly("새 비밀번호를 입력해주세요.");
     }
 }
