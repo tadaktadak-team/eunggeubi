@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RootStackParamList } from '../../../navigation/types';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { formatPhone, toDigits } from '../../../shared/utils/phone';
+import { PASSWORD_RULE_TEXT, validatePassword } from '../../../shared/utils/password';
 import * as authApi from '../api/auth';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -29,6 +30,7 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [phone, setPhone] = useState('');
   const [codeSent, setCodeSent] = useState(false);
   const [code, setCode] = useState('');
@@ -69,6 +71,11 @@ export default function SignupScreen() {
   const onSubmit = async () => {
     if (!email || !password || !name || !birth) {
       return Alert.alert('입력 확인', '모든 필수 항목을 입력해주세요.');
+    }
+    const pwCheck = validatePassword(password, { email: email.trim(), phone: phone.trim() });
+    if (!pwCheck.ok) return Alert.alert('비밀번호 확인', pwCheck.message);
+    if (password !== passwordConfirm) {
+      return Alert.alert('비밀번호 확인', '비밀번호가 일치하지 않습니다.');
     }
     if (!phoneVerified) return Alert.alert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
     const birthDate = toISODate(birth);
@@ -153,7 +160,7 @@ export default function SignupScreen() {
           <View style={styles.inputWrap}>
             <TextInput
               style={styles.inputFlex}
-              placeholder="비밀번호 (8자 이상)"
+              placeholder="비밀번호"
               placeholderTextColor={colors.placeholder}
               secureTextEntry={!showPassword}
               value={password}
@@ -167,6 +174,16 @@ export default function SignupScreen() {
               />
             </TouchableOpacity>
           </View>
+          <Text style={styles.hint}>{PASSWORD_RULE_TEXT}</Text>
+
+          <TextInput
+            style={styles.input}
+            placeholder="비밀번호 확인"
+            placeholderTextColor={colors.placeholder}
+            secureTextEntry={!showPassword}
+            value={passwordConfirm}
+            onChangeText={setPasswordConfirm}
+          />
 
           <View style={styles.row}>
             <TextInput
