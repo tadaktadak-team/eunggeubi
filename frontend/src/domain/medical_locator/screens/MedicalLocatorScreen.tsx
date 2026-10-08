@@ -83,6 +83,7 @@ export default function MedicalLocatorScreen() {
 
   // 위치 확보까지만 담당. 실패하면 화면 전체를 에러로 보여줘야 하는 전제조건이라 그대로 try/catch.
   async function loadInitialData() {
+    let permissionDenied = false;
     try {
       setLoading(true);
       setError(null);
@@ -93,6 +94,7 @@ export default function MedicalLocatorScreen() {
         await Location.requestForegroundPermissionsAsync();
 
       if (status !== "granted") {
+        permissionDenied = true;
         throw new Error("위치 권한이 필요합니다.");
       }
 
@@ -153,7 +155,12 @@ export default function MedicalLocatorScreen() {
       loadPharmacies(latitude, longitude);
 
     } catch (e) {
-      console.error("위치 조회 실패:", e);
+      // 권한 거부는 사용자가 고른 결과라 오류가 아니다(개발 빌드의 빨간 오류 알림을 띄우지 않도록 warn)
+      if (permissionDenied) {
+        console.warn("위치 권한 거부:", e);
+      } else {
+        console.error("위치 조회 실패:", e);
+      }
 
       if (e instanceof Error) {
         setError(e.message);
