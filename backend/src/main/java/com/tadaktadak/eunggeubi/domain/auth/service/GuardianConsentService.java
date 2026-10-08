@@ -35,6 +35,7 @@ public class GuardianConsentService {
     private static final int MAX_PER_GUARDIAN_PER_DAY = 3;
     private static final int MAX_PER_PHONE_PER_DAY = 3;
     private static final int MAX_PER_USER_PER_DAY = 10;
+    private static final String DAILY_LIMIT_MESSAGE = "오늘 보낼 수 있는 동의 문자 횟수를 넘었어요. 내일 다시 시도해주세요.";
 
     private final GuardianRepository guardianRepository;
     private final GuardianConsentRepository guardianConsentRepository;
@@ -60,6 +61,13 @@ public class GuardianConsentService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+
+        // 가입 응답의 동의 토큰은 3일간 쓸 수 있다. 상한이 없으면 같은 토큰으로 아무 번호에나 문자를 계속 보낼 수 있어서
+        // (IP당 분당 5건 제한만으로는 부족하다) 마이페이지 등록과 같은 간격·일일 상한을 건다
+        if (guardianConsentRepository.countByUserIdAndSentAtAfter(user.getId(), now.minus(RESEND_COOLDOWN)) > 0) {
+            throw new IllegalArgumentException("잠시 후 다시 시도해주세요. 동의 문자는 1분에 한 번만 보낼 수 있어요.");
+        }
+        enforceDailyLimits(user.getId(), request.phone(), now);
 
         // 2. 보호자 저장
         Guardian guardian = guardianRepository.save(Guardian.builder()
@@ -148,11 +156,10 @@ public class GuardianConsentService {
                 .ifPresent(c -> {
                     throw new IllegalArgumentException("잠시 후 다시 시도해주세요. 동의 문자는 1분에 한 번만 보낼 수 있어요.");
                 });
-        if (guardianConsentRepository.countByGuardianIdAndSentAtAfter(guardianId, since) >= MAX_PER_GUARDIAN_PER_DAY
-                || guardianConsentRepository.countByPhoneAndSentAtAfter(guardian.getPhone(), since) >= MAX_PER_PHONE_PER_DAY
-                || guardianConsentRepository.countByUserIdAndSentAtAfter(user.getId(), since) >= MAX_PER_USER_PER_DAY) {
-            throw new IllegalArgumentException("오늘 보낼 수 있는 동의 문자 횟수를 넘었어요. 내일 다시 시도해주세요.");
+        if (guardianConsentRepository.countByGuardianIdAndSentAtAfter(guardianId, since) >= MAX_PER_GUARDIAN_PER_DAY) {
+            throw new IllegalArgumentException(DAILY_LIMIT_MESSAGE);
         }
+        enforceDailyLimits(user.getId(), guardian.getPhone(), now);
 
         // 먼저 보낸 링크는 무효화하고 가장 최근 링크만 쓸 수 있게 한다
         guardianConsentRepository.findByGuardianIdAndStatus(guardianId, ConsentStatus.PENDING)
@@ -182,6 +189,17 @@ public class GuardianConsentService {
             throw new ExternalApiException("동의 문자를 보내지 못했습니다. 잠시 후 다시 시도해주세요.", e);
         }
     }
+
+    // 같은 번호나 같은 회원이 하루에 받을 수 있는 동의 문자 수를 제한한다(문자 비용과 스팸 방지).
+    // 가입 경로와 마이페이지 등록 경로가 똑같이 쓴다.
+    private void enforceDailyLimits(Long userId, String phone, LocalDateTime now) {
+        LocalDateTime since = now.minusDays(1);
+        if (guardianConsentRepository.countByPhoneAndSentAtAfter(phone, since) >= MAX_PER_PHONE_PER_DAY
+                || guardianConsentRepository.countByUserIdAndSentAtAfter(userId, since) >= MAX_PER_USER_PER_DAY) {
+            throw new IllegalArgumentException(DAILY_LIMIT_MESSAGE);
+        }
+    }
+
     // 동의 확정 전에 보여줄 안내 화면용 정보. 상태를 바꾸지 않는다(GET 은 부작용이 없어야 한다).
     @Transactional(readOnly = true)
     public ConsentPageInfo loadConsentPage(String token) {
