@@ -190,6 +190,13 @@ public class GuardianConsentService {
         }
     }
 
+    // 보호자를 삭제할 때: 아직 누르지 않은 동의 링크를 무효화한다
+    @Transactional
+    public void expirePending(Long guardianId) {
+        guardianConsentRepository.findByGuardianIdAndStatus(guardianId, ConsentStatus.PENDING)
+                .forEach(GuardianConsent::expire);
+    }
+
     // 같은 번호나 같은 회원이 하루에 받을 수 있는 동의 문자 수를 제한한다(문자 비용과 스팸 방지).
     // 가입 경로와 마이페이지 등록 경로가 똑같이 쓴다.
     private void enforceDailyLimits(Long userId, String phone, LocalDateTime now) {

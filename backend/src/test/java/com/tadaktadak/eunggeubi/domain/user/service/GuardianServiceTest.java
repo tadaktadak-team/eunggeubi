@@ -43,10 +43,11 @@ class GuardianServiceTest {
         // 메시지가 다르면 번호를 바꿔 가며 어떤 보호자가 존재하는지 알아낼 수 있다
         assertThat(notMine.getMessage()).isEqualTo(missing.getMessage());
         verify(guardianRepository, never()).delete(others);
+        verify(consentService, never()).expirePending(10L);
     }
 
     @Test
-    void 내_보호자는_삭제된다() {
+    void 내_보호자는_삭제되고_보낸_동의_링크는_무효가_된다() {
         Guardian mine = mock(Guardian.class);
         when(mine.getUserId()).thenReturn(1L);
         when(guardianRepository.findById(10L)).thenReturn(Optional.of(mine));
@@ -54,6 +55,7 @@ class GuardianServiceTest {
         service.deleteGuardian(1L, 10L);
 
         verify(guardianRepository).delete(mine);
+        verify(consentService).expirePending(10L);
     }
 
     @Test

@@ -82,6 +82,9 @@ public class GuardianService {
     @Transactional
     public void deleteGuardian(Long userId, Long guardianId) {
         guardianRepository.delete(findOwned(userId, guardianId));
+        // 이미 보낸 동의 링크는 눌러도 "만료"로 안내되게 한다. 발송 기록은 하루 발송 상한 계산에 쓰여서
+        // 바로 지우지 않고 AccountCleanupService 가 하루 뒤에 지운다
+        guardianConsentService.expirePending(guardianId);
     }
 
     // 본인 번호나 이미 등록한 번호는 보호자로 둘 수 없다
