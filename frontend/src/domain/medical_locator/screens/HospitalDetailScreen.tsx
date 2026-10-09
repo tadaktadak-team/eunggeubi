@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,20 +14,20 @@ import { RootStackParamList } from "../../../navigation/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getHospitalDetail } from "../api/hospitalDetail";
 import { HospitalDetail } from "../types/hospitalDetail";
+import { Ionicons } from "@expo/vector-icons";
+import { colors } from "../../../shared/theme/theme";
+import {
+  DAY_LABELS,
+  NO_INFO_MESSAGE,
+  formatTime,
+  getWeekdayHoursSummary,
+} from "../utils/hospitalHours";
+import { openDirections as openMapDirections } from "../utils/openDirections";
 
 type HospitalDetailRouteProp = RouteProp<RootStackParamList, "HospitalDetail">;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
 type TabType = "info" | "checklist";
-
-const DAY_LABELS: { key: keyof HospitalDetail; label: string; endKey: keyof HospitalDetail }[] = [
-  { key: "mondayStart", endKey: "mondayEnd", label: "월요일" },
-  { key: "tuesdayStart", endKey: "tuesdayEnd", label: "화요일" },
-  { key: "wednesdayStart", endKey: "wednesdayEnd", label: "수요일" },
-  { key: "thursdayStart", endKey: "thursdayEnd", label: "목요일" },
-  { key: "fridayStart", endKey: "fridayEnd", label: "금요일" },
-  { key: "saturdayStart", endKey: "saturdayEnd", label: "토요일" },
-];
 
 const CHECKLIST_ITEMS = [
   { id: "id_card", label: "신분증" },
@@ -36,11 +35,6 @@ const CHECKLIST_ITEMS = [
   { id: "medication", label: "복용 중인 약 목록" },
   { id: "symptom_memo", label: "증상 메모 또는 사진" },
 ];
-
-function formatTime(value: string | null | undefined) {
-  if (!value || value.length !== 4) return null;
-  return `${value.slice(0, 2)}:${value.slice(2, 4)}`;
-}
 
 export default function HospitalDetailScreen() {
   const navigation = useNavigation<NavigationProp>();
@@ -55,7 +49,12 @@ export default function HospitalDetailScreen() {
     longitude,
     availableBeds,
     congestion,
+    hasEmergency,
+    category,
   } = route.params;
+  // 병원은 파랑, 응급실 탭에서 들어오면 빨강 (목록/시트와 동일한 색 구분)
+  const accentColor = category === "응급실" ? "#E53935" : "#1E88E5";
+  const isEmergencyHospital = hasEmergency ?? availableBeds != null;
 
   const [activeTab, setActiveTab] = useState<TabType>("info");
   const [detail, setDetail] = useState<HospitalDetail | null>(null);
@@ -65,7 +64,7 @@ export default function HospitalDetailScreen() {
     {}
   );
 
-    useEffect(() => {
+  useEffect(() => {
     loadDetail();
     loadChecklist();
   }, [ykiho]);
@@ -83,26 +82,8 @@ export default function HospitalDetailScreen() {
     }
   }
 
-  async function openDirections() {
-    if (latitude == null || longitude == null) {
-      return;
-    }
-
-    const kakaoMapUrl = `kakaomap://look?p=${latitude},${longitude}`;
-    const kakaoWebUrl = `https://map.kakao.com/link/to/${encodeURIComponent(
-      name
-    )},${latitude},${longitude}`;
-
-    try {
-      const canOpen = await Linking.canOpenURL(kakaoMapUrl);
-      if (canOpen) {
-        await Linking.openURL(kakaoMapUrl);
-      } else {
-        await Linking.openURL(kakaoWebUrl);
-      }
-    } catch (e) {
-      console.error("길찾기 열기 실패:", e);
-    }
+  function openDirections() {
+    return openMapDirections(name, latitude, longitude);
   }
 
   async function loadDetail() {
@@ -121,7 +102,7 @@ export default function HospitalDetailScreen() {
     }
   }
 
-    function toggleChecklistItem(id: string) {
+  function toggleChecklistItem(id: string) {
     setCheckedItems((prev) => {
       const updated = { ...prev, [id]: !prev[id] };
       AsyncStorage.setItem(`checklist_${ykiho}`, JSON.stringify(updated)).catch(
@@ -131,13 +112,39 @@ export default function HospitalDetailScreen() {
     });
   }
 
+  const hoursSummary = getWeekdayHoursSummary(detail);
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.backButton} onPress={() => navigation.goBack()}>
-          {"< 뒤로"}
-        </Text>
-        <Text style={styles.title}>{name}</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="chevron-back" size={26} color="#222" />
+        </TouchableOpacity>
+
+        <View style={styles.titleWrap}>
+          <Text style={styles.title} numberOfLines={1}>
+            {name}
+          </Text>
+          {isEmergencyHospital && (
+            <View style={styles.erTag}>
+              <View style={styles.erDot} />
+              <Text style={styles.erTagText}>응급실 운영</Text>
+            </View>
+          )}
+        </View>
+
+        {latitude != null && longitude != null && (
+          <TouchableOpacity
+            style={[styles.directionsButton, { backgroundColor: accentColor }]}
+            onPress={openDirections}
+          >
+            <Ionicons name="navigate-outline" size={16} color="#fff" />
+            <Text style={styles.directionsButtonText}>길찾기</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 탭 */}
@@ -149,12 +156,14 @@ export default function HospitalDetailScreen() {
           <Text
             style={[
               styles.tabLabel,
-              activeTab === "info" && styles.tabLabelActive,
+              activeTab === "info" && { color: accentColor },
             ]}
           >
             기본정보
           </Text>
-          {activeTab === "info" && <View style={styles.tabIndicator} />}
+          {activeTab === "info" && (
+            <View style={[styles.tabIndicator, { backgroundColor: accentColor }]} />
+          )}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -164,43 +173,63 @@ export default function HospitalDetailScreen() {
           <Text
             style={[
               styles.tabLabel,
-              activeTab === "checklist" && styles.tabLabelActive,
+              activeTab === "checklist" && { color: accentColor },
             ]}
           >
             방문준비
           </Text>
-          {activeTab === "checklist" && <View style={styles.tabIndicator} />}
+          {activeTab === "checklist" && (
+            <View style={[styles.tabIndicator, { backgroundColor: accentColor }]} />
+          )}
         </TouchableOpacity>
       </View>
 
       {activeTab === "info" ? (
         <ScrollView contentContainerStyle={styles.content}>
           {/* 기본 정보 (목록에서 넘겨받은 값, 항상 표시) */}
-          <View style={styles.section}>
-            <Text style={styles.address}>{address}</Text>
-            <Text style={styles.phone}>{phone}</Text>
-            {distance != null && (
-              <Text style={styles.distance}>{distance}km</Text>
+          <View style={styles.infoSection}>
+            <View style={styles.infoRow}>
+              <Ionicons name="location-outline" size={18} color="#999" />
+              <Text style={styles.infoText}>{address}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Ionicons name="call-outline" size={18} color="#999" />
+              <Text style={styles.infoText}>{phone}</Text>
+            </View>
+            {(hoursSummary || isEmergencyHospital) && (
+              <View style={styles.infoRow}>
+                <Ionicons name="time-outline" size={18} color="#999" />
+                <Text style={styles.infoText}>
+                  {[hoursSummary, isEmergencyHospital ? "응급실 24시" : null]
+                    .filter(Boolean)
+                    .join(" / ")}
+                </Text>
+              </View>
             )}
-
-            {latitude != null && longitude != null && (
-              <TouchableOpacity
-                style={styles.directionsButton}
-                onPress={openDirections}
-              >
-                <Text style={styles.directionsButtonText}>길찾기</Text>
-              </TouchableOpacity>
+            {distance != null && (
+              <View style={styles.infoRow}>
+                <Ionicons name="walk-outline" size={18} color="#999" />
+                <Text style={styles.infoText}>{distance}km</Text>
+              </View>
             )}
           </View>
 
-          {/* 응급실 잔여 병상 (A안: 응급실 카테고리에서 들어온 경우에만 존재) */}
+          {/* 응급실 잔여 병상 (응급실이 있는 병원이고 병상 정보가 있을 때) */}
           {availableBeds != null && (
             <View style={styles.bedSection}>
-              <Text style={styles.bedTitle}>응급실 잔여 병상</Text>
-              <Text style={styles.bedCount}>{availableBeds}병상</Text>
-              {congestion != null && (
-                <Text style={styles.congestion}>혼잡도 {congestion}%</Text>
-              )}
+              <View style={styles.bedLeft}>
+                <Ionicons name="pulse-outline" size={20} color="#2E7D32" />
+                <View>
+                  <Text style={styles.bedTitle}>응급실 잔여 병상</Text>
+                  {congestion != null && (
+                    <Text style={styles.congestion}>혼잡도 {congestion}%</Text>
+                  )}
+                </View>
+              </View>
+              <Text style={styles.bedCount}>
+                {availableBeds}
+                <Text style={styles.bedUnit}>병상</Text>
+              </Text>
             </View>
           )}
 
@@ -221,19 +250,43 @@ export default function HospitalDetailScreen() {
           {detail && (
             <>
               <View style={styles.section}>
+                <Text style={styles.sectionTitle}>진료과목</Text>
+                {detail.departments.length === 0 ? (
+                  <Text style={styles.message}>{NO_INFO_MESSAGE}</Text>
+                ) : (
+                  <View style={styles.departmentWrap}>
+                    {detail.departments.map((dept) => (
+                      <View key={dept.name} style={styles.departmentChip}>
+                        <Text style={styles.departmentText}>{dept.name}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.section}>
                 <Text style={styles.sectionTitle}>진료시간</Text>
-                {DAY_LABELS.map(({ key, endKey, label }) => {
-                  const start = formatTime(detail[key] as string | null);
-                  const end = formatTime(detail[endKey] as string | null);
+                {DAY_LABELS.every(({ key, endKey }) => {
                   return (
-                    <View key={label} style={styles.timeRow}>
-                      <Text style={styles.dayLabel}>{label}</Text>
-                      <Text style={styles.timeValue}>
-                        {start && end ? `${start} - ${end}` : "정보 없음"}
-                      </Text>
-                    </View>
+                    !formatTime(detail[key] as string | null) ||
+                    !formatTime(detail[endKey] as string | null)
                   );
-                })}
+                }) ? (
+                  <Text style={styles.message}>{NO_INFO_MESSAGE}</Text>
+                ) : (
+                  DAY_LABELS.map(({ key, endKey, label }) => {
+                    const start = formatTime(detail[key] as string | null);
+                    const end = formatTime(detail[endKey] as string | null);
+                    return (
+                      <View key={label} style={styles.timeRow}>
+                        <Text style={styles.dayLabel}>{label}</Text>
+                        <Text style={styles.timeValue}>
+                          {start && end ? `${start} - ${end}` : "휴진"}
+                        </Text>
+                      </View>
+                    );
+                  })
+                )}
                 {detail.lunchTime && (
                   <Text style={styles.lunchTime}>
                     점심시간 {detail.lunchTime}
@@ -248,25 +301,6 @@ export default function HospitalDetailScreen() {
                   <Text style={styles.closedInfo}>
                     공휴일: {detail.closedOnHoliday}
                   </Text>
-                )}
-              </View>
-
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>진료과목</Text>
-                {detail.departments.length === 0 ? (
-                  <Text style={styles.message}>
-                    등록된 진료과목이 없습니다.
-                  </Text>
-                ) : (
-                  <View style={styles.departmentWrap}>
-                    {detail.departments.map((dept) => (
-                      <View key={dept.name} style={styles.departmentChip}>
-                        <Text style={styles.departmentText}>
-                          {dept.name}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
                 )}
               </View>
             </>
@@ -288,7 +322,10 @@ export default function HospitalDetailScreen() {
                   <View
                     style={[
                       styles.checkbox,
-                      checked && styles.checkboxChecked,
+                      checked && {
+                      backgroundColor: accentColor,
+                      borderColor: accentColor,
+                    },
                     ]}
                   >
                     {checked && <Text style={styles.checkboxMark}>✓</Text>}
@@ -313,26 +350,49 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingRight: 16,
     paddingVertical: 12,
   },
 
   backButton: {
-    fontSize: 15,
-    color: "#1E88E5",
-    marginRight: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+
+  titleWrap: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   title: {
+    flexShrink: 1,
     fontSize: 20,
     fontWeight: "700",
-    flex: 1,
+  },
+
+  erTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+
+  erDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#2E7D32",
+    marginRight: 4,
+  },
+
+  erTagText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#2E7D32",
   },
 
   tabRow: {
     flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
   },
 
   tabButton: {
@@ -348,14 +408,14 @@ const styles = StyleSheet.create({
   },
 
   tabLabelActive: {
-    color: "#1E88E5",
+    color: colors.primary,
   },
 
   tabIndicator: {
     marginTop: 8,
     height: 2,
-    width: "60%",
-    backgroundColor: "#1E88E5",
+    width: "100%",
+    backgroundColor: colors.primary,
   },
 
   content: {
@@ -375,61 +435,79 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  address: {
-    fontSize: 15,
-    marginBottom: 4,
+  infoSection: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
 
-  phone: {
-    fontSize: 15,
-    color: "#1E88E5",
-    marginBottom: 4,
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
   },
 
-  distance: {
-    fontSize: 14,
-    color: "#666",
+  infoText: {
+    flex: 1,
+    marginLeft: 10,
+    fontSize: 15,
+    color: "#555",
   },
 
   directionsButton: {
-    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: "#1E88E5",
-    alignItems: "center",
+    backgroundColor: colors.primary,
   },
 
   directionsButtonText: {
+    marginLeft: 4,
     color: "#fff",
     fontWeight: "700",
     fontSize: 14,
   },
 
   bedSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginHorizontal: 20,
     marginVertical: 12,
     padding: 16,
     borderRadius: 12,
-    backgroundColor: "#FFEBEE",
+    backgroundColor: "#E8F5E9",
+  },
+
+  bedLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
 
   bedTitle: {
-    fontSize: 14,
-    color: "#E53935",
-    fontWeight: "600",
-  },
-
-  bedCount: {
-    fontSize: 24,
+    fontSize: 15,
+    color: "#2E7D32",
     fontWeight: "700",
-    color: "#E53935",
-    marginTop: 4,
   },
 
   congestion: {
-    fontSize: 13,
-    color: "#E53935",
-    marginTop: 4,
+    fontSize: 12,
+    color: "#2E7D32",
+    marginTop: 2,
+  },
+
+  bedCount: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#2E7D32",
+  },
+
+  bedUnit: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 
   center: {
@@ -482,12 +560,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: "#E3F2FD",
+    backgroundColor: "#F1F1F1",
+    borderWidth: 1,
+    borderColor: "#E3E3E3",
   },
 
   departmentText: {
     fontSize: 13,
-    color: "#1E88E5",
+    color: "#333",
     fontWeight: "600",
   },
 
@@ -509,8 +589,8 @@ const styles = StyleSheet.create({
   },
 
   checkboxChecked: {
-    backgroundColor: "#1E88E5",
-    borderColor: "#1E88E5",
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
 
   checkboxMark: {

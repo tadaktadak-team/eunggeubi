@@ -1,8 +1,8 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { StyleSheet } from "react-native";
-import { WebView } from "react-native-webview";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { StyleSheet } from 'react-native';
+import { WebView } from 'react-native-webview';
 
-const KAKAO_JS_KEY = "d2ca7fd693afc98a1e534caf7e697b48";
+const KAKAO_JS_KEY = 'd2ca7fd693afc98a1e534caf7e697b48';
 
 export interface MapMarkerData {
   id: string;
@@ -16,6 +16,7 @@ interface KakaoMapViewProps {
   centerLatitude: number;
   centerLongitude: number;
   markers: MapMarkerData[];
+  onMarkerPress?: (id: string) => void;
 }
 
 export interface KakaoMapViewHandle {
@@ -59,6 +60,19 @@ const HTML_TEMPLATE = `
       myLocMarker.setMap(map);
     });
 
+    // 지도 영역 크기가 바뀌면(시트가 열려 목록이 숨겨질 때 등) 지도를 다시 맞춘다.
+    // relayout은 중심을 유지하지 않으므로 중심을 저장했다가 복원한다.
+    function fixMapSize() {
+      if (!map) return;
+      var center = map.getCenter();
+      map.relayout();
+      map.setCenter(center);
+    }
+    window.addEventListener('resize', fixMapSize);
+    if (window.ResizeObserver) {
+      new ResizeObserver(fixMapSize).observe(document.getElementById('map'));
+    }
+
     function clearMarkers() {
       markers.forEach(function (m) { m.setMap(null); });
       markers = [];
@@ -78,10 +92,17 @@ const HTML_TEMPLATE = `
         content.style.fontSize = '12px';
         content.style.fontWeight = '700';
         content.style.whiteSpace = 'nowrap';
+        content.style.cursor = 'pointer';
+        content.addEventListener('click', function () {
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify({ type: 'MARKER_PRESS', id: item.id })
+          );
+        });
 
         var overlay = new kakao.maps.CustomOverlay({
           position: position,
           content: content,
+          clickable: true,
           yAnchor: 1
         });
         overlay.setMap(map);
@@ -107,18 +128,18 @@ const HTML_TEMPLATE = `
 `;
 
 const KakaoMapView = forwardRef<KakaoMapViewHandle, KakaoMapViewProps>(
-  ({ centerLatitude, centerLongitude, markers }, ref) => {
+  ({ centerLatitude, centerLongitude, markers, onMarkerPress }, ref) => {
     const webviewRef = useRef<WebView>(null);
 
     const sendMarkersToWebView = (data: MapMarkerData[]) => {
       const message = JSON.stringify({
-        type: "UPDATE_MARKERS",
+        type: 'UPDATE_MARKERS',
         markers: data,
       });
       webviewRef.current?.injectJavaScript(
         `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
-          message
-        )} })); true;`
+          message,
+        )} })); true;`,
       );
     };
 
@@ -130,23 +151,36 @@ const KakaoMapView = forwardRef<KakaoMapViewHandle, KakaoMapViewProps>(
       sendMarkersToWebView(markers);
     }, [markers]);
 
-    const html = HTML_TEMPLATE.replace(
-      /__CENTER_LAT__/g,
-      String(centerLatitude)
-    ).replace(/__CENTER_LNG__/g, String(centerLongitude));
+    const html = HTML_TEMPLATE.replace(/__CENTER_LAT__/g, String(centerLatitude)).replace(
+      /__CENTER_LNG__/g,
+      String(centerLongitude),
+    );
 
     return (
       <WebView
         ref={webviewRef}
         style={styles.webview}
-        originWhitelist={["*"]}
+        originWhitelist={['*']}
         source={{ html }}
-        onError={(e) => console.log("WebView 에러:", e.nativeEvent)}
-        onHttpError={(e) => console.log("WebView HTTP 에러:", e.nativeEvent)}
+        onError={(e) => console.log('WebView 에러:', e.nativeEvent)}
+        onHttpError={(e) => console.log('WebView HTTP 에러:', e.nativeEvent)}
         onLoadEnd={() => sendMarkersToWebView(markers)}
+        onLayout={() =>
+          webviewRef.current?.injectJavaScript('if (window.fixMapSize) { fixMapSize(); } true;')
+        }
+        onMessage={(e) => {
+          try {
+            const payload = JSON.parse(e.nativeEvent.data);
+            if (payload.type === 'MARKER_PRESS') {
+              onMarkerPress?.(payload.id);
+            }
+          } catch (err) {
+            console.log('WebView 메시지 파싱 실패:', err);
+          }
+        }}
       />
     );
-  }
+  },
 );
 
 export default KakaoMapView;

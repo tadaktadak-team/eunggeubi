@@ -34,7 +34,7 @@ function TabsNavigator() {
     <>
       <Tab.Navigator tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>
         <Tab.Screen name="AiChat" component={AiConsultationNavigator} options={{ title: 'AI상담' }} />
-        <Tab.Screen name="Hospital" component={MedicalLocatorScreen} options={{ title: '병원찾기' }} />
+        <Tab.Screen name="Hospital" component={MedicalLocatorScreen} options={{ title: '의료기관' }} />
         <Tab.Screen name="Medicine" component={DrugNavigator} options={{ title: '약물정보' }} />
         <Tab.Screen name="My" component={MyPageNavigator} options={{ title: '마이' }} />
       </Tab.Navigator>
