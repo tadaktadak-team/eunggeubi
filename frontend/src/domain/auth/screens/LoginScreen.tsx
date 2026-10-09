@@ -3,8 +3,6 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -17,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
+import { showAlert } from '../../../shared/dialog';
+import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../hooks/useAuth';
 
@@ -42,7 +42,7 @@ export default function LoginScreen() {
 
   const onLogin = async () => {
     if (!email || !password) {
-      Alert.alert('입력 확인', '이메일과 비밀번호를 입력해주세요.');
+      showAlert('입력 확인', '이메일과 비밀번호를 입력해주세요.');
       return;
     }
     setSubmitting(true);
@@ -50,13 +50,13 @@ export default function LoginScreen() {
       await signIn(email.trim(), password);
       // 성공 시 AuthProvider가 상태를 바꿔 자동으로 홈으로 전환됨
     } catch (e: any) {
-      Alert.alert('로그인 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('로그인 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const notReady = () => Alert.alert('준비 중', '다음 단계에서 만들 거예요!');
+  const notReady = () => showAlert('준비 중', '다음 단계에서 만들 거예요!');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -101,17 +101,13 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={[styles.loginBtn, submitting && { opacity: 0.6 }]}
+          <Button
+            title="로그인"
+            variant="neutral"
             onPress={onLogin}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.loginBtnText}>로그인</Text>
-            )}
-          </TouchableOpacity>
+            loading={submitting}
+            style={styles.loginBtn}
+          />
 
           <View style={styles.links}>
             <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
@@ -192,15 +188,7 @@ const styles = StyleSheet.create({
     height: 52,
   },
   input: { flex: 1, fontSize: font.body, color: colors.text },
-  loginBtn: {
-    backgroundColor: colors.black,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.sm,
-  },
-  loginBtnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  loginBtn: { marginTop: spacing.sm },
   links: {
     flexDirection: 'row',
     justifyContent: 'center',

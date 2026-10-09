@@ -2,9 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { showAlert } from '../../../shared/dialog';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { FirstAidGuideDto, getFirstAidGuide, searchFirstAidGuide } from '../api/firstAid';
 import DisclaimerFooter from '../components/DisclaimerFooter';
@@ -35,7 +45,7 @@ export default function FirstAidGuideScreen() {
       // 이전 상황의 스텝이 남아있으면 지금 선택된 칩/situation과 내용이 안 맞게 보인다 - 비워서
       // "이 상황은 못 불러왔다"를 명확히 한다.
       setGuide(null);
-      Alert.alert('오류', '응급처치 정보를 불러오지 못했어요.');
+      showAlert('오류', '응급처치 정보를 불러오지 못했어요.');
     } finally {
       setLoading(false);
     }
@@ -56,11 +66,11 @@ export default function FirstAidGuideScreen() {
         setSituation(result.situation);
         setGuide(result);
       } else {
-        Alert.alert('안내', '해당 상황을 찾지 못했어요. 아래 목록에서 골라주세요.');
+        showAlert('안내', '해당 상황을 찾지 못했어요. 아래 목록에서 골라주세요.');
       }
     } catch (e) {
       console.error(e);
-      Alert.alert('오류', '검색 중 문제가 발생했어요.');
+      showAlert('오류', '검색 중 문제가 발생했어요.');
     } finally {
       setLoading(false);
     }
@@ -69,11 +79,11 @@ export default function FirstAidGuideScreen() {
   const callEmergency = () => {
     if (__DEV__) {
       // 개발/테스트 중엔 실제 전화 대신 안내만 (emergency 도메인과 동일한 가드)
-      Alert.alert('개발 모드', '실제 배포 앱에서는 119로 전화가 연결됩니다.');
+      showAlert('개발 모드', '실제 배포 앱에서는 119로 전화가 연결됩니다.');
       return;
     }
     Linking.openURL('tel:119').catch(() => {
-      Alert.alert('전화 연결 실패', '이 기기에서는 전화를 걸 수 없어요.');
+      showAlert('전화 연결 실패', '이 기기에서는 전화를 걸 수 없어요.');
     });
   };
 
@@ -188,10 +198,11 @@ const styles = StyleSheet.create({
   },
   stepBadgeText: { color: colors.white, fontSize: font.caption, fontWeight: '700' },
   stepText: { flex: 1, fontSize: font.sub, color: colors.text },
+  // 119는 emergency 역할이다. 일반 동작(primary)과 반드시 다른 색이어야 한다.
   callBtn: {
     height: 52,
     borderRadius: radius.md,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.danger,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

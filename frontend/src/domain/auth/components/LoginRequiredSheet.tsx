@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { RootStackParamList } from '../../../navigation/types';
+import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -55,12 +56,14 @@ export default function LoginRequiredSheet({ visible, onClose }: Props) {
             ))}
           </View>
 
-          <TouchableOpacity style={styles.loginBtn} onPress={goLogin}>
-            <Text style={styles.loginBtnText}>로그인 / 회원가입</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.guestBtn} onPress={onClose}>
-            <Text style={styles.guestText}>로그인 없이 계속 이용하기</Text>
-          </TouchableOpacity>
+          <Button title="로그인 / 회원가입" onPress={goLogin} style={styles.loginBtn} />
+          <Button
+            title="로그인 없이 계속 이용하기"
+            variant="text"
+            onPress={onClose}
+            style={styles.guestBtn}
+            textStyle={styles.guestText}
+          />
         </Pressable>
       </Pressable>
     </Modal>
@@ -83,7 +86,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#FCE9E7',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.md,
@@ -107,16 +110,7 @@ const styles = StyleSheet.create({
   featureRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.xs },
   featureText: { marginLeft: spacing.sm, fontSize: font.body, color: colors.text, fontWeight: '600' },
   featureLocked: { color: colors.placeholder, fontWeight: '400' },
-  loginBtn: {
-    width: '100%',
-    backgroundColor: colors.primary,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  loginBtnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  loginBtn: { width: '100%', marginBottom: spacing.md },
   guestBtn: { paddingVertical: spacing.sm },
   guestText: { color: colors.textSub, fontSize: font.sub },
 });

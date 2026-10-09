@@ -87,7 +87,8 @@ const styles = StyleSheet.create({
     width: SIZE,
     height: SIZE,
     borderRadius: SIZE / 2,
-    backgroundColor: colors.primary,
+    // emergency 역할. 앱에서 이 색으로 채워진 버튼은 119와 긴급 알림뿐이다.
+    backgroundColor: colors.danger,
     shadowColor: '#000',
     shadowOpacity: 0.25,
     shadowRadius: 4,

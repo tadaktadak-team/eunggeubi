@@ -3,8 +3,6 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
+import { showAlert } from '../../../shared/dialog';
+import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import * as authApi from '../api/auth';
 import { Relationship } from '../types';
@@ -44,10 +44,10 @@ export default function GuardianConsentScreen() {
 
   const onSend = async () => {
     if (!name || !phone) {
-      return Alert.alert('입력 확인', '보호자 이름과 연락처를 입력해주세요.');
+      return showAlert('입력 확인', '보호자 이름과 연락처를 입력해주세요.');
     }
     if (!agree) {
-      return Alert.alert('동의 필요', '보호자 개인정보 수집·이용에 동의해주세요.');
+      return showAlert('동의 필요', '보호자 개인정보 수집·이용에 동의해주세요.');
     }
     setSubmitting(true);
     try {
@@ -59,7 +59,7 @@ export default function GuardianConsentScreen() {
       });
       navigation.navigate('GuardianWaiting', { consentToken, email, maskedPhone: res.maskedPhone });
     } catch (e: any) {
-      Alert.alert('발송 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('발송 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSubmitting(false);
     }
@@ -130,17 +130,12 @@ export default function GuardianConsentScreen() {
             <Text style={styles.checkText}>[필수] 보호자 개인정보 수집·이용 동의</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.sendBtn, submitting && { opacity: 0.6 }]}
+          <Button
+            title="동의 문자 발송"
             onPress={onSend}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.sendBtnText}>동의 문자 발송</Text>
-            )}
-          </TouchableOpacity>
+            loading={submitting}
+            style={styles.sendBtn}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -187,13 +182,5 @@ const styles = StyleSheet.create({
   relTextActive: { color: colors.white },
   check: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, marginBottom: spacing.md },
   checkText: { marginLeft: spacing.sm, fontSize: font.sub, color: colors.text },
-  sendBtn: {
-    backgroundColor: colors.primary,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.sm,
-  },
-  sendBtnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  sendBtn: { marginTop: spacing.sm },
 });

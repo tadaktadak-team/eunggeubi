@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { ChecklistChatMessage } from '../types';
 import AiAvatar from './AiAvatar';
@@ -35,17 +36,18 @@ export default function ChecklistCard({ message, onToggleItem, onSubmit, onSubmi
         ))}
 
         {message.answered ? (
-          <Pressable style={[styles.submitBtn, styles.submitBtnDisabled]} disabled>
-            <Text style={styles.submitText}>답변 완료</Text>
-          </Pressable>
+          // 이미 답한 상태다. 눌리지 않지만 회색으로 덮지 않는다.
+          <Button title="답변 완료" variant="neutral" size="md" done style={styles.submitBtn} />
         ) : (
           <View style={styles.buttonRow}>
-            <Pressable style={[styles.submitBtn, styles.noneBtn]} onPress={onSubmitNone}>
-              <Text style={styles.noneText}>해당사항 없음</Text>
-            </Pressable>
-            <Pressable style={[styles.submitBtn, styles.answerBtn]} onPress={onSubmit}>
-              <Text style={styles.submitText}>답변하기</Text>
-            </Pressable>
+            <Button
+              title="해당사항 없음"
+              variant="secondary"
+              size="md"
+              onPress={onSubmitNone}
+              style={styles.rowBtn}
+            />
+            <Button title="답변하기" size="md" onPress={onSubmit} style={styles.rowBtn} />
           </View>
         )}
       </View>
@@ -77,24 +79,7 @@ const styles = StyleSheet.create({
   },
   checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
   itemLabel: { fontSize: font.sub, color: colors.text, flexShrink: 1 },
-  submitBtn: {
-    height: 44,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.xs,
-  },
-  submitBtnDisabled: { backgroundColor: colors.disabled },
-  submitText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  submitBtn: { marginTop: spacing.xs },
   buttonRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.xs },
-  answerBtn: { flex: 1, marginTop: 0 },
-  noneBtn: {
-    flex: 1,
-    marginTop: 0,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  noneText: { color: colors.textSub, fontSize: font.body, fontWeight: '700' },
+  rowBtn: { flex: 1 },
 });
