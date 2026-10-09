@@ -1,6 +1,7 @@
 package com.tadaktadak.eunggeubi.global.config;
 
 import com.tadaktadak.eunggeubi.global.security.JwtAuthenticationEntryPoint;
+import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.security.JwtAuthenticationFilter;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
 import com.tadaktadak.eunggeubi.global.security.RateLimitFilter;
@@ -22,6 +23,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtProvider jwtProvider;
+    private final UserRepository userRepository;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
     // 앞단에 X-Forwarded-For를 덮어써주는 신뢰된 프록시(nginx/ALB 등)가 확실히 있을 때만 true로 켠다.
@@ -60,7 +62,7 @@ public class SecurityConfig {
                 )
 
                 // 시큐리티 기본 필터 앞에 우리 JWT 필터 끼워넣기
-                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider),
+                .addFilterBefore(new JwtAuthenticationFilter(jwtProvider, userRepository),
                         UsernamePasswordAuthenticationFilter.class)
                 // AI 상담은 permitAll이라 JWT 인증으로도 막을 수 없다 - 그 앞에서 IP 기준으로 먼저 거른다.
                 .addFilterBefore(new RateLimitFilter(trustProxyForwardedFor), JwtAuthenticationFilter.class);

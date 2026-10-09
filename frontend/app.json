@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "frontend",
+    "name": "응급이",
     "slug": "eunggeubi",
     "owner": "tadaktadak-team",
     "scheme": "eunggeubi",
@@ -14,7 +14,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FDFDFD",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"

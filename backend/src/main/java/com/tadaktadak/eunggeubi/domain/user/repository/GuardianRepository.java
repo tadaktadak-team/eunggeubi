@@ -9,7 +9,12 @@ public interface GuardianRepository extends JpaRepository<Guardian, Long> {
     // 특정 회원에 등록된 보호자 목록 조회
     List<Guardian> findByUserId(Long userId);
 
-    // 알림 수신 ON인 보호자만 조회 (긴급 알림 발송 대상)
-    List<Guardian> findByUserIdAndNotifyEnabledTrue(Long userId);
+    // 긴급 알림 발송 대상: 수신 ON + 보호자가 문자로 동의한 사람만
+    List<Guardian> findByUserIdAndNotifyEnabledTrueAndVerifiedAtIsNotNull(Long userId);
 
+    long countByUserId(Long userId);
+
+    boolean existsByUserIdAndPhone(Long userId, String phone);
+
+    boolean existsByUserIdAndPhoneAndIdNot(Long userId, String phone, Long id);
 }

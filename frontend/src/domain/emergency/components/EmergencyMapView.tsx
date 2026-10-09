@@ -86,7 +86,7 @@ export default function EmergencyMapView({ latitude, longitude }: EmergencyMapVi
       originWhitelist={['*']}
       source={{ html }}
       scrollEnabled={false}
-      onError={(e) => console.log('지도 로딩 오류:', e.nativeEvent)}
+      onError={(e) => console.error('지도 로딩 오류:', e.nativeEvent)}
     />
   );
 }

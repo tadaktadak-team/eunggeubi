@@ -16,6 +16,8 @@ import com.tadaktadak.eunggeubi.global.security.JwtProvider;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
+
+import com.tadaktadak.eunggeubi.global.validation.PasswordValidator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -38,6 +40,10 @@ public class AuthService {
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
+        // 0. 비밀번호에 개인정보가 섞였는지 (필드 레벨 검증이 못 보는 교차 검사)
+        PasswordValidator.ensureNotContainsUserInfo(
+                request.password(), request.email(), request.phone());
+
         // 1. 이메일 중복 확인
         if (userRepository.existsByEmail(request.email())) {
             throw new IllegalArgumentException("이미 가입된 이메일입니다.");

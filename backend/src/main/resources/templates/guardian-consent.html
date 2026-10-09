@@ -26,8 +26,10 @@
     <!-- 동의 가능: 폼을 보여준다. 여기서는 아직 아무것도 확정되지 않았다. -->
     <div th:if="${ready}">
         <h1>보호자 동의 요청</h1>
-        <p class="lead"><b th:text="${childName}">자녀</b> 님이 응급이에 가입하려고 합니다.</p>
-        <p>만 14세 미만 아동은 법정대리인의 동의가 필요합니다.</p>
+        <p class="lead" th:unless="${registration}"><b th:text="${childName}">자녀</b> 님이 응급이에 가입하려고 합니다.</p>
+        <p th:unless="${registration}">만 14세 미만 아동은 법정대리인의 동의가 필요합니다.</p>
+        <p class="lead" th:if="${registration}"><b th:text="${childName}">회원</b> 님이 회원님을 응급 상황 알림을 받는 보호자로 등록했습니다.</p>
+        <p th:if="${registration}">동의하기 전에는 어떤 알림도 발송되지 않습니다. 모르는 분이라면 이 창을 닫으시면 됩니다.</p>
 
         <div class="box">
             <div><b>수집 항목</b><span>보호자 이름, 연락처, 자녀와의 관계</span></div>

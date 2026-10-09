@@ -63,6 +63,7 @@ export function useEmergency() {
         sentAt: result.sentAt,
         message: result.message,
         guardians: result.guardians,
+        skipReason: result.skipReason,
       });
 
       callEmergency();

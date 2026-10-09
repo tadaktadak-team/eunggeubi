@@ -2,6 +2,7 @@ package com.tadaktadak.eunggeubi.domain.auth.controller;
 
 import com.tadaktadak.eunggeubi.domain.auth.dto.ConsentPageInfo;
 import com.tadaktadak.eunggeubi.domain.auth.service.GuardianConsentService;
+import com.tadaktadak.eunggeubi.domain.user.entity.ConsentPurpose;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -37,11 +38,15 @@ public class GuardianConsentPageController {
                     ? "자녀" : info.childName();
             model.addAttribute("childName", child);
             model.addAttribute("token", token);
+            model.addAttribute("registration", info.purpose() == ConsentPurpose.REGISTRATION);
             return VIEW;
         }
 
         switch (info.state()) {
-            case ALREADY_CONFIRMED -> fill(model, "이미 동의가 완료되었습니다.", "자녀가 앱에서 로그인할 수 있어요.");
+            case ALREADY_CONFIRMED -> fill(model, "이미 동의가 완료되었습니다.",
+                    info.purpose() == ConsentPurpose.REGISTRATION
+                            ? "긴급 상황이 생기면 알림 문자를 받게 돼요."
+                            : "자녀가 앱에서 로그인할 수 있어요.");
             case EXPIRED -> fill(model, "만료된 링크입니다.", "앱에서 동의 문자를 다시 요청해주세요.");
             default -> fill(model, "유효하지 않은 링크입니다.", "문자에 포함된 주소가 맞는지 확인해주세요.");
         }
@@ -53,8 +58,12 @@ public class GuardianConsentPageController {
     public String confirm(@RequestParam("t") String token, Model model) {
         model.addAttribute("ready", false);
         try {
-            guardianConsentService.confirmConsent(token);
-            fill(model, "동의가 완료되었습니다.", "이제 자녀가 앱에서 로그인할 수 있어요.");
+            ConsentPurpose purpose = guardianConsentService.confirmConsent(token);
+            if (purpose == ConsentPurpose.REGISTRATION) {
+                fill(model, "보호자 등록에 동의하셨습니다.", "이제 긴급 상황이 생기면 알림 문자를 받게 돼요.");
+            } else {
+                fill(model, "동의가 완료되었습니다.", "이제 자녀가 앱에서 로그인할 수 있어요.");
+            }
         } catch (IllegalArgumentException e) {
             fill(model, "동의를 완료하지 못했습니다.", e.getMessage());
         }
