@@ -2,8 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Dispatch, SetStateAction, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { getHealthProfile, saveHealthProfile } from '../api/health';
@@ -78,7 +87,7 @@ export default function HealthScreen() {
         setMedications(p.medications);
         setAllergies(p.allergies);
       } catch (e: any) {
-        Alert.alert('오류', e?.message ?? '불러오지 못했어요.');
+        showAlert('오류', e?.message ?? '불러오지 못했어요.');
       } finally {
         setLoading(false);
       }
@@ -94,11 +103,11 @@ export default function HealthScreen() {
     try {
       setSaving(true);
       await saveHealthProfile({ bloodType, diseases, medications, allergies });
-      Alert.alert('저장 완료', '건강 프로필이 저장됐어요.', [
+      showAlert('저장 완료', '건강 프로필이 저장됐어요.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      Alert.alert('저장 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('저장 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSaving(false);
     }

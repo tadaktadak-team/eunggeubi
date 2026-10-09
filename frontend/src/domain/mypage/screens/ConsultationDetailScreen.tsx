@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { getConsultationDetail } from '../api/consultation';
@@ -75,7 +76,7 @@ export default function ConsultationDetailScreen() {
       const detail = await getConsultationDetail(sessionId);
       setMessages(detail.messages);
     } catch (e: any) {
-      Alert.alert('오류', e?.message ?? '상담 내역을 불러오지 못했어요.');
+      showAlert('오류', e?.message ?? '상담 내역을 불러오지 못했어요.');
     } finally {
       setLoading(false);
     }

@@ -1,8 +1,17 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { formatPhone, toDigits } from '../../../shared/utils/phone';
@@ -43,7 +52,7 @@ export default function AccountEditScreen() {
       setGender(info.gender);
       setAddress(info.address ?? '');
     } catch (e: any) {
-      Alert.alert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
+      showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
     } finally {
       setLoading(false);
     }
@@ -55,12 +64,12 @@ export default function AccountEditScreen() {
 
   const onSave = async () => {
     if (!name.trim() || !phone.trim()) {
-      Alert.alert('입력 확인', '이름과 전화번호를 입력해주세요.');
+      showAlert('입력 확인', '이름과 전화번호를 입력해주세요.');
       return;
     }
     const birthDate = toISODate(birth);
     if (!birthDate) {
-      Alert.alert('생년월일', '생년월일 8자리를 정확히 입력해주세요. (예: 19900101)');
+      showAlert('생년월일', '생년월일 8자리를 정확히 입력해주세요. (예: 19900101)');
       return;
     }
 
@@ -73,11 +82,11 @@ export default function AccountEditScreen() {
         gender,
         address: address.trim() || null,
       });
-      Alert.alert('저장 완료', '회원 정보가 수정됐어요.', [
+      showAlert('저장 완료', '회원 정보가 수정됐어요.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      Alert.alert('저장 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('저장 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSaving(false);
     }

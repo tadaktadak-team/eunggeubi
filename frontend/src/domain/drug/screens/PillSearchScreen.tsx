@@ -7,10 +7,10 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchPills, PillSearchResponse } from '../api/pill';
@@ -73,7 +73,7 @@ const PillSearchScreen = ({ navigation }: any) => {
 
   const handleSearch = async () => {
     if (!printText.trim() && !selectedShape && !selectedColor) {
-      Alert.alert('조건 필요', '모양, 색상, 식별문자 중 하나는 입력해주세요.');
+      showAlert('조건 필요', '모양, 색상, 식별문자 중 하나는 입력해주세요.');
       return;
     }
     requestIdRef.current += 1;
@@ -95,7 +95,7 @@ const PillSearchScreen = ({ navigation }: any) => {
       shouldScrollRef.current = true;
     } catch (error) {
       console.error('낱알 특징 검색 오류:', error);
-      Alert.alert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
+      showAlert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
@@ -118,7 +118,7 @@ const PillSearchScreen = ({ navigation }: any) => {
       setPageNo(nextPage);
     } catch (error) {
       console.error('낱알 특징 검색 추가 로딩 오류:', error);
-      Alert.alert('불러오기 실패', '추가 결과를 불러오지 못했습니다. 다시 스크롤해 재시도해 주세요.');
+      showAlert('불러오기 실패', '추가 결과를 불러오지 못했습니다. 다시 스크롤해 재시도해 주세요.');
     } finally {
       fetchingMoreRef.current = false;
       setLoadingMore(false);

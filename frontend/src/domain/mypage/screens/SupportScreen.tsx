@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { SUPPORT_EMAIL } from '../../../shared/constants/contact';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
@@ -16,14 +17,14 @@ export default function SupportScreen() {
 
   const onCopy = async () => {
     await Clipboard.setStringAsync(SUPPORT_EMAIL);
-    Alert.alert('복사됨', '문의 이메일 주소를 복사했어요.');
+    showAlert('복사됨', '문의 이메일 주소를 복사했어요.');
   };
 
   // 기기·버전을 미리 채워두면 되묻는 왕복을 줄일 수 있다.
   const onCompose = () => {
     const body = `\n\n\n--------------------\n앱 버전: 1.0.0\n기기: ${Platform.OS} ${Platform.Version}`;
     const url = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('[응급이] 문의')}&body=${encodeURIComponent(body)}`;
-    Linking.openURL(url).catch(() => Alert.alert('오류', '메일 앱을 열 수 없어요.'));
+    Linking.openURL(url).catch(() => showAlert('오류', '메일 앱을 열 수 없어요.'));
   };
 
   return (

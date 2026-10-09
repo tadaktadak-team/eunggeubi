@@ -7,10 +7,10 @@ import {
   FlatList,
   ActivityIndicator,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchDrugsByName, DrugInfoResponse } from '../api/drug';
@@ -71,7 +71,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
       setTotalCount(result.totalCount);
     } catch (error) {
       console.error('약품 검색 오류:', error);
-      Alert.alert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
+      showAlert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
       if (requestId !== requestIdRef.current) return; // 실패도 최신 요청 건일 때만 반영
       setDrugs([]);
       setTotalCount(0);
@@ -100,7 +100,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
       console.error('약품 검색 추가 로딩 오류:', error);
       // runSearch와 달리 여기서 Alert가 없으면, 실패로 조용히 멈춘 게 "결과 끝"처럼 보여서
       // 사용자가 재시도할 방법도 모른 채 더 있는 결과를 놓치게 된다.
-      Alert.alert('불러오기 실패', '추가 결과를 불러오지 못했습니다. 다시 스크롤해 재시도해 주세요.');
+      showAlert('불러오기 실패', '추가 결과를 불러오지 못했습니다. 다시 스크롤해 재시도해 주세요.');
     } finally {
       fetchingMoreRef.current = false;
       setLoadingMore(false);

@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Linking, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  TouchableOpacity,
+  Linking,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { getDrugDetail, DrugInfoResponse } from '../api/drug';
@@ -81,7 +90,7 @@ const DrugDetailScreen = ({ route }: any) => {
 
   const handleOpenMfds = () => {
     Linking.openURL(buildMfdsUrl(drug.itemSeq)).catch(() =>
-      Alert.alert('오류', '식약처 페이지를 열 수 없어요.'),
+      showAlert('오류', '식약처 페이지를 열 수 없어요.'),
     );
   };
 
