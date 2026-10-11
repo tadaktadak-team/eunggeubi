@@ -10,12 +10,13 @@ interface DrugCardProps {
   drugType?: string;    // 예: 일반의약품
   itemImage?: string;   // 알약 이미지 URL (없거나 못 불러오면 제형 추정 아이콘으로 대체)
   onPress?: () => void;
+  imageOrder?: number;  // 목록에서의 순서. 위쪽 카드 이미지부터 받도록 대기열 순서에 쓴다.
 }
 
-const DrugCard = ({ name, drugType, itemImage, onPress }: DrugCardProps) => {
+const DrugCard = ({ name, drugType, itemImage, onPress, imageOrder }: DrugCardProps) => {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      <DrugImage uri={itemImage} name={name} size={48} style={styles.image} />
+      <DrugImage uri={itemImage} name={name} size={48} style={styles.image} order={imageOrder} />
 
       <View style={styles.infoContainer}>
         <Text style={styles.nameText} numberOfLines={1}>

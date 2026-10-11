@@ -16,6 +16,7 @@ import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchPills, PillSearchResponse } from '../api/pill';
 import { addRecentSearch } from '../storage/recentSearches';
 import DrugImage from '../components/DrugImage';
+import { useVisibleRowKeys, VISIBLE_ROW_CONFIG } from '../hooks/useVisibleRowKeys';
 
 const NUM_OF_ROWS = 20;
 
@@ -63,6 +64,8 @@ const PillSearchScreen = ({ navigation }: any) => {
   // 보이고 직접 스크롤해야 하는 문제가 있었다. 검색이 끝나면 필터 영역 높이만큼 자동으로 스크롤해
   // 결과(또는 "결과 없음" 안내)가 바로 보이게 한다.
   const listRef = useRef<FlatList<PillSearchResponse>>(null);
+  // 지금 화면에 보이는 행만 약 이미지를 요청한다(미리 그려 둔 화면 밖 행은 아이콘만 표시).
+  const { visibleKeys, onViewableItemsChanged } = useVisibleRowKeys();
   const headerHeightRef = useRef(0);
 
   const handleReset = () => {
@@ -232,7 +235,10 @@ const PillSearchScreen = ({ navigation }: any) => {
         maxToRenderPerBatch={12}
         windowSize={7}
         removeClippedSubviews
-        renderItem={({ item }) => (
+        extraData={visibleKeys}
+        viewabilityConfig={VISIBLE_ROW_CONFIG}
+        onViewableItemsChanged={onViewableItemsChanged}
+        renderItem={({ item, index }) => (
           <TouchableOpacity
             style={styles.resultCard}
             onPress={() => {
@@ -245,7 +251,14 @@ const PillSearchScreen = ({ navigation }: any) => {
               navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
             }}
           >
-            <DrugImage uri={item.itemImage} name={item.itemName} size={56} style={styles.resultImage} />
+            <DrugImage
+              uri={item.itemImage}
+              name={item.itemName}
+              size={56}
+              style={styles.resultImage}
+              active={visibleKeys.has(item.itemSeq)}
+              order={index}
+            />
             <View style={styles.resultInfo}>
               <Text style={styles.resultName} numberOfLines={1}>
                 {item.itemName}

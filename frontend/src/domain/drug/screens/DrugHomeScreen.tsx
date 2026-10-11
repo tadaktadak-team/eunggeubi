@@ -79,12 +79,13 @@ const DrugHomeScreen = ({ navigation }: any) => {
         <View style={styles.recentSection}>
           <Text style={styles.sectionTitle}>최근 검색</Text>
           {recentDrugs.length > 0 ? (
-            recentDrugs.map((drug) => (
+            recentDrugs.map((drug, index) => (
               <DrugCard
                 key={drug.itemSeq}
                 name={drug.name}
                 drugType={drug.drugType}
                 itemImage={drug.itemImage}
+                imageOrder={index}
                 onPress={() => navigation.navigate('DrugDetail', { itemSeq: drug.itemSeq })}
               />
             ))
