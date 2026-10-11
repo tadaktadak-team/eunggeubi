@@ -56,7 +56,7 @@ const DrugHomeScreen = ({ navigation }: any) => {
             activeOpacity={0.7}
           >
             <View style={styles.actionIconBg}>
-              <MaterialCommunityIcons name="pill" size={26} color={colors.primary} />
+              <MaterialCommunityIcons name="pill" size={22} color={colors.primary} />
             </View>
             <Text style={styles.actionTitle}>낱알 특징</Text>
           </TouchableOpacity>
@@ -67,7 +67,7 @@ const DrugHomeScreen = ({ navigation }: any) => {
             activeOpacity={0.7}
           >
             <View style={styles.actionIconBg}>
-              <Ionicons name="pulse-outline" size={26} color={colors.primary} />
+              <Ionicons name="pulse-outline" size={22} color={colors.primary} />
             </View>
             <Text style={styles.actionTitle}>상호작용</Text>
           </TouchableOpacity>
@@ -119,7 +119,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.inputBg,
-    borderRadius: radius.pill,
+    borderRadius: 10, // 병원·약국 찾기 화면 검색창(MedicalLocatorScreen searchInput)과 동일하게 맞춤
     paddingHorizontal: spacing.lg,
     height: 48,
     marginBottom: spacing.lg,
@@ -138,21 +138,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.inputBg,
     borderRadius: radius.lg,
-    paddingVertical: spacing.lg + 2,
+    paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   actionIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.md,
+    width: 40,
+    height: 40,
+    borderRadius: radius.md - 2,
     backgroundColor: colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs + 2,
   },
   actionTitle: {
-    fontSize: font.body,
+    fontSize: font.sub + 1,
     fontWeight: 'bold',
     color: colors.text,
   },
