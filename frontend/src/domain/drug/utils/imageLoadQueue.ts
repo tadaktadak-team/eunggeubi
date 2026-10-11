@@ -220,6 +220,12 @@ export function createImageLoadQueue(options: ImageLoadQueueOptions): ImageLoadQ
     // 정지 전의 실패 기록은 비운다. 정지가 끝나자마자 예전 실패 때문에 다시 정지되지 않게 하기 위해서다.
     recentFailures = [];
     onEvent({ type: 'cooldown-start', distinctFailures, totalFailures, totalGranted });
+    // 기존 대기 타이머는 정지 전 토큰 기준이라(상세 사진으로 토큰이 음수면 수십 초 뒤로 잡혀 있을 수 있음)
+    // 그대로 두면 정지 종료가 15초보다 늦어진다. 지우고 정지 종료 시각에 맞춰 다시 잡는다.
+    if (timer !== null) {
+      clearTimer(timer);
+      timer = null;
+    }
     schedule();
   };
 

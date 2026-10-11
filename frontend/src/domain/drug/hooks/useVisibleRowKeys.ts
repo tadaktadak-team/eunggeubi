@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { ViewToken } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 
 // FlatList는 화면 위아래로 여러 화면 분량의 행을 미리 그려 둔다(예: 낱알 검색은 windowSize=7이라
 // 약 50행). 그 행들이 전부 약 이미지를 요청하면 서버 한도(분당 약 15장) 때문에 대기열이 수십 개씩
@@ -10,6 +11,8 @@ import type { ViewToken } from 'react-native';
 // 요청하지 않도록 최소 노출 시간을 둔다. FlatList는 이 값이 렌더링마다 바뀌면 안 되므로 상수로 둔다.
 export const VISIBLE_ROW_CONFIG = { itemVisiblePercentThreshold: 30, minimumViewTime: 200 };
 
+const EMPTY_KEYS: ReadonlySet<string> = new Set();
+
 function sameKeys(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
   if (a.size !== b.size) return false;
   for (const key of a) if (!b.has(key)) return false;
@@ -17,6 +20,7 @@ function sameKeys(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
 }
 
 export function useVisibleRowKeys() {
+  const isFocused = useIsFocused();
   const [visibleKeys, setVisibleKeys] = useState<ReadonlySet<string>>(() => new Set());
 
   // FlatList는 onViewableItemsChanged가 렌더링 중에 다른 함수로 바뀌면 에러를 내므로 항상 같은 함수를 넘긴다.
@@ -29,5 +33,7 @@ export function useVisibleRowKeys() {
     setVisibleKeys((prev) => (sameKeys(prev, next) ? prev : next));
   }, []);
 
-  return { visibleKeys, onViewableItemsChanged };
+  // 화면 이동(스택)은 이전 화면을 지우지 않고 뒤에 남겨 둔다. 상세 화면 등이 위에 덮여 있는 동안에는
+  // 이 목록의 행이 실제로는 보이지 않으므로, 그 행들의 대기 요청이 토큰을 쓰지 않도록 비어 있는 것으로 돌려준다.
+  return { visibleKeys: isFocused ? visibleKeys : EMPTY_KEYS, onViewableItemsChanged };
 }

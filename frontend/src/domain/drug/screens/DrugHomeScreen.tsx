@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 
@@ -12,6 +12,8 @@ const DrugHomeScreen = ({ navigation }: any) => {
   const insets = useSafeAreaInsets();
   const [searchQuery, setSearchQuery] = useState('');
   const [recentDrugs, setRecentDrugs] = useState<RecentDrug[]>([]);
+  // 검색·상세 화면이 위에 덮여 있는 동안에는 최근 검색 카드 이미지를 요청하지 않는다(보이지 않으므로).
+  const isFocused = useIsFocused();
 
   // 검색 후 상세 봤다가 돌아왔을 때 최신 목록으로 갱신되도록 포커스마다 다시 불러옴
   useFocusEffect(
@@ -86,6 +88,7 @@ const DrugHomeScreen = ({ navigation }: any) => {
                 drugType={drug.drugType}
                 itemImage={drug.itemImage}
                 imageOrder={index}
+                imageActive={isFocused}
                 onPress={() => navigation.navigate('DrugDetail', { itemSeq: drug.itemSeq })}
               />
             ))
