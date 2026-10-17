@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { getConsultations } from '../api/consultation';
@@ -26,7 +27,7 @@ export default function ConsultationHistoryScreen() {
       setLoading(true);
       setConsultations(await getConsultations());
     } catch (e: any) {
-      Alert.alert('오류', e?.message ?? '상담 이력을 불러오지 못했어요.');
+      showAlert('오류', e?.message ?? '상담 이력을 불러오지 못했어요.');
     } finally {
       setLoading(false);
     }

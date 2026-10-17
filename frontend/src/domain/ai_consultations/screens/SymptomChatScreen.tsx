@@ -2,9 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { showAlert } from '../../../shared/dialog';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import AiAvatar from '../components/AiAvatar';
 import AnswerCard from '../components/AnswerCard';
@@ -59,7 +69,7 @@ export default function SymptomChatScreen() {
   };
 
   const showDisclaimer = () =>
-    Alert.alert('안내', '*참고용이며, 의료 전문가의 상담을 대체하지 않습니다.');
+    showAlert('안내', '*참고용이며, 의료 전문가의 상담을 대체하지 않습니다.');
 
   return (
       <KeyboardAvoidingView
@@ -144,7 +154,7 @@ export default function SymptomChatScreen() {
               disabled={loading}
               hitSlop={8}
           >
-            <Ionicons name="arrow-forward" size={18} color={colors.white} />
+            <Ionicons name="arrow-forward" size={18} color={loading ? colors.disabledText : colors.white} />
           </Pressable>
         </View>
 

@@ -1,8 +1,17 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { formatPhone, toDigits } from '../../../shared/utils/phone';
@@ -50,7 +59,7 @@ export default function AccountEditScreen() {
       setGender(info.gender);
       setAddress(info.address ?? '');
     } catch (e: any) {
-      Alert.alert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
+      showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
     } finally {
       setLoading(false);
     }
@@ -75,34 +84,34 @@ export default function AccountEditScreen() {
     try {
       await sendPhoneCode(phone, 'SIGNUP');
       setCodeSent(true);
-      Alert.alert('인증번호 발송', '새 전화번호로 인증번호를 보냈어요. 문자를 확인해주세요.');
+      showAlert('인증번호 발송', '새 전화번호로 인증번호를 보냈어요. 문자를 확인해주세요.');
     } catch (e: any) {
-      Alert.alert('발송 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('발송 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
 
   const verifyCode = async () => {
-    if (!code) return Alert.alert('인증번호', '인증번호를 입력해주세요.');
+    if (!code) return showAlert('인증번호', '인증번호를 입력해주세요.');
     try {
       await verifyPhoneCode(phone, 'SIGNUP', code.trim());
       setVerifiedPhone(phone);
     } catch (e: any) {
-      Alert.alert('인증 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('인증 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
 
   const onSave = async () => {
     if (!name.trim() || !phone.trim()) {
-      Alert.alert('입력 확인', '이름과 전화번호를 입력해주세요.');
+      showAlert('입력 확인', '이름과 전화번호를 입력해주세요.');
       return;
     }
     if (phoneChanged && !phoneVerified) {
-      Alert.alert('휴대폰 인증', '바꾼 전화번호로 인증을 완료해주세요.');
+      showAlert('휴대폰 인증', '바꾼 전화번호로 인증을 완료해주세요.');
       return;
     }
     const birthDate = toISODate(birth);
     if (!birthDate) {
-      Alert.alert('생년월일', '생년월일 8자리를 정확히 입력해주세요. (예: 19900101)');
+      showAlert('생년월일', '생년월일 8자리를 정확히 입력해주세요. (예: 19900101)');
       return;
     }
 
@@ -115,11 +124,11 @@ export default function AccountEditScreen() {
         gender,
         address: address.trim() || null,
       });
-      Alert.alert('저장 완료', '회원 정보가 수정됐어요.', [
+      showAlert('저장 완료', '회원 정보가 수정됐어요.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
-      Alert.alert('저장 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('저장 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSaving(false);
     }

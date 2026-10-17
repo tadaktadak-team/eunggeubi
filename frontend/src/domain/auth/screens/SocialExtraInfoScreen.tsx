@@ -2,8 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,6 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
+import { showAlert } from '../../../shared/dialog';
+import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import * as authApi from '../api/auth';
 import { completeSocialSignup } from '../api/social';
@@ -46,24 +46,24 @@ export default function SocialExtraInfoScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const sendCode = async () => {
-    if (!phone) return Alert.alert('전화번호', '전화번호를 입력해주세요.');
+    if (!phone) return showAlert('전화번호', '전화번호를 입력해주세요.');
     try {
       await authApi.sendPhoneCode(phone.trim(), 'SIGNUP');
       setCodeSent(true);
-      Alert.alert('인증번호 발송', '인증번호를 발송했어요.\n(개발 중: 서버 콘솔에서 확인)');
+      showAlert('인증번호 발송', '인증번호를 발송했어요.\n(개발 중: 서버 콘솔에서 확인)');
     } catch (e: any) {
-      Alert.alert('발송 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('발송 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
 
   const verifyCode = async () => {
-    if (!code) return Alert.alert('인증번호', '인증번호를 입력해주세요.');
+    if (!code) return showAlert('인증번호', '인증번호를 입력해주세요.');
     try {
       await authApi.verifyPhoneCode(phone.trim(), 'SIGNUP', code.trim());
       setPhoneVerified(true);
-      Alert.alert('인증 완료', '휴대폰 인증이 완료됐어요.');
+      showAlert('인증 완료', '휴대폰 인증이 완료됐어요.');
     } catch (e: any) {
-      Alert.alert('인증 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('인증 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
 
@@ -71,11 +71,11 @@ export default function SocialExtraInfoScreen() {
     /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : null;
 
   const onSubmit = async () => {
-    if (!phoneVerified) return Alert.alert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
+    if (!phoneVerified) return showAlert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
     const birthDate = toISODate(birth);
-    if (!birthDate) return Alert.alert('생년월일', '생년월일 8자리를 정확히 입력해주세요. (예: 19900101)');
+    if (!birthDate) return showAlert('생년월일', '생년월일 8자리를 정확히 입력해주세요. (예: 19900101)');
     if (!agreeService || !agreePrivacy || !agreeSensitive) {
-      return Alert.alert('약관 동의', '필수 약관에 모두 동의해주세요.');
+      return showAlert('약관 동의', '필수 약관에 모두 동의해주세요.');
     }
 
     setSubmitting(true);
@@ -88,7 +88,7 @@ export default function SocialExtraInfoScreen() {
       await signInWithTokens(res);
       // 성공하면 AuthProvider가 자동으로 홈으로 전환됨
     } catch (e: any) {
-      Alert.alert('가입 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('가입 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSubmitting(false);
     }
@@ -111,13 +111,13 @@ export default function SocialExtraInfoScreen() {
               onChangeText={setPhone}
               editable={!phoneVerified}
             />
-            <TouchableOpacity
-              style={[styles.smallBtn, phoneVerified && styles.smallBtnDone]}
+            <Button
+              title={phoneVerified ? '완료' : '인증'}
+              variant={phoneVerified ? 'success' : 'neutral'}
               onPress={sendCode}
-              disabled={phoneVerified}
-            >
-              <Text style={styles.smallBtnText}>{phoneVerified ? '완료' : '인증'}</Text>
-            </TouchableOpacity>
+              done={phoneVerified}
+              textStyle={styles.smallBtnText}
+            />
           </View>
 
           {codeSent && !phoneVerified && (
@@ -131,9 +131,7 @@ export default function SocialExtraInfoScreen() {
                 onChangeText={setCode}
                 maxLength={6}
               />
-              <TouchableOpacity style={styles.smallBtn} onPress={verifyCode}>
-                <Text style={styles.smallBtnText}>확인</Text>
-              </TouchableOpacity>
+              <Button title="확인" variant="neutral" onPress={verifyCode} textStyle={styles.smallBtnText} />
             </View>
           )}
           {phoneVerified && <Text style={styles.verifiedText}>✓ 휴대폰 인증 완료</Text>}
@@ -175,13 +173,7 @@ export default function SocialExtraInfoScreen() {
             <Text style={styles.checkText}>[필수] 민감정보 처리 동의</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.btn, submitting && { opacity: 0.6 }]}
-            onPress={onSubmit}
-            disabled={submitting}
-          >
-            {submitting ? <ActivityIndicator color={colors.white} /> : <Text style={styles.btnText}>가입 완료</Text>}
-          </TouchableOpacity>
+          <Button title="가입 완료" onPress={onSubmit} loading={submitting} style={styles.btn} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -206,16 +198,7 @@ const styles = StyleSheet.create({
   inputDisabled: { opacity: 0.6 },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   rowInput: { flex: 1, marginBottom: 0, marginRight: spacing.sm },
-  smallBtn: {
-    backgroundColor: colors.text,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  smallBtnDone: { backgroundColor: colors.success },
-  smallBtnText: { color: colors.white, fontSize: font.sub, fontWeight: '700' },
+  smallBtnText: { fontSize: font.sub },
   verifiedText: { color: colors.success, fontSize: font.sub, marginBottom: spacing.md },
   genderRow: { flexDirection: 'row', marginBottom: spacing.md },
   genderBtn: {
@@ -232,13 +215,5 @@ const styles = StyleSheet.create({
   genderTextActive: { color: colors.white },
   check: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
   checkText: { marginLeft: spacing.sm, fontSize: font.sub, color: colors.text },
-  btn: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.primary,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  btn: { marginTop: spacing.lg },
 });

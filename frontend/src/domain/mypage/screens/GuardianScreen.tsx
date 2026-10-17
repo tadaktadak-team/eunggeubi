@@ -2,8 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { formatPhone } from '../../../shared/utils/phone';
@@ -22,7 +31,7 @@ export default function GuardianScreen() {
       setLoading(true);
       setGuardians(await getGuardians());
     } catch (e: any) {
-      Alert.alert('오류', e?.message ?? '보호자 목록을 불러오지 못했어요.');
+      showAlert('오류', e?.message ?? '보호자 목록을 불러오지 못했어요.');
     } finally {
       setLoading(false);
     }
@@ -46,16 +55,16 @@ export default function GuardianScreen() {
       });
     } catch (e: any) {
       setGuardians((prev) => prev.map((x) => (x.id === g.id ? { ...x, notifyEnabled: g.notifyEnabled } : x)));
-      Alert.alert('변경 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('변경 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
 
   const onResend = async (g: Guardian) => {
     try {
       await resendGuardianVerification(g.id);
-      Alert.alert('문자를 보냈어요', `${g.name}님에게 동의 문자를 다시 보냈어요.`);
+      showAlert('문자를 보냈어요', `${g.name}님에게 동의 문자를 다시 보냈어요.`);
     } catch (e: any) {
-      Alert.alert('보내지 못했어요', e?.message ?? '다시 시도해주세요.');
+      showAlert('보내지 못했어요', e?.message ?? '다시 시도해주세요.');
     }
   };
 
@@ -64,12 +73,12 @@ export default function GuardianScreen() {
       await deleteGuardian(g.id);
       setGuardians((prev) => prev.filter((x) => x.id !== g.id));
     } catch (e: any) {
-      Alert.alert('삭제 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('삭제 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
 
   const openMenu = (g: Guardian) =>
-    Alert.alert(g.name, '작업을 선택하세요', [
+    showAlert(g.name, '작업을 선택하세요', [
       { text: '수정', onPress: () => navigation.navigate('GuardianForm', { guardian: g }) },
       ...(g.verified ? [] : [{ text: '동의 문자 다시 보내기', onPress: () => onResend(g) }]),
       { text: '삭제', style: 'destructive', onPress: () => confirmDelete(g) },
@@ -78,7 +87,7 @@ export default function GuardianScreen() {
 
   // 다시 등록하려면 보호자가 동의 문자를 새로 받아야 해서 한 번 더 묻는다
   const confirmDelete = (g: Guardian) =>
-    Alert.alert('보호자 삭제', `${g.name}님을 보호자에서 삭제할까요?\n다시 등록하면 동의 문자를 새로 받아야 해요.`, [
+    showAlert('보호자 삭제', `${g.name}님을 보호자에서 삭제할까요?\n다시 등록하면 동의 문자를 새로 받아야 해요.`, [
       { text: '취소', style: 'cancel' },
       { text: '삭제', style: 'destructive', onPress: () => runDelete(g) },
     ]);

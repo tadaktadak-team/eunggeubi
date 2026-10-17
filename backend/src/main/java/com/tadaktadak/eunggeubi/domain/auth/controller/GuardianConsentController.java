@@ -2,7 +2,7 @@ package com.tadaktadak.eunggeubi.domain.auth.controller;
 
 import com.tadaktadak.eunggeubi.domain.auth.dto.ConsentStatusResponse;
 import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianConsentResponse;
-import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianRequest;
+import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianConsentRequest;
 import com.tadaktadak.eunggeubi.domain.auth.service.GuardianConsentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +23,7 @@ public class GuardianConsentController {
 
     // 보호자 정보 입력 + 동의 문자 발송
     @PostMapping("/request")
-    public ResponseEntity<GuardianConsentResponse> request(@Valid @RequestBody GuardianRequest request) {
+    public ResponseEntity<GuardianConsentResponse> request(@Valid @RequestBody GuardianConsentRequest request) {
         return ResponseEntity.ok(guardianConsentService.requestConsent(request));
     }
 

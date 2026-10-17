@@ -84,3 +84,6 @@ Thumbs.db
 .Spotlight-V100
 .Trashes
 .fseventsd
+
+# Claude Code 개인 환경 설정
+.claude/

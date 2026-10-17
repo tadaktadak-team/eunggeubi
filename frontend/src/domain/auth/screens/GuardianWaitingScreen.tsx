@@ -2,11 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
-import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { showAlert } from '../../../shared/dialog';
+import Button from '../../../shared/components/Button';
+import { colors, font, spacing } from '../../../shared/theme/theme';
 import * as authApi from '../api/auth';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -25,10 +27,10 @@ export default function GuardianWaitingScreen() {
       if (res.confirmed) {
         navigation.navigate('SignupComplete', { email });
       } else {
-        Alert.alert('아직 동의 전이에요', '보호자가 문자 링크로 동의를 완료하면 가입이 마무리돼요.');
+        showAlert('아직 동의 전이에요', '보호자가 문자 링크로 동의를 완료하면 가입이 마무리돼요.');
       }
     } catch (e: any) {
-      Alert.alert('확인 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('확인 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setChecking(false);
     }
@@ -54,21 +56,20 @@ export default function GuardianWaitingScreen() {
           로 동의 링크가 발송되었습니다.{'\n'}보호자가 링크를 눌러 동의하면 가입이 완료돼요.
         </Text>
 
-        <TouchableOpacity
-          style={[styles.checkBtn, checking && { opacity: 0.6 }]}
+        <Button
+          title="동의 완료 확인"
           onPress={onCheck}
-          disabled={checking}
-        >
-          {checking ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Text style={styles.checkBtnText}>동의 완료 확인</Text>
-          )}
-        </TouchableOpacity>
+          loading={checking}
+          style={styles.checkBtn}
+        />
 
-        <TouchableOpacity style={styles.later} onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.laterText}>나중에 하기 (로그인 화면으로)</Text>
-        </TouchableOpacity>
+        <Button
+          title="나중에 하기 (로그인 화면으로)"
+          variant="text"
+          onPress={() => navigation.navigate('Login')}
+          style={styles.later}
+          textStyle={styles.laterText}
+        />
       </View>
     </SafeAreaView>
   );
@@ -104,15 +105,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     marginBottom: spacing.xl,
   },
-  checkBtn: {
-    backgroundColor: colors.primary,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'stretch',
-  },
-  checkBtnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  checkBtn: { alignSelf: 'stretch' },
   later: { marginTop: spacing.lg },
-  laterText: { color: colors.textSub, fontSize: font.sub, textDecorationLine: 'underline' },
+  laterText: { fontSize: font.sub, textDecorationLine: 'underline' },
 });

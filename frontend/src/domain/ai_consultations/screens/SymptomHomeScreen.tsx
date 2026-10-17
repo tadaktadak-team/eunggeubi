@@ -2,9 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { showAlert } from '../../../shared/dialog';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useNearestEmergencyBed } from '../../medical_locator/hooks/useNearestEmergencyBed';
 import EmergencyBedSheet from '../../medical_locator/components/EmergencyBedSheet';
@@ -38,7 +39,7 @@ export default function SymptomHomeScreen() {
   const goAsk = (message: string) => {
     const trimmed = message.trim();
     if (!trimmed) {
-      Alert.alert('증상을 입력해주세요', '예) 어젯밤부터 두통이 심해요');
+      showAlert('증상을 입력해주세요', '예) 어젯밤부터 두통이 심해요');
       return;
     }
     navigation.navigate('SymptomChat', { initialMessage: trimmed });
@@ -49,7 +50,7 @@ export default function SymptomHomeScreen() {
     (navigation.getParent() as any)?.navigate(tabName);
   };
 
-  const notReady = () => Alert.alert('준비 중', '다음 단계에서 만들 거예요!');
+  const notReady = () => showAlert('준비 중', '다음 단계에서 만들 거예요!');
 
   return (
       <View style={styles.container}>

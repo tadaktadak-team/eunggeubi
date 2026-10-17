@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { RootStackParamList } from '../../../navigation/types';
-import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import Button from '../../../shared/components/Button';
+import { colors, font, spacing } from '../../../shared/theme/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -45,12 +46,18 @@ export default function LoginRequiredSheet({ visible, onClose }: Props) {
           </View>
 
           <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.guestBtn} onPress={onClose}>
-              <Text style={styles.guestText}>로그인 없이 이용</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.loginBtn} onPress={goLogin}>
-              <Text style={styles.loginBtnText}>로그인 / 회원가입</Text>
-            </TouchableOpacity>
+            <Button
+              title="로그인 없이 이용"
+              variant="secondary"
+              onPress={onClose}
+              style={styles.guestBtn}
+            />
+            <Button
+              title="로그인 / 회원가입"
+              variant="neutral"
+              onPress={goLogin}
+              style={styles.loginBtn}
+            />
           </View>
         </Pressable>
       </Pressable>
@@ -81,24 +88,8 @@ const styles = StyleSheet.create({
   list: { gap: spacing.md, marginTop: spacing.xl, marginBottom: spacing.xl },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowText: { fontSize: font.body, color: colors.text },
+  // 높이·색·모서리는 Button이 들고 있으므로 여기서는 가로 비율만 준다
   buttonRow: { flexDirection: 'row', gap: spacing.sm },
-  guestBtn: {
-    flex: 1,
-    height: 52,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  guestText: { color: colors.text, fontSize: font.body, fontWeight: '700' },
-  loginBtn: {
-    flex: 1.2,
-    height: 52,
-    borderRadius: radius.md,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loginBtnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  guestBtn: { flex: 1 },
+  loginBtn: { flex: 1.2 },
 });

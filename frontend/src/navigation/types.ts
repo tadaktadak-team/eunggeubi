@@ -8,7 +8,6 @@ export type RootStackParamList = {
   FindAccount: { tab?: 'FIND_ID' | 'FIND_PW' } | undefined;
   Legal: { tab?: 'terms' | 'privacy'; section?: string } | undefined;
   Tabs: undefined;
-  EditProfile: undefined;
   GuardianConsent: { consentToken: string; email: string };
   GuardianWaiting: { consentToken: string; email: string; maskedPhone: string };
   SocialConsent: { ticket: string };

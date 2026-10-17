@@ -1,6 +1,7 @@
 import * as Location from 'expo-location';
 import { useState } from 'react';
-import { Alert, Linking } from 'react-native';
+import { Linking } from 'react-native';
+import { showAlert } from '../../../shared/dialog';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -15,11 +16,11 @@ export function useEmergency() {
 
   const callEmergency = () => {
     if (__DEV__) {
-      Alert.alert('개발 모드', '실제 배포 앱에서는 119로 전화가 연결됩니다.');
+      showAlert('개발 모드', '실제 배포 앱에서는 119로 전화가 연결됩니다.');
       return;
     }
     Linking.openURL('tel:119').catch(() => {
-      Alert.alert('전화 연결 실패', '이 기기에서는 전화를 걸 수 없어요.');
+      showAlert('전화 연결 실패', '이 기기에서는 전화를 걸 수 없어요.');
     });
   };
 
@@ -35,7 +36,7 @@ export function useEmergency() {
 
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('위치 권한 필요', '보호자에게 위치를 보내려면 위치 권한이 필요해요.');
+        showAlert('위치 권한 필요', '보호자에게 위치를 보내려면 위치 권한이 필요해요.');
         callEmergency();
         return;
       }
@@ -68,7 +69,7 @@ export function useEmergency() {
 
       callEmergency();
     } catch (e) {
-      Alert.alert('오류', '긴급 발동 중 문제가 발생했어요.');
+      showAlert('오류', '긴급 발동 중 문제가 발생했어요.');
       callEmergency();
       console.error(e);
     } finally {
