@@ -19,6 +19,7 @@ import { showAlert } from '../../../shared/dialog';
 import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../hooks/useAuth';
+import { SocialLoginResult, startKakaoLogin, startNaverLogin, startGoogleLogin } from '../api/social';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -26,14 +27,14 @@ const SOCIAL_ICON_SIZE = 48;
 
 // key는 백엔드 Provider enum(KAKAO/NAVER/GOOGLE)과 동일하게 맞춤
 const SOCIAL_PROVIDERS = [
-  { key: 'KAKAO', label: '카카오', icon: require('../../../../assets/social/kakao.png') },
-  { key: 'NAVER', label: '네이버', icon: require('../../../../assets/social/naver.png') },
-  { key: 'GOOGLE', label: '구글', icon: require('../../../../assets/social/google.png') },
+  { key: 'KAKAO', label: '카카오', icon: require('../../../../assets/social/kakao.png'), start: startKakaoLogin },
+  { key: 'NAVER', label: '네이버', icon: require('../../../../assets/social/naver.png'), start: startNaverLogin },
+  { key: 'GOOGLE', label: '구글', icon: require('../../../../assets/social/google.png'), start: startGoogleLogin },
 ] as const;
 
 export default function LoginScreen() {
   const navigation = useNavigation<Nav>();
-  const { signIn } = useAuth();
+  const { signIn, signInWithTokens } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,7 +57,27 @@ export default function LoginScreen() {
     }
   };
 
-  const notReady = () => showAlert('준비 중', '다음 단계에서 만들 거예요!');
+  const handleSocial = async (start: () => Promise<SocialLoginResult>, label: string) => {
+    try {
+      const result = await start();
+      if (result.type === 'cancel') {
+        return;
+      }
+      if (result.type === 'signup') {
+        // 신규 → 정보 부족(카카오)이면 추가정보 화면, 아니면 약관만
+        if (result.needInfo) {
+          navigation.navigate('SocialExtraInfo', { ticket: result.ticket });
+        } else {
+          navigation.navigate('SocialConsent', { ticket: result.ticket });
+        }
+        return;
+      }
+      // result.type === 'login' → 이미 토큰을 받았으므로 바로 로그인 상태로 전환
+      await signInWithTokens(result);
+    } catch (e: any) {
+      showAlert(`${label} 로그인 실패`, e?.message ?? '다시 시도해주세요.');
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -136,7 +157,7 @@ export default function LoginScreen() {
               <TouchableOpacity
                 key={provider.key}
                 style={styles.socialBtn}
-                onPress={notReady}
+                onPress={() => handleSocial(provider.start, provider.label)}
                 accessibilityRole="button"
                 accessibilityLabel={`${provider.label}로 시작하기`}
               >

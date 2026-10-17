@@ -11,6 +11,8 @@ import SignupScreen from '../domain/auth/screens/SignupScreen';
 import SplashScreen from '../domain/auth/screens/SplashScreen';
 import GuardianConsentScreen from '../domain/auth/screens/GuardianConsentScreen';
 import GuardianWaitingScreen from '../domain/auth/screens/GuardianWaitingScreen';
+import SocialConsentScreen from '../domain/auth/screens/SocialConsentScreen';
+import SocialExtraInfoScreen from '../domain/auth/screens/SocialExtraInfoScreen';
 import EmergencyResultScreen from '../domain/emergency/screens/EmergencyResultScreen';
 import DrugNavigator from '../domain/drug/screens/DrugNavigator';
 import LegalScreen from '../shared/screens/LegalScreen';
@@ -92,6 +94,8 @@ export default function RootNavigator() {
               <Stack.Screen name="GuardianConsent" component={GuardianConsentScreen} />
               <Stack.Screen name="GuardianWaiting" component={GuardianWaitingScreen} />
               <Stack.Screen name="FindAccount" component={FindAccountScreen} />
+              <Stack.Screen name="SocialConsent" component={SocialConsentScreen} />
+              <Stack.Screen name="SocialExtraInfo" component={SocialExtraInfoScreen} />
                             <Stack.Screen name="Tabs" component={TabsNavigator} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
               <Stack.Screen name="Legal" component={LegalScreen} />
