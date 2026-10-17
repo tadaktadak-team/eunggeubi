@@ -31,27 +31,33 @@ public class HealthProfile extends BaseTimeEntity {
     @Column(columnDefinition = "TEXT") //콤마 구분
     private String diseases;
 
-    @Column(columnDefinition = "TEXT") //콤마 구분
+    @Column(columnDefinition = "TEXT") //콤마 구분 (이름만. AI 상담이 읽는다)
     private String medications;
+
+    @Column(name = "medication_items", columnDefinition = "TEXT") //이름+품목번호 JSON
+    private String medicationItems;
 
     @Column(columnDefinition = "TEXT") //콤마 구분
     private String allergies;
 
     @Builder
     private HealthProfile(Long userId, String bloodType, String diseases,
-                          String medications, String allergies) {
+                          String medications, String medicationItems, String allergies) {
         this.userId = userId;
         this.bloodType = bloodType;
         this.diseases = diseases;
         this.medications = medications;
+        this.medicationItems = medicationItems;
         this.allergies = allergies;
     }
 
     // 건강 프로필 수정 (변경 감지로 반영)
-    public void update(String bloodType, String diseases, String medications, String allergies) {
+    public void update(String bloodType, String diseases, String medications,
+                       String medicationItems, String allergies) {
         this.bloodType = bloodType;
         this.diseases = diseases;
         this.medications = medications;
+        this.medicationItems = medicationItems;
         this.allergies = allergies;
     }
 }

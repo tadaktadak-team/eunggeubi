@@ -18,6 +18,7 @@ import { addRecentSearch } from '../storage/recentSearches';
 import { stripHtmlTags } from '../../../shared/utils/html';
 import { getPermitStatusLabel, isPrescriptionDrug } from '../utils/drugStatus';
 import DrugImage from '../components/DrugImage';
+import { useVisibleRowKeys, VISIBLE_ROW_CONFIG } from '../hooks/useVisibleRowKeys';
 
 const NUM_OF_ROWS = 10;
 
@@ -52,6 +53,8 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
   // state는 비동기로 갱신돼서 onEndReached가 연달아 호출되면 loadingMore 검사를 둘 다 통과
   // ref로 즉시 잠가서 같은 페이지를 두 번 요청하지 않게 하고, 새 검색이 시작되면 이전 요청 결과는 버림
   const fetchingMoreRef = useRef(false);
+  // 지금 화면에 보이는 행만 약 이미지를 요청한다(미리 그려 둔 화면 밖 행은 아이콘만 표시).
+  const { visibleKeys, onViewableItemsChanged } = useVisibleRowKeys();
   const requestIdRef = useRef(0);
 
   // 새 검색어로 첫 페이지부터 다시 검색
@@ -157,6 +160,9 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
           contentContainerStyle={styles.listContent}
           onEndReached={loadMore}
           onEndReachedThreshold={0.4}
+          extraData={visibleKeys}
+          viewabilityConfig={VISIBLE_ROW_CONFIG}
+          onViewableItemsChanged={onViewableItemsChanged}
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator size="small" color={colors.primary} style={styles.footerLoading} />
@@ -174,7 +180,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
               </View>
             )
           }
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <TouchableOpacity
               style={styles.card}
               onPress={() => {
@@ -196,7 +202,14 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
                 navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
               }}
             >
-              <DrugImage uri={item.itemImage} name={item.name} size={70} style={styles.cardImage} />
+              <DrugImage
+                uri={item.itemImage}
+                name={item.name}
+                size={70}
+                style={styles.cardImage}
+                active={visibleKeys.has(item.itemSeq)}
+                order={index}
+              />
               <View style={styles.cardInfo}>
                 <Text style={styles.itemName} numberOfLines={1}>
                   {item.name}

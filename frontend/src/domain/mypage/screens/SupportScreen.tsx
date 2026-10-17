@@ -5,6 +5,7 @@ import { Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from
 import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { SUPPORT_EMAIL } from '../../../shared/constants/contact';
+import { callNumber } from '../../../shared/utils/call';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 
 const EMERGENCY_LINES: { label: string; number: string; desc: string }[] = [
@@ -61,7 +62,7 @@ export default function SupportScreen() {
             <Pressable
               key={l.number}
               style={[styles.lineRow, i > 0 && styles.lineBorder]}
-              onPress={() => Linking.openURL(`tel:${l.number}`)}
+              onPress={() => callNumber(l.number)}
             >
               <View style={styles.lineBadge}>
                 <Text style={styles.lineBadgeText}>{l.number}</Text>

@@ -2,6 +2,10 @@ package com.tadaktadak.eunggeubi.domain.hospital.controller;
 
 import com.tadaktadak.eunggeubi.domain.hospital.dto.MedicalFacilityResponse;
 import com.tadaktadak.eunggeubi.domain.hospital.service.HospitalService;
+import com.tadaktadak.eunggeubi.global.validation.KoreaLatitude;
+import com.tadaktadak.eunggeubi.global.validation.KoreaLongitude;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,8 +27,8 @@ public class HospitalController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public List<MedicalFacilityResponse> findNearbyHospitals(
-            @RequestParam double lat,
-            @RequestParam double lng
+            @RequestParam @KoreaLatitude double lat,
+            @RequestParam @KoreaLongitude double lng
     ) {
         return hospitalService.findNearbyHospitals(lat, lng);
     }
@@ -34,8 +38,8 @@ public class HospitalController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public List<MedicalFacilityResponse> findNearbyPharmacies(
-            @RequestParam double lat,
-            @RequestParam double lng
+            @RequestParam @KoreaLatitude double lat,
+            @RequestParam @KoreaLongitude double lng
     ) {
         return hospitalService.findNearbyPharmacies(lat, lng);
     }
@@ -44,7 +48,9 @@ public class HospitalController {
             produces = MediaType.APPLICATION_JSON_VALUE
     )
     public HospitalDetailResponse getHospitalDetail(
-            @RequestParam String ykiho
+            @RequestParam
+            @Size(max = 200, message = "병원 식별자가 올바르지 않습니다.")
+            @Pattern(regexp = "^[A-Za-z0-9+/=_-]+$", message = "병원 식별자가 올바르지 않습니다.") String ykiho
     ) {
         return hospitalService.findHospitalDetail(ykiho);
     }
