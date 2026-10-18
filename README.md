@@ -63,39 +63,15 @@ OpenAI · 질병관리청 건강정보 · 식약처(e약은요 · 낱알식별 �
 
 ## 시스템 아키텍처
 
-클라이언트는 HTTPS로 Caddy에 접속하고, Caddy가 TLS를 종단한 뒤 같은 EC2 안의 Spring Boot(:8080)로 전달합니다. 애플리케이션 시크릿은 서버에 평문으로 두지 않고 기동할 때마다 Parameter Store에서 주입됩니다.
+클라이언트는 HTTPS로 Caddy에 접속하고, Caddy가 TLS를 종단한 뒤 같은 EC2 안의 Spring Boot로 전달합니다. 애플리케이션은 `127.0.0.1:8080`에만 바인딩되어 외부에서 직접 접근할 수 없고, 모든 요청이 Caddy를 거칩니다. `/actuator/*`는 Caddy에서 404로 막아 헬스체크 엔드포인트가 밖으로 드러나지 않습니다.
+
+데이터베이스는 퍼블릭 액세스 없이 보안그룹 참조로 웹 서버에서만 접근할 수 있고, 애플리케이션 시크릿은 서버에 평문으로 두지 않고 기동할 때마다 Parameter Store(SecureString)에서 주입됩니다.
+
+OpenAI·공공데이터·SMS·소셜 로그인 등 외부 연동은 모두 서버가 대행합니다. 클라이언트에는 외부 API 키가 내려가지 않습니다.
 
 <img src="docs/images/architecture.png" alt="시스템 아키텍처" width="100%">
 
-<details>
-<summary>Mermaid 코드</summary>
-
-```mermaid
-flowchart TB
-    app["Expo 앱<br/>iOS · Android · Web"]
-
-    subgraph aws["AWS ap-northeast-2"]
-        direction TB
-        caddy["Caddy<br/>자동 HTTPS · /actuator 차단"]
-        api["Spring Boot 3.5<br/>127.0.0.1:8080"]
-        rds[("RDS MySQL 8.4<br/>Single-AZ · 비공개")]
-        ps["SSM Parameter Store<br/>SecureString"]
-
-        caddy --> api
-        ps -.->|기동 시 주입| api
-        api -->|JPA| rds
-    end
-
-    ext["<b>외부 연동</b><br/><br/>AI 상담<br/>OpenAI · Qdrant Cloud<br/><br/>공공데이터<br/>질병관리청 · 식약처<br/>심평원 · 국립중앙의료원<br/><br/>알림 · 인증<br/>Solapi SMS<br/>네이버 · 카카오 · 구글"]
-
-    app -->|HTTPS| caddy
-    api -->|REST| ext
-
-    classDef extBox fill:#fff4e6,stroke:#e8a33d,color:#333
-    class ext extBox
-```
-
-</details>
+> 다이어그램 원본: [`docs/architecture.drawio`](docs/architecture.drawio)
 
 ### 배포 파이프라인
 
