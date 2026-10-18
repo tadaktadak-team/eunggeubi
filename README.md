@@ -35,19 +35,32 @@
 ## 기술 스택
 
 **Frontend**
-Expo 57 · React Native 0.86 · React 19 · TypeScript · React Navigation 7 · react-native-maps · react-native-svg · expo-location · expo-secure-store · expo-updates
+
+![Expo](https://img.shields.io/badge/Expo_57-000020?style=flat-square&logo=expo&logoColor=white)
+![React Native](https://img.shields.io/badge/React_Native_0.86-61DAFB?style=flat-square&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white)
 
 **Backend**
-Java 17 · Spring Boot 3.5 · Spring Security · Spring Data JPA · Spring AI · Thymeleaf · JJWT 0.12.6
 
-**Database**
-MySQL 8.4 (RDS) · Qdrant (벡터 DB)
+![Java](https://img.shields.io/badge/Java_17-007396?style=flat-square&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring_Boot_3.5-6DB33F?style=flat-square&logo=springboot&logoColor=white)
+![Spring Security](https://img.shields.io/badge/Spring_Security-6DB33F?style=flat-square&logo=springsecurity&logoColor=white)
+![JPA](https://img.shields.io/badge/Spring_Data_JPA-59666C?style=flat-square&logo=hibernate&logoColor=white)
+![Spring AI](https://img.shields.io/badge/Spring_AI-6DB33F?style=flat-square&logo=spring&logoColor=white)
 
-**Infra & DevOps**
-AWS EC2 · RDS · S3 · SSM Parameter Store · Caddy · GitHub Actions(OIDC) · EAS Update
+**Data**
 
-**External API**
-OpenAI · 질병관리청 건강정보 · 식약처(e약은요 · 낱알식별 · DUR · 허가정보) · 심평원(병원 · 약국 · 진료과목) · 국립중앙의료원(응급실 실시간 병상) · Solapi SMS · 네이버 · 카카오 · 구글 OAuth
+![MySQL](https://img.shields.io/badge/MySQL_8.4-4479A1?style=flat-square&logo=mysql&logoColor=white)
+![Qdrant](https://img.shields.io/badge/Qdrant-DC244C?style=flat-square&logo=qdrant&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-412991?style=flat-square&logo=openai&logoColor=white)
+
+**Infra**
+
+![AWS](https://img.shields.io/badge/AWS_EC2_·_RDS_·_S3-232F3E?style=flat-square&logo=amazonwebservices&logoColor=white)
+![Caddy](https://img.shields.io/badge/Caddy-1F88C0?style=flat-square&logo=caddy&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+
+**외부 연동** · 질병관리청 · 식약처 · 심평원 · 국립중앙의료원 · Solapi · 네이버/카카오/구글 OAuth
 
 ## 핵심 기술 선택 이유
 
