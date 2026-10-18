@@ -1,0 +1,31 @@
+# /etc/systemd/system/eunggeubi.service
+[Unit]
+Description=eunggeubi backend (Spring Boot)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=eunggeubi
+Group=eunggeubi
+WorkingDirectory=/opt/eunggeubi
+ExecStart=/usr/local/bin/eunggeubi-run.sh
+Restart=always
+RestartSec=10
+SuccessExitStatus=143
+TimeoutStopSec=30
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=eunggeubi
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target
