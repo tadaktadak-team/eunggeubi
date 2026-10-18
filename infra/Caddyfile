@@ -1,0 +1,17 @@
+eunggeubi.duckdns.org {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# Actuator 는 배포 스크립트가 서버 내부(127.0.0.1:8080)에서 직접 호출한다.
+	# 외부에서는 존재 자체를 숨긴다.
+	@actuator path /actuator/*
+	respond @actuator 404
+
+	reverse_proxy 127.0.0.1:8080
+}
