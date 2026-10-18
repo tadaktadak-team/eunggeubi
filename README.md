@@ -62,17 +62,6 @@
 
 **외부 연동** · 질병관리청 · 식약처 · 심평원 · 국립중앙의료원 · Solapi · 네이버/카카오/구글 OAuth
 
-## 핵심 기술 선택 이유
-
-**Expo (React Native)** — 하나의 코드베이스로 iOS·Android를 함께 내고, 웹 프리뷰로 팀 내 확인을 빠르게 돌립니다. EAS Update로 스토어 심사 없이 OTA 배포가 가능해 시연 직전 수정에도 대응할 수 있습니다.
-
-**Spring AI + Qdrant** — AI 상담은 모델이 지어낸 답이 아니라 **질병관리청 자료를 근거로 한 참고정보**여야 합니다. 질병 문서를 청크 단위로 임베딩해 Qdrant에 적재하고, 검색된 근거와 출처를 함께 보여주는 RAG 구조로 만들었습니다. 진단으로 읽힐 표현은 별도 가드로 걸러냅니다.
-
-**공공데이터 API** — 병상·약물·병원 정보를 직접 수집하면 최신성과 신뢰성을 보장할 수 없습니다. 국립중앙의료원 실시간 병상, 식약처 DUR, 심평원 기관 정보를 그대로 사용해 출처를 분명히 했습니다.
-
-**SSM Parameter Store + OIDC 배포** — 서버에 평문 `.env`를 두지 않고 기동할 때마다 Parameter Store(SecureString)에서 환경변수를 받아 올립니다. GitHub Actions는 영구 AWS 키 없이 OIDC로 인증해 레포에 장기 자격증명이 남지 않습니다.
-
-**Caddy** — 자동 HTTPS(Let's Encrypt)로 인증서 갱신을 따로 챙기지 않고, `/actuator/*`를 외부에서 404로 막아 헬스체크 엔드포인트 노출을 차단합니다.
 
 ## 시스템 아키텍처
 
@@ -84,7 +73,6 @@ OpenAI·공공데이터·SMS·소셜 로그인 등 외부 연동은 모두 서�
 
 <img src="docs/images/architecture.png" alt="시스템 아키텍처" width="100%">
 
-> 다이어그램 원본: [`docs/architecture.drawio`](docs/architecture.drawio)
 
 
 ## 시작하기
