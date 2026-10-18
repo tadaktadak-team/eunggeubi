@@ -73,59 +73,6 @@ OpenAI·공공데이터·SMS·소셜 로그인 등 외부 연동은 모두 서�
 
 > 다이어그램 원본: [`docs/architecture.drawio`](docs/architecture.drawio)
 
-### 배포 파이프라인
-
-`develop`에 push하면 바뀐 쪽만 자동으로 나갑니다. 백엔드는 OIDC로 인증해 S3에 올린 뒤 SSM으로 서버에서 교체하고, 실패하면 이전 릴리스로 자동 롤백합니다.
-
-<details>
-<summary>Mermaid 코드</summary>
-
-```mermaid
-flowchart TB
-    push["develop 브랜치 push"]
-
-    push -->|backend 변경| build["GitHub Actions<br/>gradlew bootJar"]
-    build -->|OIDC 인증<br/>영구 키 없음| s3["S3<br/>releases/커밋7자리.jar"]
-    s3 -->|SSM send-command| deploy["eunggeubi-deploy.sh<br/>릴리스 생성 → 심링크 교체<br/>→ 헬스체크<br/>실패 시 이전 릴리스 자동 롤백"]
-
-    push -->|frontend 변경| eas["EAS Update<br/>OTA 배포 · preview 환경"]
-
-    classDef ok fill:#e8f5e9,stroke:#4caf50,color:#333
-    class deploy,eas ok
-```
-
-</details>
-
-## 프로젝트 구조
-
-백엔드는 도메인별 패키지(controller · service · repository · entity · dto), 프론트는 도메인 모듈(`domain/`)과 공용 모듈(`shared/`)로 구성했습니다.
-
-```
-backend/src/main/java/com/tadaktadak/eunggeubi/
-├── domain/
-│   ├── auth/              인증 · 소셜로그인 · 휴대폰 인증 · 보호자 동의
-│   ├── user/              회원 정보 · 탈퇴 · 보호자
-│   ├── ai_consultations/  증상 상담 · RAG · 체크리스트 · 이력
-│   ├── drug/              의약품 · 낱알식별 · 병용금기
-│   ├── emergency/         119 호출 · 보호자 알림
-│   ├── emergency_bed/     응급실 실시간 병상
-│   ├── first_aid/         응급처치 안내
-│   ├── health/            건강 프로필
-│   └── hospital/          병원 · 약국 정보
-└── global/                security · sms · util · exception · validation
-
-frontend/src/
-├── domain/
-│   ├── auth/              로그인 · 가입 · 계정찾기 · 보호자 동의 · 소셜
-│   ├── mypage/            마이페이지 · 회원정보 · 건강 프로필 · 상담 이력
-│   ├── ai_consultations/  증상 입력 · 상담 · 응급처치
-│   ├── drug/              약물 검색 · 낱알 · 병용 확인
-│   ├── medical_locator/   지도 · 병원 상세
-│   ├── emergency/         119 버튼 · 결과
-│   └── onboarding/        첫 실행 둘러보기
-├── navigation/
-└── shared/                components · dialog · storage · theme · api
-```
 
 ## 시작하기
 
@@ -141,39 +88,12 @@ cd frontend && npm install && npm start
 
 `npm start`는 현재 PC의 LAN IP를 자동으로 찾아 `EXPO_PUBLIC_API_BASE_URL`에 넣어줍니다. 실기기(Expo Go)에서는 `localhost`로 로컬 백엔드에 접속할 수 없기 때문입니다.
 
-**환경 변수** — 로컬은 `backend/src/main/resources/application-local.yml`(git 제외), 운영은 SSM Parameter Store에서 주입합니다.
-
-| 변수 | 용도 |
-|---|---|
-| `OPENAI_API_KEY` | AI 상담 |
-| `QDRANT_REST_URL` · `QDRANT_API_KEY` | 벡터 DB |
-| `E_DRUG_SECRET` · `PILL_IDENT_SECRET` · `DUR_SECRET` · `DRUG_PRMSN_SECRET` | 식약처 |
-| `EMERGENCY_BED_SECRET` | 응급실 병상 |
-| `SOLAPI_API_KEY` · `SOLAPI_API_SECRET` · `SOLAPI_FROM` | SMS |
-| `NAVER_CLIENT_ID` · `KAKAO_CLIENT_ID` · `GOOGLE_CLIENT_ID` (+ 각 SECRET) | 소셜 로그인 |
-| `JWT_SECRET` | 토큰 서명 |
-
-## 협업 규칙
-
-**브랜치 전략**
-
-- `main` — 배포 브랜치 (직접 push 금지)
-- `develop` — 통합 개발 브랜치
-- `feature/<도메인명>` — 도메인 단위 기능 개발, 프론트·백엔드 변경을 함께 포함
-
-**커밋 컨벤션**
-
-`type: 한글 설명` 형식을 사용합니다. (예: `feat: 앱 첫 실행 시 5단계 둘러보기 추가`)
-
-**PR 규칙**
-
-제목은 `[작업영역] 타입: 작업 내용` (예: `[FE] feat: 로그인 화면 구현`), 본문은 `작업 내용`과 `참고 사항`으로 나눠 작성합니다.
 
 ## 팀
 
 | 이름 | GitHub | 담당 파트 |
 |---|---|---|
-| 함한솔 | [@h-ns-l0](https://github.com/h-ns-l0) | 인증 · 소셜로그인 · 휴대폰 인증 · 보호자 동의 · 온보딩 · AWS 인프라 · CI/CD |
+| 함한솔 | [@h-ns-l0](https://github.com/h-ns-l0) | 인증 · 소셜로그인 · 휴대폰 인증 · 보호자 동의 · AWS 인프라 · CI/CD |
 | 정수민 | [@SO0omin](https://github.com/SO0omin) | 마이페이지 · 회원·건강 프로필 · 긴급 호출 · 보호자 알림 |
 | 김준휘 | [@junhwi44](https://github.com/junhwi44) | AI 상담(RAG) · 응급처치 안내 |
 | 박하은 | [@mintsilver](https://github.com/mintsilver) | 응급실·병상 조회 · 의료기관 찾기 · 지도 |
