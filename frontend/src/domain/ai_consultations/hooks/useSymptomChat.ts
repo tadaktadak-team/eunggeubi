@@ -11,9 +11,18 @@ import { getGuestCode, saveGuestCode } from '../../../shared/storage/guestCodeSt
 import { getConsultationDetail } from '../../mypage/api/consultation';
 import { ChatMessage } from '../types';
 
+// 스트리밍 중인 답변 - 처음 오면 끝에 붙이고, 이후엔 같은 id 자리를 바꿔 끼운다.
+function upsert(messages: ChatMessage[], message: ChatMessage): ChatMessage[] {
+  return messages.some((m) => m.id === message.id)
+    ? messages.map((m) => (m.id === message.id ? message : m))
+    : [...messages, message];
+}
+
 export function useSymptomChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  // 답변 글자가 화면에 나오기 시작했는지 - 그때부터는 "입력 중..." 표시를 숨긴다.
+  const [answering, setAnswering] = useState(false);
   // 상담 세션을 이어가기 위한 값들. 화면(훅 인스턴스)이 살아있는 동안 대화 전체에서 공유한다.
   const sessionRef = useRef<{ sessionId?: string; guestCode?: string }>({});
   // 비회원 무료 상담 횟수를 다 써서 서버가 403을 준 상태 - 화면이 회원가입 안내 시트를 띄운다.
@@ -31,21 +40,31 @@ export function useSymptomChat() {
 
     setMessages((prev) => [...prev, { id: nextChatMessageId(), type: 'user', text: trimmed }]);
     setLoading(true);
+    let answerId: string | undefined;
     try {
       // 기기에 저장된 guestCode를 세션이 바뀌어도 계속 쓴다(횟수 제한/가입 시 기록 이전의 기준).
       // 로그인 상태면 서버가 무시한다.
       // 메모리(sessionRef)보다 저장소가 우선 - 가입하면 저장소만 비워지므로, 메모리 값을 먼저 쓰면
       // 이미 계정으로 이전된 옛 코드를 계속 보내게 된다.
       const storedGuestCode = (await getGuestCode()) ?? undefined;
-      const { answerMessage, checklistMessage, sessionId, guestCode } = await requestSymptomAdvice(
+      // 답변 말풍선은 첫 문장이 오면 붙이고, 이후엔 같은 id 자리를 바꿔 끼운다.
+      const { checklistMessage, sessionId, guestCode } = await requestSymptomAdvice(
         trimmed,
         sessionRef.current.sessionId,
         storedGuestCode,
+        (answer) => {
+          answerId = answer.id;
+          // 최종 답변(consultationId 있음)이 오면 다시 "입력 중..." - 이어서 체크리스트를 만든다.
+          setAnswering(answer.consultationId === undefined);
+          setMessages((prev) => upsert(prev, answer));
+        },
       );
       if (guestCode) await saveGuestCode(guestCode);
       sessionRef.current = { sessionId, guestCode: guestCode ?? storedGuestCode };
-      setMessages((prev) => [...prev, answerMessage, ...(checklistMessage ? [checklistMessage] : [])]);
+      if (checklistMessage) setMessages((prev) => [...prev, checklistMessage]);
     } catch (e) {
+      // 받다 만 답변은 치운다 - 아래에서 에러 말풍선이나 가입 안내로 바뀐다.
+      setMessages((prev) => prev.filter((m) => m.id !== answerId));
       // 403 전체가 아니라 서버가 한도 초과로 표시한 것만 - 다른 403까지 가입 안내로 새지 않게.
       if ((e as { code?: string }).code === 'GUEST_LIMIT') {
         // 답변 못 받은 질문 말풍선은 치운다 - 저장도 안 됐다.
@@ -62,6 +81,7 @@ export function useSymptomChat() {
       ]);
     } finally {
       setLoading(false);
+      setAnswering(false);
     }
     return true;
   }, []);
@@ -94,11 +114,17 @@ export function useSymptomChat() {
         ),
       );
       setLoading(true);
+      let answerId: string | undefined;
       try {
         await submitChecklistAnswers(target.consultationId, checkedLabels, sessionRef.current.guestCode);
-        const regenerated = await regenerateAnswer(target.consultationId, sessionRef.current.guestCode);
-        setMessages((prev) => [...prev, regenerated]);
+        await regenerateAnswer(target.consultationId, sessionRef.current.guestCode, (answer) => {
+          answerId = answer.id;
+          setAnswering(true);
+          setMessages((prev) => upsert(prev, answer));
+        });
       } catch (e) {
+        // 받다 만 답변은 치운다 - 아래에서 에러 말풍선이나 가입 안내로 바뀐다.
+        setMessages((prev) => prev.filter((m) => m.id !== answerId));
         // 비회원은 답변당 재생성 1회까지다 - 넘으면 에러 말풍선 대신 가입 안내를 띄우고, 가입 후 다시
         // 답변할 수 있게 체크리스트는 풀어둔다.
         if ((e as { code?: string }).code === 'GUEST_LIMIT') {
@@ -117,6 +143,7 @@ export function useSymptomChat() {
         ]);
       } finally {
         setLoading(false);
+        setAnswering(false);
       }
     },
     [messages],
@@ -170,5 +197,5 @@ export function useSymptomChat() {
     }
   }, []);
 
-  return { messages, loading, guestLimitReached, limitSheetVisible, setLimitSheetVisible, sendText, resume, toggleChecklistItem, submitChecklist, submitChecklistNone };
+  return { messages, loading, answering, guestLimitReached, limitSheetVisible, setLimitSheetVisible, sendText, resume, toggleChecklistItem, submitChecklist, submitChecklistNone };
 }

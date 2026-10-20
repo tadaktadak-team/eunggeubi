@@ -34,7 +34,7 @@ export default function SymptomChatScreen() {
   const { params } = useRoute<ChatRoute>();
   const insets = useSafeAreaInsets();
   const {
-    messages, loading, guestLimitReached, limitSheetVisible, setLimitSheetVisible,
+    messages, loading, answering, guestLimitReached, limitSheetVisible, setLimitSheetVisible,
     sendText, resume, toggleChecklistItem, submitChecklist, submitChecklistNone,
   } = useSymptomChat();
 
@@ -127,7 +127,7 @@ export default function SymptomChatScreen() {
             );
           })}
 
-          {loading && (
+          {loading && !answering && (
               <View style={styles.typingRow}>
                 <AiAvatar />
                 <Text style={styles.typingText}>입력 중...</Text>
