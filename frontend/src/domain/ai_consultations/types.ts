@@ -98,6 +98,7 @@ export type FirstAidSituation = string;
 // AI상담 탭 내부 네비게이션
 export type AiConsultationStackParamList = {
   SymptomHome: undefined;
-  SymptomChat: { initialMessage?: string } | undefined;
+  // sessionId가 있으면 그 상담의 지난 대화를 불러와 이어서 묻는다(홈의 "최근 상담 이어가기").
+  SymptomChat: { initialMessage?: string; sessionId?: string } | undefined;
   FirstAidGuide: { situation?: FirstAidSituation } | undefined;
 };

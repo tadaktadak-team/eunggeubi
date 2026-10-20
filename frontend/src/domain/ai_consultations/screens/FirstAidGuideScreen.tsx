@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
@@ -6,7 +6,13 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
-import { FirstAidGuideDto, FirstAidTopicDto, getFirstAidGuide, searchFirstAidGuide } from '../api/firstAid';
+import {
+  FirstAidGuideDto,
+  FirstAidTopicDto,
+  getFirstAidGuide,
+  getFirstAidTopics,
+  searchFirstAidGuide,
+} from '../api/firstAid';
 import { AiConsultationStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<AiConsultationStackParamList>;
@@ -15,7 +21,22 @@ type Nav = NativeStackNavigationProp<AiConsultationStackParamList>;
 // 구분되게 일상어를 앞에 둔다. 둘이 같으면 한 번만 보여준다.
 const candidateLabel = (c: FirstAidTopicDto) =>
   c.shortName && c.shortName !== c.topic ? `${c.shortName} (${c.topic})` : c.topic;
-type GuideRoute = RouteProp<AiConsultationStackParamList, 'FirstAidGuide'>;
+
+// 처음 들어왔을 때 검색 없이 바로 누르는 자주 찾는 상황. topic은 서버 first-aid-topics.txt의 주제 이름과
+// 글자까지 같아야 한다(다르면 가이드를 못 찾는다). 아이콘은 Ionicons에 없는 뼈·머리가 있는 MaterialCommunityIcons.
+const QUICK_TOPICS: { topic: string; label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
+  { topic: '화상', label: '화상', icon: 'fire' },
+  { topic: '코피(비출혈)', label: '코피', icon: 'water' },
+  { topic: '열상', label: '베인 상처', icon: 'content-cut' },
+  { topic: '골절', label: '골절', icon: 'bone' },
+  { topic: '염좌', label: '삠', icon: 'walk' },
+  { topic: '외상성 뇌손상', label: '머리 부딪힘', icon: 'head-flash' },
+  { topic: '동물 및 곤충에 의한 응급상황', label: '동물·벌레 물림', icon: 'bug' },
+  { topic: '안외상(각막이물)', label: '눈에 이물질', icon: 'eye' },
+];
+// first-aid-topics.txt의 [안전] 분류 이름.
+const SAFETY_CATEGORY = '안전';
+type GuideRoute =RouteProp<AiConsultationStackParamList, 'FirstAidGuide'>;
 
 export default function FirstAidGuideScreen() {
   const navigation = useNavigation<Nav>();
@@ -30,6 +51,10 @@ export default function FirstAidGuideScreen() {
   const [showList, setShowList] = useState(false);
   // 여러 후보 중 하나를 골라 들어온 상태 - 이때만 "다른 상황 보기"로 목록에 돌아갈 수 있다.
   const canGoBackToList = !showList && candidates.length > 1;
+  // 원인별로 처치가 다른 주제(예: 동물·벌레 물림)를 고르면 서버가 세부 상황 목록(cases)을 준다 - 하나를 고르면
+  // 그 경우의 응급처치만 불러온다. 고른 뒤에도 남겨둬서 "다른 경우 보기"로 되돌아올 수 있게 한다.
+  const [caseMenu, setCaseMenu] = useState<{ situation: string; title: string; cases: string[] } | null>(null);
+  const viewingCase = !!caseMenu && !!guide;
 
   // 후보 중엔 참고자료에 현장 응급처치 내용이 없는 주제(예: 치통 및 만성 통증)가 섞일 수 있다 - 그걸 고르면
   // 목록에서 빼고 남은 후보로 돌려보내서, 같은 걸 또 누르거나 빈 화면에 갇히지 않게 한다.
@@ -43,15 +68,36 @@ export default function FirstAidGuideScreen() {
     Alert.alert('안내', `'${candidateLabel(c)}'은(는) 제공할 수 있는 응급처치 정보가 없어요.${rest.length > 0 ? ' 다른 상황을 골라주세요.' : ''}`);
   };
 
-  // 헤더 뒤로가기도 후보에서 골라 들어온 상태면 화면을 나가지 않고 목록으로 돌아간다.
-  const onPressBack = () => (canGoBackToList ? setShowList(true) : navigation.goBack());
+  // 직접 검색·자주 찾는 상황으로 연 가이드면 처음 화면(자주 찾는 상황)으로 돌아갈 수 있다.
+  // AI 상담에서 바로 들어온 경우는 돌아갈 처음 화면이 없으니 뺀다.
+  const canGoBackHome = !!(guide || caseMenu) && !params?.situation;
+  const goBackHome = () => {
+    setGuide(null);
+    setCaseMenu(null);
+  };
 
-  // 성공 여부를 돌려준다. silent면 실패 안내를 호출부가 직접 띄운다.
-  const loadGuide = useCallback(async (target: string, { silent = false } = {}) => {
+  // 헤더 뒤로가기도 세부 상황이나 후보에서 골라 들어온 상태면 화면을 나가지 않고 그 목록으로 돌아간다.
+  const onPressBack = () => {
+    if (viewingCase) setGuide(null);
+    else if (canGoBackToList) setShowList(true);
+    else if (canGoBackHome) goBackHome();
+    else navigation.goBack();
+  };
+
+  // 성공 여부를 돌려준다. silent면 실패 안내를 호출부가 직접 띄운다. caseName은 세부 상황을 고른 경우에만 준다.
+  const loadGuide = useCallback(async (target: string, { silent = false, caseName }: { silent?: boolean; caseName?: string } = {}) => {
     setLoading(true);
     try {
-      const result = await getFirstAidGuide(target);
-      setGuide(result);
+      const result = await getFirstAidGuide(target, caseName);
+      if (result.cases?.length) {
+        // 세부 상황이 있는 주제 - 단계 대신 고를 목록을 보여준다.
+        setCaseMenu({ situation: target, title: result.title, cases: result.cases });
+        setGuide(null);
+      } else {
+        // 다른 주제로 넘어왔으면 이전 주제의 세부 상황 목록은 버린다.
+        if (!caseName) setCaseMenu(null);
+        setGuide(result);
+      }
       return true;
     } catch (e) {
       console.warn(e);
@@ -69,6 +115,22 @@ export default function FirstAidGuideScreen() {
   useEffect(() => {
     if (params?.situation) loadGuide(params.situation);
   }, [params?.situation, loadGuide]);
+
+  // "상황별로 찾기" 목록. 못 불러와도 검색·자주 찾는 상황은 쓸 수 있으니 목록만 안 보여준다.
+  const [topics, setTopics] = useState<FirstAidTopicDto[]>([]);
+  const [openCategory, setOpenCategory] = useState<string | null>(null);
+  useEffect(() => {
+    getFirstAidTopics().then((r) => setTopics(r.candidates)).catch(console.warn);
+  }, []);
+  // 성폭력·아동학대는 응급처치와 결이 달라 분류 목록과 따로 보여준다.
+  const safetyTopics = topics.filter((t) => t.category === SAFETY_CATEGORY);
+  const categories = [...new Set(topics.map((t) => t.category))].filter((c) => c !== SAFETY_CATEGORY);
+
+  // 자주 찾는 상황·상황별로 찾기에서 주제를 바로 연다. 이전 검색 후보가 남으면 "다른 상황 보기"가 엉뚱한 목록을 띄운다.
+  const openTopic = (topic: string) => {
+    setCandidates([]);
+    loadGuide(topic);
+  };
 
   const onSearchSubmit = async () => {
     const trimmed = searchText.trim();
@@ -88,6 +150,7 @@ export default function FirstAidGuideScreen() {
         setCandidates(matched);
         setShowList(true);
         setGuide(null);
+        setCaseMenu(null);
       } else {
         Alert.alert('안내', '해당 상황을 찾지 못했어요. 다른 표현으로 검색해주세요.');
       }
@@ -113,7 +176,6 @@ export default function FirstAidGuideScreen() {
 
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.searchBox}>
-            <Ionicons name="search" size={18} color={colors.placeholder} />
             <TextInput
                 style={styles.searchInput}
                 placeholder="상황 입력 (예: 화상, 코피)"
@@ -123,6 +185,7 @@ export default function FirstAidGuideScreen() {
                 onSubmitEditing={onSearchSubmit}
                 returnKeyType="search"
             />
+            <Ionicons name="search" size={18} color={colors.placeholder} />
           </View>
 
           {loading ? (
@@ -138,7 +201,6 @@ export default function FirstAidGuideScreen() {
                 {candidates.map((c) => (
                     <Pressable key={c.topic} style={styles.candidateRow} onPress={() => selectSituation(c)}>
                       <View style={styles.candidateText}>
-                        {!!c.category && <Text style={styles.categoryChip}>{c.category}</Text>}
                         <Text style={styles.candidateName}>{candidateLabel(c)}</Text>
                         {!!c.description && <Text style={styles.candidateDesc}>{c.description}</Text>}
                       </View>
@@ -148,11 +210,37 @@ export default function FirstAidGuideScreen() {
               </View>
           ) : (
               <>
-                {canGoBackToList && (
-                    <Pressable style={styles.backToListBtn} onPress={() => setShowList(true)} hitSlop={8}>
+                {viewingCase ? (
+                    <Pressable style={styles.backToListBtn} onPress={() => setGuide(null)} hitSlop={8}>
                       <Ionicons name="chevron-back" size={16} color={colors.textSub} />
-                      <Text style={styles.backToListText}>다른 상황 보기</Text>
+                      <Text style={styles.backToListText}>다른 경우 보기</Text>
                     </Pressable>
+                ) : (canGoBackToList || canGoBackHome) && (
+                    // 후보 목록(여러 후보에서 골랐을 때)이나 처음 화면(자주 찾는 상황)으로 돌아가는 아이콘 버튼.
+                    <Pressable
+                        style={styles.backToListBtn}
+                        onPress={canGoBackToList ? () => setShowList(true) : goBackHome}
+                        hitSlop={8}
+                        accessibilityLabel="다른 상황 보기"
+                    >
+                      <Ionicons name="chevron-back" size={16} color={colors.textSub} />
+                    </Pressable>
+                )}
+                {!guide && caseMenu && (
+                    <View style={styles.card}>
+                      <Text style={styles.cardTitle}>{caseMenu.title}</Text>
+                      <Text style={styles.caseQuestion}>어떤 경우인가요?</Text>
+                      {caseMenu.cases.map((c) => (
+                          <Pressable
+                              key={c}
+                              style={styles.candidateRow}
+                              onPress={() => loadGuide(caseMenu.situation, { caseName: c })}
+                          >
+                            <Text style={[styles.candidateName, styles.candidateText]}>{c}</Text>
+                            <Ionicons name="chevron-forward" size={18} color={colors.placeholder} />
+                          </Pressable>
+                      ))}
+                    </View>
                 )}
                 {guide && (
                     <View style={styles.card}>
@@ -165,11 +253,74 @@ export default function FirstAidGuideScreen() {
                       ))}
                     </View>
                 )}
+                {!guide && !caseMenu && (
+                    <>
+                      <View style={styles.card}>
+                        <Text style={styles.cardTitle}>자주 찾는 상황</Text>
+                        <View style={styles.quickGrid}>
+                          {QUICK_TOPICS.map((t) => (
+                              <Pressable key={t.topic} style={styles.quickItem} onPress={() => openTopic(t.topic)}>
+                                <MaterialCommunityIcons name={t.icon} size={24} color={colors.primary} />
+                                <Text style={styles.quickLabel}>{t.label}</Text>
+                              </Pressable>
+                          ))}
+                        </View>
+                      </View>
+                      {categories.length > 0 && (
+                          <View style={styles.card}>
+                            <Text style={styles.cardTitle}>상황별로 찾기</Text>
+                            {categories.map((category) => {
+                              const items = topics.filter((t) => t.category === category);
+                              const open = openCategory === category;
+                              return (
+                                  <View key={category}>
+                                    <Pressable
+                                        style={styles.candidateRow}
+                                        onPress={() => setOpenCategory(open ? null : category)}
+                                    >
+                                      <Text style={[styles.candidateName, styles.candidateText]}>
+                                        {category} <Text style={styles.categoryCount}>({items.length})</Text>
+                                      </Text>
+                                      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={colors.placeholder} />
+                                    </Pressable>
+                                    {open && items.map((t) => (
+                                        <TopicRow key={t.topic} topic={t} onPress={() => openTopic(t.topic)} />
+                                    ))}
+                                  </View>
+                              );
+                            })}
+                          </View>
+                      )}
+                      {safetyTopics.length > 0 && (
+                          <View style={styles.card}>
+                            <Text style={styles.cardTitle}>도움이 필요할 때</Text>
+                            {safetyTopics.map((t) => (
+                                <TopicRow key={t.topic} topic={t} onPress={() => openTopic(t.topic)} />
+                            ))}
+                          </View>
+                      )}
+                    </>
+                )}
+                {/* 응급처치 단계는 서버가 질병관리청 국가건강정보포털 자료만 근거로 만든다(FirstAidPrompts). */}
+                {guide && <Text style={styles.sourceFooter}>출처: 질병관리청 국가건강정보포털</Text>}
               </>
           )}
         </ScrollView>
 
       </View>
+  );
+}
+
+// 상황별로 찾기·도움이 필요할 때의 주제 한 줄 - 짧은 이름과 "이럴 때 열어 보세요" 설명.
+function TopicRow({ topic, onPress }: { topic: FirstAidTopicDto; onPress: () => void }) {
+  return (
+      <Pressable style={[styles.candidateRow, styles.topicRow]} onPress={onPress}>
+        <View style={styles.candidateText}>
+          <Text style={styles.topicName}>{topic.shortName || topic.topic}</Text>
+          {!!topic.description && <Text style={styles.candidateDesc}>{topic.description}</Text>}
+        </View>
+        <Ionicons name="chevron-forward" size={18} color={colors.placeholder} />
+      </Pressable>
   );
 }
 
@@ -191,7 +342,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     backgroundColor: colors.inputBg,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
   },
@@ -212,6 +363,7 @@ const styles = StyleSheet.create({
   stepText: { flex: 1, fontSize: font.sub, color: colors.text },
   backToListBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 2 },
   backToListText: { fontSize: font.sub, color: colors.textSub },
+  sourceFooter: { textAlign: 'center', color: colors.placeholder, fontSize: font.caption },
   candidateRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -221,15 +373,15 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   candidateText: { flex: 1, alignItems: 'flex-start', gap: spacing.xs },
-  categoryChip: {
-    fontSize: font.caption,
-    color: colors.textSub,
-    backgroundColor: colors.inputBg,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    overflow: 'hidden',
-  },
   candidateName: { fontSize: font.body, fontWeight: '700', color: colors.text },
   candidateDesc: { fontSize: font.sub, color: colors.textSub },
+  // 4열 2줄. 라벨이 긴 칸(동물·벌레 물림)은 두 줄로 접힌다.
+  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: spacing.md },
+  quickItem: { width: '25%', alignItems: 'center', gap: spacing.xs },
+  quickLabel: { fontSize: font.sub, color: colors.text, textAlign: 'center' },
+  categoryCount: { fontWeight: '400', color: colors.placeholder },
+  // 펼친 분류 안의 주제는 들여써서 분류 줄과 구분한다.
+  topicRow: { paddingLeft: spacing.md },
+  topicName: { fontSize: font.sub, fontWeight: '700', color: colors.text },
+  caseQuestion: { fontSize: font.sub, color: colors.textSub, marginBottom: spacing.sm },
 });

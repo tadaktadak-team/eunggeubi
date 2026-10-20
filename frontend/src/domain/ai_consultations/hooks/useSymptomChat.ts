@@ -8,6 +8,7 @@ import {
   submitChecklistAnswers,
 } from '../api/aiConsultations';
 import { getGuestCode, saveGuestCode } from '../../../shared/storage/guestCodeStorage';
+import { getConsultationDetail } from '../../mypage/api/consultation';
 import { ChatMessage } from '../types';
 
 export function useSymptomChat() {
@@ -137,5 +138,37 @@ export function useSymptomChat() {
     [finishChecklist],
   );
 
-  return { messages, loading, guestLimitReached, limitSheetVisible, setLimitSheetVisible, sendText, toggleChecklistItem, submitChecklist, submitChecklistNone };
+  // 지난 상담을 불러와 이어간다. 다음 질문부터 이 sessionId로 보내면 서버가 이전 대화를 맥락으로 붙여 답한다.
+  // 상세 API는 본문만 줘서 지난 답변은 출처·응급처치 바로보기 없이 글만 보인다. 답 안 한 체크리스트도
+  // 다시 띄울 수 없어 빼고, 답한 체크리스트는 고른 항목을 사용자 말풍선으로 보여준다(상담 이력 상세와 같은 방식).
+  const resume = useCallback(async (sessionId: string) => {
+    setLoading(true);
+    try {
+      const detail = await getConsultationDetail(sessionId);
+      sessionRef.current = { ...sessionRef.current, sessionId };
+      setMessages(
+        detail.messages.flatMap((m): ChatMessage[] => {
+          if (m.senderType === 'USER') return [{ id: nextChatMessageId(), type: 'user', text: m.content }];
+          const answer: ChatMessage = {
+            id: nextChatMessageId(),
+            type: 'regenerated',
+            message: m.content,
+            sources: [],
+            disclaimer: m.disclaimer ?? '',
+          };
+          if (!m.checklistAnswered) return [answer];
+          const picked = m.checkedItems.length > 0 ? m.checkedItems.join(', ') : '해당하는 항목이 없어요';
+          return [answer, { id: nextChatMessageId(), type: 'user', text: picked }];
+        }),
+      );
+    } catch (e) {
+      console.error(e);
+      // 못 불러와도 새 상담으로는 쓸 수 있게 안내만 남긴다.
+      setMessages([{ id: nextChatMessageId(), type: 'regenerated', message: '지난 상담을 불러오지 못했어요. 새로 질문해주세요.', sources: [], disclaimer: '' }]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { messages, loading, guestLimitReached, limitSheetVisible, setLimitSheetVisible, sendText, resume, toggleChecklistItem, submitChecklist, submitChecklistNone };
 }

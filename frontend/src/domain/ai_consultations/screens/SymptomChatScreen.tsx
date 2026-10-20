@@ -26,7 +26,7 @@ export default function SymptomChatScreen() {
   const insets = useSafeAreaInsets();
   const {
     messages, loading, guestLimitReached, limitSheetVisible, setLimitSheetVisible,
-    sendText, toggleChecklistItem, submitChecklist, submitChecklistNone,
+    sendText, resume, toggleChecklistItem, submitChecklist, submitChecklistNone,
   } = useSymptomChat();
 
   const [inputText, setInputText] = useState('');
@@ -47,6 +47,11 @@ export default function SymptomChatScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params?.initialMessage]);
+
+  // 홈의 "최근 상담 이어가기"로 들어오면 지난 대화를 불러온다.
+  useEffect(() => {
+    if (params?.sessionId) resume(params.sessionId);
+  }, [params?.sessionId, resume]);
 
   const onSend = () => {
     // 응답 오는 중에 연타하면 sessionRef 갱신 순서가 응답 도착 순서에 의존하게 된다 - 로딩 중엔 막는다.
@@ -186,7 +191,7 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     backgroundColor: colors.inputBg,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
     fontSize: font.body,
