@@ -10,6 +10,7 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.RawSearchQuery;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
@@ -20,7 +21,7 @@ class RagRetrievalServiceTest {
 
     private final VectorStore vectorStore = mock(VectorStore.class);
     private final ChatClient chatClient = mock(ChatClient.class);
-    private final RagRetrievalService service = new RagRetrievalService(vectorStore, chatClient);
+    private final RagRetrievalService service = new RagRetrievalService(vectorStore, chatClient, Executors.newFixedThreadPool(2));
 
     @Test
     void 검색어_재작성이_성공하면_재작성된_검색어를_반환한다() {

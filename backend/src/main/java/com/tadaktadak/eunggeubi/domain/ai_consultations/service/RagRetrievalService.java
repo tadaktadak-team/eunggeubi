@@ -9,6 +9,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
@@ -58,6 +61,7 @@ public class RagRetrievalService {
 
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
+    private final Executor ragSearchExecutor; // AsyncConfig - 빈 이름과 필드 이름으로 매칭된다
 
     // 사용자의 일상어 표현을 검색용 의학 용어로 바꾼다(예: "발이 부어요" -> "부종 다리 발목 붓기") -
     // 실제로 이렇게 안 바꾸면 관련 문서가 top-K 밖으로 밀려서 검색이 아예 안 되는 경우가 있었다.
@@ -112,11 +116,17 @@ public class RagRetrievalService {
         // 절대 점수가 더 높게 나옴), 합친 뒤 점수로 한 번 더 자르면 점수가 낮은 해석이 통째로
         // 밀려날 수 있다 - 그래서 해석마다 TOP_K를 공평하게 나눠 갖고, 그 안에서만 점수순으로 뽑는다.
         int perInterpretation = Math.max(1, TOP_K / interpretations.length);
+        // 해석별 검색(임베딩 API + Qdrant 왕복)은 서로 독립이라 동시에 보낸다 - 순서대로 하면 해석 수만큼
+        // 지연이 쌓인다. 중복 제거는 다 모은 뒤 원래 해석 순서대로 해서, 앞 해석이 먼저 가져가는 규칙은 같다.
+        List<CompletableFuture<List<Document>>> searches = Arrays.stream(interpretations)
+                .map(interpretation -> CompletableFuture.supplyAsync(
+                        () -> search(interpretation.trim(), perInterpretation), ragSearchExecutor))
+                .toList();
         Set<String> seenIds = new HashSet<>();
         List<List<Document>> groups = new ArrayList<>();
-        for (String interpretation : interpretations) {
+        for (CompletableFuture<List<Document>> search : searches) {
             List<Document> group = new ArrayList<>();
-            for (Document doc : search(interpretation.trim(), perInterpretation)) {
+            for (Document doc : join(search)) {
                 if (seenIds.add(doc.getId())) {
                     group.add(doc);
                 }
@@ -124,6 +134,15 @@ public class RagRetrievalService {
             groups.add(group);
         }
         return groups;
+    }
+
+    // 검색 실패를 순차 실행 때와 같은 예외로 그대로 던진다(CompletionException으로 감싸지 않게).
+    private static List<Document> join(CompletableFuture<List<Document>> search) {
+        try {
+            return search.join();
+        } catch (CompletionException e) {
+            throw e.getCause() instanceof RuntimeException cause ? cause : e;
+        }
     }
 
     private List<Document> search(String query, int topK) {

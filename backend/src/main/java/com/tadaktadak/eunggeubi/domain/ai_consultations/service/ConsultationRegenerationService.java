@@ -13,6 +13,7 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ReferenceSour
 import com.tadaktadak.eunggeubi.domain.first_aid.service.FirstAidGuideService;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,13 @@ public class ConsultationRegenerationService {
     // ponytail: 트랜잭션으로 안 감싼다 - RAG 검색+LLM 호출 동안 DB 커넥션을 잡고 있으면 동시 요청
     // 몇 개만으로 커넥션 풀이 고갈된다(저장은 Spring Data가 save() 호출마다 개별 트랜잭션으로 처리).
     public RegenerateResponse regenerate(Long consultationId, Long userId, String guestCode) {
+        return regenerate(consultationId, userId, guestCode, null);
+    }
+
+    // onPartial이 있으면 답변을 스트리밍으로 만들면서, 끝난 문장이 늘어날 때마다 지금까지의 글을 넘긴다.
+    // 반환값은 스트리밍이 아닐 때와 같은 최종 응답이다(출처·응급처치 안내 포함, 진단 가드 적용 후).
+    public RegenerateResponse regenerate(Long consultationId, Long userId, String guestCode,
+                                         Consumer<String> onPartial) {
         AiConsultation baseMessage = getOwnedAiMessage(consultationId, userId, guestCode);
         // 비회원은 답변 하나당 재생성 1회 - 질문 수 한도와 별개로 재생성만 반복 호출해 LLM을 쓰는 걸 막는다.
         // (질문 한도로 막으면 10번째 질문 직후 이전 답변들의 재생성까지 같이 막혀버린다.)
@@ -62,26 +70,25 @@ public class ConsultationRegenerationService {
         String combinedQuery = checkedItems.isEmpty()
                 ? symptomText
                 : "%s (%s 있음)".formatted(symptomText, String.join(", ", checkedItems));
-        RegenerateResponse.RelatedAidGuide relatedAidGuide = findRelatedAidGuide(combinedQuery);
 
         List<Document> docs = ragRetrievalService.retrieve(combinedQuery);
         if (docs.isEmpty()) {
-            return persistAndBuild(baseMessage, NO_MATCH_MESSAGE, List.of(), relatedAidGuide);
+            return persistAndBuild(baseMessage, NO_MATCH_MESSAGE, List.of(), combinedQuery);
         }
 
         String userPrompt = "[참고자료]\n%s\n\n[증상]\n%s\n\n[체크리스트에서 해당한다고 응답한 항목]\n%s".formatted(
                 ragRetrievalService.buildContext(docs), symptomText,
                 checkedItems.isEmpty() ? AiConsultationPrompts.NO_CHECKED_ITEMS : String.join("\n", checkedItems));
-        RawRegeneratedAnswer raw = generateRawAnswer(consultationId, userPrompt);
+        RawRegeneratedAnswer raw = generateRawAnswer(consultationId, userPrompt, onPartial);
         if (raw == null) {
-            return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of(), relatedAidGuide);
+            return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of(), combinedQuery);
         }
 
         // 마지막 방어선: 프롬프트로 진단하지 말라고 지시해도 모델이 어길 수 있다. 걸리면 부분 수정 대신
         // 통째로 안전한 문구로 교체한다 (부분 수정은 문장을 어색하게 만들 위험이 크다).
         if (DiagnosisLanguageGuard.containsDiagnosticLanguage(raw.message())) {
             log.warn("재생성 응답에서 진단형 표현이 감지되어 폴백 문구로 대체합니다. consultationId={}", consultationId);
-            return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of(), relatedAidGuide);
+            return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of(), combinedQuery);
         }
 
         List<ConsultationSource> sources = IntStream.rangeClosed(1, docs.size())
@@ -95,21 +102,28 @@ public class ConsultationRegenerationService {
                 .filter(source -> citedIndexes.contains(source.index()))
                 .toList();
 
-        return persistAndBuild(baseMessage, raw.message(), citedSources, relatedAidGuide);
+        return persistAndBuild(baseMessage, raw.message(), citedSources, combinedQuery);
     }
 
     // LLM 호출 자체가 실패하거나 스키마를 벗어난 응답(message 누락/빈 문자열)을 내놓는 경우를 모두
     // 재시도 대상으로 묶는다(ChecklistService.generateItemsWithRetry와 같은 구조). 모두 실패하면 null을
     // 돌려주고, 호출부가 DIAGNOSTIC_LANGUAGE_FALLBACK으로 처리한다.
-    private RawRegeneratedAnswer generateRawAnswer(Long consultationId, String userPrompt) {
+    private RawRegeneratedAnswer generateRawAnswer(Long consultationId, String userPrompt, Consumer<String> onPartial) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             RawRegeneratedAnswer raw;
             try {
-                raw = chatClient.prompt()
-                        .system(AiConsultationPrompts.REGENERATE_PROMPT)
-                        .user(userPrompt)
-                        .call()
-                        .entity(RawRegeneratedAnswer.class);
+                if (onPartial == null) {
+                    raw = chatClient.prompt()
+                            .system(AiConsultationPrompts.REGENERATE_PROMPT)
+                            .user(userPrompt)
+                            .call()
+                            .entity(RawRegeneratedAnswer.class);
+                } else {
+                    if (attempt > 1) {
+                        onPartial.accept(""); // 실패한 시도에서 보낸 글은 지운다
+                    }
+                    raw = streamRawAnswer(userPrompt, onPartial);
+                }
             } catch (Exception e) {
                 log.warn("재생성 LLM 호출이 실패했습니다 (시도 {}/{}). consultationId={}", attempt, MAX_ATTEMPTS, consultationId, e);
                 continue;
@@ -121,6 +135,29 @@ public class ConsultationRegenerationService {
                     attempt, MAX_ATTEMPTS, consultationId, raw);
         }
         return null;
+    }
+
+    // message 값에서 끝난 문장이 늘 때마다 넘긴다. 진단형 표현이 보이면 그때부터 안 보낸다 - 최종 응답이
+    // 어차피 폴백 문구로 바뀌니 진단 문장이 화면에 잠깐이라도 보이지 않게(AiConsultationService와 같은 이유).
+    private RawRegeneratedAnswer streamRawAnswer(String userPrompt, Consumer<String> onPartial) {
+        String[] sent = {""};
+        boolean[] blocked = {false};
+        return LlmStreaming.stream(chatClient, AiConsultationPrompts.REGENERATE_PROMPT, userPrompt,
+                RawRegeneratedAnswer.class, buffer -> {
+                    if (blocked[0]) {
+                        return;
+                    }
+                    String text = LlmStreaming.completedSentences(buffer, "message");
+                    if (text.length() <= sent[0].length()) {
+                        return;
+                    }
+                    if (DiagnosisLanguageGuard.containsDiagnosticLanguage(text)) {
+                        blocked[0] = true;
+                        return;
+                    }
+                    sent[0] = text;
+                    onPartial.accept(text);
+                });
     }
 
     // 화상/코피/골절/기도막힘 4개로 한정하지 않고 health_info 컬렉션 전체를 대상으로 찾는다 -
@@ -136,9 +173,11 @@ public class ConsultationRegenerationService {
                 .orElse(null);
     }
 
+    // 관련 응급처치 찾기(LLM 호출)는 답변을 다 만든 뒤에 한다 - 스트리밍일 때 첫 문장이 이것 때문에 늦게
+    // 나오지 않게. 결과는 최종 응답에만 들어가니 순서를 바꿔도 내용은 같다.
     private RegenerateResponse persistAndBuild(AiConsultation baseMessage, String message,
-                                                List<ConsultationSource> citedSources,
-                                                RegenerateResponse.RelatedAidGuide relatedAidGuide) {
+                                                List<ConsultationSource> citedSources, String combinedQuery) {
+        RegenerateResponse.RelatedAidGuide relatedAidGuide = findRelatedAidGuide(combinedQuery);
         AiConsultation regenerated = aiConsultationRepository.save(AiConsultation.builder()
                 .userId(baseMessage.getUserId())
                 .sessionId(baseMessage.getSessionId())
