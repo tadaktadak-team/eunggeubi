@@ -8,6 +8,7 @@ import com.tadaktadak.eunggeubi.domain.drug.dto.DrugSearchSummary;
 import com.tadaktadak.eunggeubi.domain.drug.entity.DrugInfo;
 import com.tadaktadak.eunggeubi.domain.drug.repository.DrugInfoRepository;
 import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
+import com.tadaktadak.eunggeubi.global.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -82,7 +83,7 @@ public class DrugService {
     public DrugInfoResponse getDrugDetail(String itemSeq) {
         return drugInfoRepository.findById(itemSeq)
                 .map(DrugInfoResponse::from)
-                .orElseThrow(() -> new IllegalArgumentException("해당 약물 정보를 찾을 수 없습니다: " + itemSeq));
+                .orElseThrow(() -> new ResourceNotFoundException("해당 약물 정보를 찾을 수 없습니다."));
     }
 
     /**

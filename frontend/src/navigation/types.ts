@@ -1,4 +1,4 @@
-import { GuardianResult } from '../domain/emergency/types';
+import { GuardianResult, SkipReason } from '../domain/emergency/types';
 
 export type RootStackParamList = {
   Splash: undefined;
@@ -8,7 +8,6 @@ export type RootStackParamList = {
   FindAccount: { tab?: 'FIND_ID' | 'FIND_PW' } | undefined;
   Legal: { tab?: 'terms' | 'privacy'; section?: string } | undefined;
   Tabs: undefined;
-  EditProfile: undefined;
   GuardianConsent: { consentToken: string; email: string };
   GuardianWaiting: { consentToken: string; email: string; maskedPhone: string };
   SocialConsent: { ticket: string };
@@ -21,6 +20,7 @@ export type RootStackParamList = {
     sentAt: string;
     message: string;
     guardians: GuardianResult[];
+    skipReason: SkipReason | null;
   };
 
    HospitalDetail: {

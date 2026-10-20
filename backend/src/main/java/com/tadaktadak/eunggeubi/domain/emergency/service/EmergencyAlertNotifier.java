@@ -1,6 +1,7 @@
 package com.tadaktadak.eunggeubi.domain.emergency.service;
 
 import com.tadaktadak.eunggeubi.global.sms.SmsSender;
+import com.tadaktadak.eunggeubi.global.util.PhoneNumbers;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -18,7 +19,7 @@ public class EmergencyAlertNotifier {
         try {
             smsSender.send(phone, subject, message);
         } catch (Exception e) {
-            log.error("[EMERGENCY] 보호자 문자 발송 실패 phone={}", phone, e);
+            log.error("[EMERGENCY] 보호자 문자 발송 실패 phone={}", PhoneNumbers.mask(phone), e);
         }
     }
 }

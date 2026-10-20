@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
+import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -30,9 +31,7 @@ export default function SignupCompleteScreen() {
           <Text style={styles.accountEmail}>{email}</Text>
         </View>
 
-        <TouchableOpacity style={styles.btn} onPress={() => navigation.navigate('Login')}>
-          <Text style={styles.btnText}>시작하기</Text>
-        </TouchableOpacity>
+        <Button title="시작하기" onPress={() => navigation.navigate('Login')} style={styles.btn} />
       </View>
     </SafeAreaView>
   );
@@ -45,7 +44,7 @@ const styles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: '#FCE9E7',
+    backgroundColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.xl,
@@ -61,13 +60,5 @@ const styles = StyleSheet.create({
   },
   accountLabel: { fontSize: font.caption, color: colors.textSub, marginBottom: spacing.xs },
   accountEmail: { fontSize: font.body, fontWeight: '700', color: colors.text },
-  btn: {
-    width: '100%',
-    backgroundColor: colors.primary,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  btn: { width: '100%' },
 });

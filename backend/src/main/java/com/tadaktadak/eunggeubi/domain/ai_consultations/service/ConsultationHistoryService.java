@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ChecklistRepository;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.repository.ChecklistResponseRepository;
+import com.tadaktadak.eunggeubi.global.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,11 +48,9 @@ public class ConsultationHistoryService {
         List<AiConsultation> messages =
                 aiConsultationRepository.findBySessionIdOrderByCreatedAtAsc(sessionId);
 
-        if (messages.isEmpty()) {
-            throw new IllegalArgumentException("상담 내역을 찾을 수 없습니다.");
-        }
-        if (!messages.get(0).isOwnedBy(userId, null)) {
-            throw new IllegalArgumentException("본인 상담 내역이 아닙니다.");
+        // 없는 상담과 남의 상담을 같은 응답(404)으로 돌려준다(보호자 조회와 같은 이유: 존재 여부를 알 수 없게)
+        if (messages.isEmpty() || !messages.get(0).isOwnedBy(userId, null)) {
+            throw new ResourceNotFoundException("상담 내역을 찾을 수 없습니다.");
         }
 
         Map<Long, List<String>> checkedItems = loadCheckedItems(messages);

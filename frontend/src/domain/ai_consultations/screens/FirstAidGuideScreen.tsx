@@ -2,9 +2,10 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { showAlert } from '../../../shared/dialog';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import {
   FirstAidGuideDto,
@@ -65,7 +66,7 @@ export default function FirstAidGuideScreen() {
     const rest = candidates.filter((other) => other.topic !== c.topic);
     setCandidates(rest);
     setShowList(rest.length > 0);
-    Alert.alert('안내', `'${candidateLabel(c)}'은(는) 제공할 수 있는 응급처치 정보가 없어요.${rest.length > 0 ? ' 다른 상황을 골라주세요.' : ''}`);
+    showAlert('안내', `'${candidateLabel(c)}'은(는) 제공할 수 있는 응급처치 정보가 없어요.${rest.length > 0 ? ' 다른 상황을 골라주세요.' : ''}`);
   };
 
   // 직접 검색·자주 찾는 상황으로 연 가이드면 처음 화면(자주 찾는 상황)으로 돌아갈 수 있다.
@@ -104,7 +105,7 @@ export default function FirstAidGuideScreen() {
       // 이전 상황의 스텝이 남아있으면 지금 고른 상황과 내용이 안 맞게 보인다 - 비워서
       // "이 상황은 못 불러왔다"를 명확히 한다.
       setGuide(null);
-      if (!silent) Alert.alert('오류', '응급처치 정보를 불러오지 못했어요.');
+      if (!silent) showAlert('오류', '응급처치 정보를 불러오지 못했어요.');
       return false;
     } finally {
       setLoading(false);
@@ -152,11 +153,11 @@ export default function FirstAidGuideScreen() {
         setGuide(null);
         setCaseMenu(null);
       } else {
-        Alert.alert('안내', '해당 상황을 찾지 못했어요. 다른 표현으로 검색해주세요.');
+        showAlert('안내', '해당 상황을 찾지 못했어요. 다른 표현으로 검색해주세요.');
       }
     } catch (e) {
       console.error(e);
-      Alert.alert('오류', '검색 중 문제가 발생했어요.');
+      showAlert('오류', '검색 중 문제가 발생했어요.');
     } finally {
       setLoading(false);
     }

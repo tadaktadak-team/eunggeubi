@@ -13,8 +13,8 @@ public class PasswordValidator implements ConstraintValidator<ValidPassword, Str
 
     @Override
     public boolean isValid(String password, ConstraintValidatorContext context) {
-        // null은 @NotBlank가 담당. 여기서 통과시켜야 에러 메시지가 중복되지 않음
-        if (password == null) {
+        // null·빈 값은 @NotBlank가 담당. 여기서 통과시켜야 에러 메시지가 중복되지 않음
+        if (password == null || password.isBlank()) {
             return true;
         }
 

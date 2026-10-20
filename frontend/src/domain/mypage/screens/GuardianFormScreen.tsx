@@ -1,8 +1,9 @@
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { formatPhone, toDigits } from '../../../shared/utils/phone';
@@ -24,7 +25,7 @@ export default function GuardianFormScreen() {
 
   const onSave = async () => {
     if (!name.trim() || !phone.trim()) {
-      Alert.alert('입력 확인', '이름과 전화번호를 입력해주세요.');
+      showAlert('입력 확인', '이름과 전화번호를 입력해주세요.');
       return;
     }
     try {
@@ -36,9 +37,16 @@ export default function GuardianFormScreen() {
       } else {
         await addGuardian(body);
       }
-      navigation.goBack();
+      // 새로 등록하거나 번호를 바꾸면 보호자에게 동의 문자가 간다
+      if (!editing || toDigits(editing.phone) !== body.phone) {
+        showAlert('동의 문자를 보냈어요', `${body.name}님이 문자로 동의하면 긴급 알림을 받게 돼요.`, [
+          { text: '확인', onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        navigation.goBack();
+      }
     } catch (e: any) {
-      Alert.alert('저장 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('저장 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSaving(false);
     }
@@ -66,6 +74,7 @@ export default function GuardianFormScreen() {
           placeholderTextColor={colors.placeholder}
           keyboardType="phone-pad"
         />
+        {editing && <Text style={styles.hint}>전화번호를 바꾸면 새 번호로 동의 문자가 다시 가요.</Text>}
 
         <Text style={styles.label}>관계</Text>
         <View style={styles.chipRow}>
@@ -105,6 +114,7 @@ const styles = StyleSheet.create({
     fontSize: font.body,
     color: colors.text,
   },
+  hint: { fontSize: font.caption, color: colors.textSub },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     paddingHorizontal: spacing.lg,

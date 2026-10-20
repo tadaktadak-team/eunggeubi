@@ -28,6 +28,16 @@ public class GuardianConsent {
     @Column(name = "guardian_id", nullable = false)
     private Long guardianId;
 
+    @Column(name = "user_id")
+    private Long userId;
+
+    @Column(length = 20)
+    private String phone;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ConsentPurpose purpose;
+
     @Column(name = "consent_token", nullable = false, length = 64)
     private String consentToken;
 
@@ -52,10 +62,14 @@ public class GuardianConsent {
     private LocalDateTime expiresAt;
 
     @Builder
-    private GuardianConsent(Long guardianId, String consentToken, ConsentStatus status,
+    private GuardianConsent(Long guardianId, Long userId, String phone, ConsentPurpose purpose,
+                            String consentToken, ConsentStatus status,
                             String providerMessageId, MessageType messageType,
                             LocalDateTime sentAt, LocalDateTime confirmedAt, LocalDateTime expiresAt) {
         this.guardianId = guardianId;
+        this.userId = userId;
+        this.phone = phone;
+        this.purpose = purpose;
         this.consentToken = consentToken;
         this.status = status;
         this.providerMessageId = providerMessageId;

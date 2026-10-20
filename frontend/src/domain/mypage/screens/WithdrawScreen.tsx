@@ -1,19 +1,35 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
+import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../../auth/hooks/useAuth';
 import { getMyInfo, withdraw } from '../api/user';
+import { MyPageStackParamList } from '../types';
 
 const NOTICES = [
   '등록한 보호자와 건강 프로필이 모두 삭제돼요.',
-  'AI 상담 이력을 다시 볼 수 없어요.',
+  'AI 상담 이력을 다시 볼 수 없어요. 회원 정보와 상담 이력은 부정 이용 확인을 위해 30일간 보관한 뒤 삭제돼요.',
   '탈퇴 후에는 같은 계정으로 다시 로그인할 수 없어요.',
 ];
 
+type Nav = NativeStackNavigationProp<MyPageStackParamList>;
+
 export default function WithdrawScreen() {
+  const navigation = useNavigation<Nav>();
   const { signOut } = useAuth();
 
   const [password, setPassword] = useState('');
@@ -28,7 +44,7 @@ export default function WithdrawScreen() {
       const info = await getMyInfo();
       setSocialOnly(info.socialOnly);
     } catch (e: any) {
-      Alert.alert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
+      showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
     } finally {
       setLoading(false);
     }
@@ -42,11 +58,21 @@ export default function WithdrawScreen() {
     try {
       setSubmitting(true);
       await withdraw(socialOnly ? undefined : password);
-      Alert.alert('탈퇴 완료', '그동안 이용해주셔서 감사합니다.', [
-        { text: '확인', onPress: () => signOut() },
+      // 로그아웃해도 탭 화면은 그대로 남아서(로그인 전후 모두 Tabs가 있음) 마이 탭이 이 화면에 머문다.
+      // 로그아웃을 먼저 끝내고 첫 화면으로 돌려야 비회원용 마이 화면이 보인다
+      // (먼저 돌리면 로그인 상태로 첫 화면이 열려 탈퇴한 계정의 정보를 다시 불러온다)
+      showAlert('탈퇴 완료', '그동안 이용해주셔서 감사합니다.', [
+        {
+          text: '확인',
+          onPress: () => {
+            signOut()
+              .catch(console.error)
+              .finally(() => navigation.popToTop());
+          },
+        },
       ]);
     } catch (e: any) {
-      Alert.alert('탈퇴 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('탈퇴 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSubmitting(false);
     }
@@ -54,14 +80,14 @@ export default function WithdrawScreen() {
 
   const onSubmit = () => {
     if (!agreed) {
-      Alert.alert('확인 필요', '안내 사항에 동의해주세요.');
+      showAlert('확인 필요', '안내 사항에 동의해주세요.');
       return;
     }
     if (!socialOnly && !password) {
-      Alert.alert('비밀번호 확인', '비밀번호를 입력해주세요.');
+      showAlert('비밀번호 확인', '비밀번호를 입력해주세요.');
       return;
     }
-    Alert.alert('회원 탈퇴', '정말 탈퇴하시겠어요? 되돌릴 수 없어요.', [
+    showAlert('회원 탈퇴', '정말 탈퇴하시겠어요? 되돌릴 수 없어요.', [
       { text: '취소', style: 'cancel' },
       { text: '탈퇴', style: 'destructive', onPress: runWithdraw },
     ]);
@@ -118,13 +144,13 @@ export default function WithdrawScreen() {
           <Text style={styles.agreeText}>안내 사항을 모두 확인했으며 탈퇴에 동의합니다</Text>
         </Pressable>
 
-        <Pressable
-          style={[styles.withdrawBtn, submitting && { opacity: 0.6 }]}
+        <Button
+          title="탈퇴하기"
+          variant="destructive"
           onPress={onSubmit}
-          disabled={submitting}
-        >
-          <Text style={styles.withdrawText}>{submitting ? '처리 중...' : '탈퇴하기'}</Text>
-        </Pressable>
+          loading={submitting}
+          style={styles.withdrawBtn}
+        />
       </ScrollView>
     </View>
   );
@@ -153,13 +179,5 @@ const styles = StyleSheet.create({
   },
   agreeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm },
   agreeText: { flexShrink: 1, fontSize: font.sub, color: colors.text },
-  withdrawBtn: {
-    backgroundColor: colors.text,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  withdrawText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  withdrawBtn: { marginTop: spacing.lg },
 });

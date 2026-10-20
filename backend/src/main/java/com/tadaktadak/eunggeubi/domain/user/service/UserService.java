@@ -1,12 +1,21 @@
 package com.tadaktadak.eunggeubi.domain.user.service;
 
+import com.tadaktadak.eunggeubi.domain.auth.entity.Purpose;
+import com.tadaktadak.eunggeubi.domain.auth.service.PhoneVerificationService;
 import com.tadaktadak.eunggeubi.domain.auth.service.RefreshTokenService;
+import com.tadaktadak.eunggeubi.domain.health.repository.HealthProfileRepository;
 import com.tadaktadak.eunggeubi.domain.user.dto.ChangePasswordResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.MyInfoResponse;
 import com.tadaktadak.eunggeubi.domain.user.dto.UpdateMyInfoRequest;
+import com.tadaktadak.eunggeubi.domain.user.entity.Guardian;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
+import com.tadaktadak.eunggeubi.domain.user.repository.GuardianConsentRepository;
+import com.tadaktadak.eunggeubi.domain.user.repository.GuardianRepository;
 import com.tadaktadak.eunggeubi.domain.user.repository.UserRepository;
 import com.tadaktadak.eunggeubi.global.security.JwtProvider;
+import com.tadaktadak.eunggeubi.global.util.PhoneNumbers;
+import com.tadaktadak.eunggeubi.global.validation.PasswordValidator;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,6 +29,10 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final JwtProvider jwtProvider;
+    private final GuardianRepository guardianRepository;
+    private final GuardianConsentRepository guardianConsentRepository;
+    private final HealthProfileRepository healthProfileRepository;
+    private final PhoneVerificationService phoneVerificationService;
 
     @Transactional(readOnly = true)
     public MyInfoResponse getMyInfo(Long userId) {
@@ -47,6 +60,9 @@ public class UserService {
             throw new IllegalArgumentException("현재 비밀번호와 다른 비밀번호를 입력해주세요.");
         }
 
+        // 가입·재설정과 같은 정책: 이메일 아이디나 전화번호 조각이 들어간 비밀번호는 막는다
+        PasswordValidator.ensureNotContainsUserInfo(newPassword, user.getEmail(), user.getPhone());
+
         user.changePassword(passwordEncoder.encode(newPassword));
 
         //다른 기기에 남아있는 세션을 전부 끊음(access 토큰의 경우 만료까지 최대 1시간 유효), 단 현재 기기는 유지(폐기->발급)
@@ -62,7 +78,13 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("회원 정보를 찾을 수 없습니다."));
 
-        user.updateProfile(request.name().trim(), request.phone().trim(),
+        // 전화번호는 아이디 찾기·비밀번호 재설정에 쓰여서, 바꿀 때는 새 번호로 문자 인증을 받아야 한다.
+        // 인증 목적은 가입과 같은 SIGNUP 을 쓴다(DB의 purpose 칸이 enum 이라 새 값을 넣으려면 컬럼을 바꿔야 한다)
+        if (!PhoneNumbers.digitsOnly(user.getPhone()).equals(request.phone())) {
+            phoneVerificationService.consumeVerified(request.phone(), Purpose.SIGNUP);
+        }
+
+        user.updateProfile(request.name().trim(), request.phone(),
                 request.birthDate(), request.gender(),
                 request.address() == null ? null : request.address().trim());
 
@@ -87,5 +109,17 @@ public class UserService {
 
         user.withdraw();
         refreshTokenService.revokeAll(userId);
+
+        // 등록한 보호자(이름·전화번호)와 동의 기록을 함께 지운다. 탈퇴 화면에서도, 보호자가 받는 동의 화면에서도
+        // "탈퇴 시까지만 보관"한다고 안내하고 있다.
+        List<Guardian> guardians = guardianRepository.findByUserId(userId);
+        if (!guardians.isEmpty()) {   // 빈 목록으로 IN 조회를 하지 않는다
+            guardianConsentRepository.deleteByGuardianIdIn(guardians.stream().map(Guardian::getId).toList());
+        }
+        guardianConsentRepository.deleteByUserId(userId);
+        guardianRepository.deleteAll(guardians);
+
+        // 탈퇴 화면에서 "건강 프로필이 모두 삭제돼요"라고 안내한다(혈액형·병명·복용약·알레르기)
+        healthProfileRepository.deleteByUserId(userId);
     }
 }

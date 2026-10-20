@@ -1,5 +1,6 @@
 package com.tadaktadak.eunggeubi.domain.user.entity;
 
+import com.tadaktadak.eunggeubi.global.util.PhoneNumbers;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -43,6 +44,9 @@ public class Guardian {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
+
     @Builder
     private Guardian(Long userId, String name, String phone, Relationship relationship,
                      boolean notifyEnabled, LocalDateTime createdAt) {
@@ -54,8 +58,19 @@ public class Guardian {
         this.createdAt = createdAt;
     }
 
-    // 보호자 정보 수정 (변경 감지로 반영)
+    public boolean isVerified() {
+        return verifiedAt != null;
+    }
+
+    public void markVerified(LocalDateTime verifiedAt) {
+        this.verifiedAt = verifiedAt;
+    }
+
+    // 보호자 정보 수정 (변경 감지로 반영). 번호가 바뀌면 새 번호로 다시 동의를 받아야 한다
     public void update(String name, String phone, Relationship relationship, boolean notifyEnabled) {
+        if (!PhoneNumbers.digitsOnly(this.phone).equals(phone)) {
+            this.verifiedAt = null;
+        }
         this.name = name;
         this.phone = phone;
         this.relationship = relationship;

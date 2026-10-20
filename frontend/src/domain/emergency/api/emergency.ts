@@ -1,10 +1,11 @@
 import { api } from '../../../shared/api/client';
-import { GuardianResult } from '../types';
+import { GuardianResult, SkipReason } from '../types';
 
 export interface SendAlertResponse {
   sentAt: string;
   message: string;
   guardians: GuardianResult[];
+  skipReason: SkipReason | null;
 }
 
 export function sendEmergencyAlert(latitude: number, longitude: number, address?: string) {

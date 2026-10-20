@@ -1,17 +1,17 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { saveTokens } from '../../../shared/storage/tokenStorage';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
-import { changePassword } from '../api/user';
+import { PASSWORD_RULE_TEXT, validatePassword } from '../../../shared/utils/password';
+import { changePassword, getMyInfo } from '../api/user';
 import { MyPageStackParamList } from '../types';
 
 type Nav = NativeStackNavigationProp<MyPageStackParamList>;
-
-const MIN_LENGTH = 8; // 서버 @Size(min = 8)과 맞춘 값
 
 export default function ChangePasswordScreen() {
   const navigation = useNavigation<Nav>();
@@ -20,11 +20,20 @@ export default function ChangePasswordScreen() {
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
+  const [userInfo, setUserInfo] = useState<{ email: string; phone: string }>();
 
-  //서버와 같은 규칙으로 검증, 프론트에서도 거름
+  //이메일 아이디·전화번호가 들어간 비밀번호를 미리 거르려고 불러온다. 실패해도 서버가 같은 검사를 하니 화면은 그대로 쓴다
+  useEffect(() => {
+    getMyInfo()
+      .then((info) => setUserInfo({ email: info.email, phone: info.phone }))
+      .catch((e) => console.warn('내 정보 조회 실패(비밀번호 사전 검사 생략):', e));
+  }, []);
+
+  //서버와 같은 규칙으로 검증, 프론트에서도 거름(가입·비밀번호 재설정과 같은 정책)
   const validate = () => {
     if (!current || !next || !confirm) return '모든 항목을 입력해주세요.';
-    if (next.length < MIN_LENGTH) return `새 비밀번호는 ${MIN_LENGTH}자 이상이어야 해요.`;
+    const policy = validatePassword(next, userInfo);
+    if (!policy.ok) return policy.message;
     if (next !== confirm) return '새 비밀번호가 서로 달라요.';
     if (next === current) return '현재 비밀번호와 다른 비밀번호를 입력해주세요.';
     return null;
@@ -33,7 +42,7 @@ export default function ChangePasswordScreen() {
   const onSave = async () => {
     const error = validate();
     if (error) {
-      Alert.alert('입력 확인', error);
+      showAlert('입력 확인', error);
       return;
     }
     try {
@@ -42,12 +51,12 @@ export default function ChangePasswordScreen() {
       //서버가 기존 토큰을 전부 폐기 -> 새로 받은 토큰으로 교체해야 이 기기의 로그인이 유지
       await saveTokens(tokens.accessToken, tokens.refreshToken);
 
-      Alert.alert('변경 완료', '비밀번호가 변경됐어요.\n다른 기기에서는 로그아웃 처리했어요.', [
+      showAlert('변경 완료', '비밀번호가 변경됐어요.\n다른 기기에서는 로그아웃 처리했어요.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
       //현재 비밀번호 불일치 등 서버 메시지를 그대로 노출
-      Alert.alert('변경 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('변경 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSaving(false);
     }
@@ -77,11 +86,12 @@ export default function ChangePasswordScreen() {
           style={styles.input}
           value={next}
           onChangeText={setNext}
-          placeholder={`${MIN_LENGTH}자 이상`}
+          placeholder="새 비밀번호"
           placeholderTextColor={colors.placeholder}
           secureTextEntry
           autoCapitalize="none"
         />
+        <Text style={styles.hint}>{PASSWORD_RULE_TEXT}</Text>
 
         <Text style={styles.label}>새 비밀번호 확인</Text>
         <TextInput
@@ -108,6 +118,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, gap: spacing.sm },
   label: { fontSize: font.sub, fontWeight: '700', color: colors.text, marginTop: spacing.md },
+  hint: { color: colors.textSub, fontSize: font.caption },
   input: {
     backgroundColor: colors.inputBg,
     borderRadius: radius.md,

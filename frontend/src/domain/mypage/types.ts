@@ -6,6 +6,7 @@ export interface Guardian {
   relationship: Relationship;
   phone: string;
   notifyEnabled: boolean;
+  verified: boolean; // 보호자가 문자로 동의했는지 (동의 전에는 긴급 알림이 가지 않음)
 }
 
 export const RELATIONSHIP_LABEL: Record<Relationship, string> = {
@@ -17,12 +18,30 @@ export const RELATIONSHIP_LABEL: Record<Relationship, string> = {
 
 export const RELATIONSHIP_OPTIONS: Relationship[] = ['PARENT', 'GRANDPARENT', 'SIBLING', 'OTHER'];
 
+// 복용약 한 건. itemSeq가 있으면 약 검색으로 고른 것, null이면 직접 입력한 것
+export interface MedicationItem {
+  name: string;
+  itemSeq: string | null;
+}
+
+// GET /api/health/medications/search 응답
+export interface MedicationSearchItem {
+  itemSeq: string;
+  name: string;
+  drugType: string | null; // 전문의약품 / 일반의약품 (모르면 null)
+  itemImage: string | null;
+}
+
 export interface HealthProfile {
   bloodType: string | null;
   diseases: string[];
-  medications: string[];
+  medications: string[]; // 약 이름만 (medicationItems의 이름 목록)
+  medicationItems: MedicationItem[];
   allergies: string[];
 }
+
+// 저장할 때는 이름+번호(medicationItems)만 보낸다
+export type HealthProfileInput = Omit<HealthProfile, 'medications'>;
 
 export const BLOOD_TYPES = ['A', 'B', 'O', 'AB'];
 
@@ -69,7 +88,8 @@ export type MyPageStackParamList = {
   MyPageHome: undefined;
   Guardian: undefined;
   GuardianForm: { guardian?: Guardian } | undefined; // 수정/등록
-  Health: undefined;
+  Health: { pickedMedication?: MedicationItem } | undefined; // 약 검색 화면에서 고른 약을 돌려받는다
+  MedicationPicker: undefined;
   ChangePassword: undefined;
   AccountEdit: undefined;
   Withdraw: undefined;

@@ -2,12 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { formatPhone } from '../../../shared/utils/phone';
-import { deleteGuardian, getGuardians, updateGuardian } from '../api/guardian';
+import { deleteGuardian, getGuardians, resendGuardianVerification, updateGuardian } from '../api/guardian';
 import { Guardian, MyPageStackParamList, RELATIONSHIP_LABEL } from '../types';
 
 type Nav = NativeStackNavigationProp<MyPageStackParamList>;
@@ -22,7 +31,7 @@ export default function GuardianScreen() {
       setLoading(true);
       setGuardians(await getGuardians());
     } catch (e: any) {
-      Alert.alert('오류', e?.message ?? '보호자 목록을 불러오지 못했어요.');
+      showAlert('오류', e?.message ?? '보호자 목록을 불러오지 못했어요.');
     } finally {
       setLoading(false);
     }
@@ -46,7 +55,16 @@ export default function GuardianScreen() {
       });
     } catch (e: any) {
       setGuardians((prev) => prev.map((x) => (x.id === g.id ? { ...x, notifyEnabled: g.notifyEnabled } : x)));
-      Alert.alert('변경 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('변경 실패', e?.message ?? '다시 시도해주세요.');
+    }
+  };
+
+  const onResend = async (g: Guardian) => {
+    try {
+      await resendGuardianVerification(g.id);
+      showAlert('문자를 보냈어요', `${g.name}님에게 동의 문자를 다시 보냈어요.`);
+    } catch (e: any) {
+      showAlert('보내지 못했어요', e?.message ?? '다시 시도해주세요.');
     }
   };
 
@@ -55,15 +73,23 @@ export default function GuardianScreen() {
       await deleteGuardian(g.id);
       setGuardians((prev) => prev.filter((x) => x.id !== g.id));
     } catch (e: any) {
-      Alert.alert('삭제 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('삭제 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
 
   const openMenu = (g: Guardian) =>
-    Alert.alert(g.name, '작업을 선택하세요', [
+    showAlert(g.name, '작업을 선택하세요', [
       { text: '수정', onPress: () => navigation.navigate('GuardianForm', { guardian: g }) },
-      { text: '삭제', style: 'destructive', onPress: () => runDelete(g) },
+      ...(g.verified ? [] : [{ text: '동의 문자 다시 보내기', onPress: () => onResend(g) }]),
+      { text: '삭제', style: 'destructive', onPress: () => confirmDelete(g) },
       { text: '취소', style: 'cancel' },
+    ]);
+
+  // 다시 등록하려면 보호자가 동의 문자를 새로 받아야 해서 한 번 더 묻는다
+  const confirmDelete = (g: Guardian) =>
+    showAlert('보호자 삭제', `${g.name}님을 보호자에서 삭제할까요?\n다시 등록하면 동의 문자를 새로 받아야 해요.`, [
+      { text: '취소', style: 'cancel' },
+      { text: '삭제', style: 'destructive', onPress: () => runDelete(g) },
     ]);
 
   return (
@@ -90,9 +116,21 @@ export default function GuardianScreen() {
                   </View>
                 </View>
                 <Text style={styles.phone}>{formatPhone(g.phone)}</Text>
+                {g.verified ? (
+                  <View style={styles.statusRow}>
+                    <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                    <Text style={[styles.statusText, { color: colors.success }]}>문자 동의 완료</Text>
+                  </View>
+                ) : (
+                  <Pressable style={styles.statusRow} onPress={() => onResend(g)} hitSlop={6}>
+                    <Ionicons name="time-outline" size={14} color={colors.textSub} />
+                    <Text style={styles.statusText}>동의 대기 중 · 문자 다시 보내기</Text>
+                  </Pressable>
+                )}
               </View>
               <Switch
-                value={g.notifyEnabled}
+                value={g.verified && g.notifyEnabled}
+                disabled={!g.verified}
                 onValueChange={() => onToggleNotify(g)}
                 trackColor={{ true: colors.primary, false: colors.border }}
                 thumbColor={colors.white}
@@ -112,7 +150,7 @@ export default function GuardianScreen() {
 
         <View style={styles.note}>
           <Text style={styles.noteText}>
-            등록된 보호자에게는 긴급 상황 발생 시 위치 및 건강정보가 자동 전송됩니다.
+            보호자가 문자로 동의해야 긴급 상황 시 위치 알림이 전송됩니다. 동의 전에는 어떤 문자도 가지 않아요.
           </Text>
         </View>
       </ScrollView>
@@ -141,6 +179,8 @@ const styles = StyleSheet.create({
   name: { fontSize: font.h3, fontWeight: '700', color: colors.text },
   phone: { fontSize: font.body, color: colors.textSub, marginTop: 2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.xs },
+  statusText: { fontSize: font.caption, color: colors.textSub, fontWeight: '600' },
   relChip: {
     backgroundColor: colors.primaryLight,
     borderRadius: radius.sm,

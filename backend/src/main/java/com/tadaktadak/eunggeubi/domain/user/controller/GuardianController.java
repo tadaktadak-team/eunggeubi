@@ -43,6 +43,12 @@ public class GuardianController {
         return ResponseEntity.ok(guardianService.updateGuardian(userId, id, request));
     }
 
+    @PostMapping("/{id}/verification")
+    public ResponseEntity<GuardianResponse> resendVerification(
+            @AuthenticationPrincipal Long userId, @PathVariable Long id) {
+        return ResponseEntity.ok(guardianService.resendVerification(userId, id));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteGuardian(
             @AuthenticationPrincipal Long userId, @PathVariable Long id) {

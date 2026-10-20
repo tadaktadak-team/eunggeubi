@@ -2,10 +2,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { showAlert } from '../../../shared/dialog';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { useNearestEmergencyBed } from '../../medical_locator/hooks/useNearestEmergencyBed';
+import EmergencyBedSheet from '../../medical_locator/components/EmergencyBedSheet';
+import { EmergencyBed } from '../../medical_locator/types/emergencyBed';
+import { formatBeds, getBedStatus } from '../../medical_locator/utils/bedStatus';
 import DisclaimerFooter from '../components/DisclaimerFooter';
 import QuickLinkCard from '../components/QuickLinkCard';
 import SymptomChip from '../components/SymptomChip';
@@ -16,10 +21,23 @@ import { ConsultationSummary } from '../../mypage/types';
 
 type Nav = NativeStackNavigationProp<AiConsultationStackParamList>;
 
+const ER_ROW_STEP = 64;
+const ER_HEADER_HEIGHT = 36;
+
 export default function SymptomHomeScreen() {
   const navigation = useNavigation<Nav>();
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
+  const { state: nearestBed, retry: retryNearestBed } = useNearestEmergencyBed();
+  const [selectedBed, setSelectedBed] = useState<EmergencyBed | null>(null);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [erTop, setErTop] = useState(0);
+
+  // 화면 높이에 맞춰 스크롤 없이 들어가는 만큼만 보여준다 (최소 1곳, 최대 3곳)
+  const visibleBedCount =
+    viewportHeight > 0 && erTop > 0
+      ? Math.max(1, Math.min(3, Math.floor((viewportHeight - erTop - ER_HEADER_HEIGHT - spacing.lg) / ER_ROW_STEP)))
+      : 3;
 
   // 가장 최근 상담 - 채팅에서 나왔다 돌아오면 바로 이어갈 수 있게 화면에 돌아올 때마다 다시 불러온다.
   // 상담 기록은 로그인해야 저장·조회되므로 비회원은 부르지 않는다(토큰 없이 부르면 401 → 세션 종료 처리로 샌다).
@@ -36,7 +54,7 @@ export default function SymptomHomeScreen() {
   const goAsk = (message: string) => {
     const trimmed = message.trim();
     if (!trimmed) {
-      Alert.alert('증상을 입력해주세요', '예) 어젯밤부터 두통이 심해요');
+      showAlert('증상을 입력해주세요', '예) 어젯밤부터 두통이 심해요');
       return;
     }
     navigation.navigate('SymptomChat', { initialMessage: trimmed });
@@ -47,7 +65,7 @@ export default function SymptomHomeScreen() {
     (navigation.getParent() as any)?.navigate(tabName);
   };
 
-  const notReady = () => Alert.alert('준비 중', '다음 단계에서 만들 거예요!');
+  const notReady = () => showAlert('준비 중', '다음 단계에서 만들 거예요!');
 
   return (
       <View style={styles.container}>
@@ -58,7 +76,11 @@ export default function SymptomHomeScreen() {
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
+        >
           <Text style={styles.subtitle}>증상을 말하면 AI가 참고정보를 안내해요</Text>
 
           <View style={styles.inputCard}>
@@ -111,18 +133,62 @@ export default function SymptomHomeScreen() {
               </>
           )}
 
-          <Text style={styles.sectionTitle}>가까운 응급실</Text>
-          <Pressable style={styles.erCard} onPress={() => goToTab('Hospital')}>
-            <View style={styles.erInfo}>
-              <Text style={styles.erName}>OO대학병원</Text>
-              <Text style={styles.erMeta}>2.1km · 혼잡도 낮음</Text>
+          <View onLayout={(e) => setErTop(e.nativeEvent.layout.y)}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitleInline}>가까운 응급실</Text>
+            <Pressable onPress={() => goToTab('Hospital')} hitSlop={8}>
+              <Text style={styles.moreLink}>전체 보기</Text>
+            </Pressable>
+          </View>
+          {nearestBed.status === 'ready' ? (
+            nearestBed.beds.slice(0, visibleBedCount).map((bed) => {
+              const status = getBedStatus(bed);
+              return (
+                <Pressable key={bed.hpid} style={styles.erRow} onPress={() => setSelectedBed(bed)}>
+                  <View style={styles.erInfo}>
+                    <Text style={styles.erName} numberOfLines={1}>
+                      {bed.name}
+                    </Text>
+                    <Text style={styles.erMeta} numberOfLines={1}>
+                      {[bed.distance != null && `${bed.distance}km`, formatBeds(bed.availableBeds)]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </Text>
+                  </View>
+                  {status && (
+                    <View style={[styles.erBadge, { borderColor: status.color }]}>
+                      <Text style={[styles.erBadgeText, { color: status.color }]}>{status.label}</Text>
+                    </View>
+                  )}
+                  <Ionicons name="chevron-forward" size={16} color={colors.placeholder} />
+                </Pressable>
+              );
+            })
+          ) : nearestBed.status === 'loading' ? (
+            <View style={[styles.erCard, styles.erLoading]}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.erMeta}>가까운 응급실을 찾는 중...</Text>
             </View>
-            <View style={styles.erBadge}>
-              <Text style={styles.erBadgeText}>병상 12</Text>
-            </View>
-          </Pressable>
+          ) : (
+            <Pressable
+              style={styles.erCard}
+              onPress={nearestBed.status === 'denied' ? () => Linking.openSettings() : nearestBed.status === 'error' ? retryNearestBed : () => goToTab('Hospital')}
+            >
+              <Text style={styles.erMeta}>
+                {nearestBed.status === 'denied'
+                  ? '위치 권한을 허용하면 가까운 응급실을 보여드려요. (눌러서 설정 열기)'
+                  : nearestBed.status === 'outside'
+                    ? '응급이는 대한민국 안에서만 가까운 응급실을 찾을 수 있어요.'
+                    : nearestBed.status === 'empty'
+                      ? '근처 응급실 정보가 없어요.'
+                      : '가까운 응급실을 불러오지 못했어요. (눌러서 다시 시도)'}
+              </Text>
+            </Pressable>
+          )}
+          </View>
         </ScrollView>
 
+        <EmergencyBedSheet bed={selectedBed} onClose={() => setSelectedBed(null)} />
         <DisclaimerFooter />
       </View>
   );
@@ -191,15 +257,28 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
   },
-  erInfo: { gap: spacing.xs },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md },
+  sectionTitleInline: { fontSize: font.h3, fontWeight: '700', color: colors.text },
+  moreLink: { fontSize: font.sub, color: colors.textSub, fontWeight: '600' },
+  erRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 1,
+    marginBottom: spacing.sm - 2,
+  },
+  erInfo: { flex: 1, gap: spacing.xs },
+  erLoading: { justifyContent: 'flex-start', gap: spacing.md },
   erName: { fontSize: font.body, fontWeight: '700', color: colors.text },
   erMeta: { fontSize: font.caption, color: colors.textSub },
   erBadge: {
     borderWidth: 1,
-    borderColor: colors.primary,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    paddingVertical: 2,
   },
-  erBadgeText: { color: colors.primary, fontSize: font.caption, fontWeight: '700' },
+  erBadgeText: { fontSize: font.caption, fontWeight: '700' },
 });

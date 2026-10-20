@@ -3,8 +3,6 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,6 +15,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
+import { showAlert } from '../../../shared/dialog';
+import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { formatPhone, toDigits } from '../../../shared/utils/phone';
 import { PASSWORD_RULE_TEXT, validatePassword } from '../../../shared/utils/password';
@@ -63,57 +63,57 @@ export default function FindAccountScreen() {
   const purpose: Purpose = tab === 'FIND_ID' ? 'FIND_ID' : 'FIND_PW';
 
   const sendCode = async () => {
-    if (!phone) return Alert.alert('전화번호', '전화번호를 입력해주세요.');
+    if (!phone) return showAlert('전화번호', '전화번호를 입력해주세요.');
     try {
       await authApi.sendPhoneCode(phone.trim(), purpose);
       setCodeSent(true);
-      Alert.alert('인증번호 발송', '인증번호를 발송했어요.\n(개발 중: 서버 콘솔에서 확인)');
+      showAlert('인증번호 발송', '인증번호를 발송했어요.\n(개발 중: 서버 콘솔에서 확인)');
     } catch (e: any) {
-      Alert.alert('발송 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('발송 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
 
   const verifyCode = async () => {
-    if (!code) return Alert.alert('인증번호 발송', '인증번호를 발송했어요. 문자를 확인해주세요.');
+    if (!code) return showAlert('인증번호 발송', '인증번호를 발송했어요. 문자를 확인해주세요.');
     try {
       await authApi.verifyPhoneCode(phone.trim(), purpose, code.trim());
       setPhoneVerified(true);
-      Alert.alert('인증 완료', '휴대폰 인증이 완료됐어요.');
+      showAlert('인증 완료', '휴대폰 인증이 완료됐어요.');
     } catch (e: any) {
-      Alert.alert('인증 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('인증 실패', e?.message ?? '다시 시도해주세요.');
     }
   };
 
   const onFindEmail = async () => {
-    if (!name) return Alert.alert('이름', '이름을 입력해주세요.');
-    if (!phoneVerified) return Alert.alert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
+    if (!name) return showAlert('이름', '이름을 입력해주세요.');
+    if (!phoneVerified) return showAlert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
     setSubmitting(true);
     try {
       const res = await authApi.findEmail(name.trim(), phone.trim());
       setFoundEmail(res.email);
     } catch (e: any) {
-      Alert.alert('아이디 찾기 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('아이디 찾기 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const onResetPassword = async () => {
-    if (!email || !newPassword) return Alert.alert('입력 확인', '이메일과 새 비밀번호를 입력해주세요.');
+    if (!email || !newPassword) return showAlert('입력 확인', '이메일과 새 비밀번호를 입력해주세요.');
     const pwCheck = validatePassword(newPassword, { email: email.trim(), phone: phone.trim() });
-    if (!pwCheck.ok) return Alert.alert('비밀번호 확인', pwCheck.message);
+    if (!pwCheck.ok) return showAlert('비밀번호 확인', pwCheck.message);
     if (newPassword !== newPasswordConfirm) {
-      return Alert.alert('비밀번호 확인', '비밀번호가 일치하지 않습니다.');
+      return showAlert('비밀번호 확인', '비밀번호가 일치하지 않습니다.');
     }
-    if (!phoneVerified) return Alert.alert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
+    if (!phoneVerified) return showAlert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
     setSubmitting(true);
     try {
       await authApi.resetPassword(email.trim(), phone.trim(), newPassword);
-      Alert.alert('완료', '비밀번호가 변경됐어요. 새 비밀번호로 로그인해주세요.', [
+      showAlert('완료', '비밀번호가 변경됐어요. 새 비밀번호로 로그인해주세요.', [
         { text: '로그인하러 가기', onPress: () => navigation.navigate('Login') },
       ]);
     } catch (e: any) {
-      Alert.alert('비밀번호 재설정 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('비밀번호 재설정 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSubmitting(false);
     }
@@ -131,13 +131,13 @@ export default function FindAccountScreen() {
           onChangeText={(v) => setPhone(toDigits(v))}
           editable={!phoneVerified}
         />
-        <TouchableOpacity
-          style={[styles.smallBtn, phoneVerified && styles.smallBtnDone]}
+        <Button
+          title={phoneVerified ? '완료' : '인증'}
+          variant={phoneVerified ? 'success' : 'neutral'}
           onPress={sendCode}
-          disabled={phoneVerified}
-        >
-          <Text style={styles.smallBtnText}>{phoneVerified ? '완료' : '인증'}</Text>
-        </TouchableOpacity>
+          done={phoneVerified}
+          textStyle={styles.smallBtnText}
+        />
       </View>
       {codeSent && !phoneVerified && (
         <View style={styles.row}>
@@ -150,9 +150,7 @@ export default function FindAccountScreen() {
             onChangeText={setCode}
             maxLength={6}
           />
-          <TouchableOpacity style={styles.smallBtn} onPress={verifyCode}>
-            <Text style={styles.smallBtnText}>확인</Text>
-          </TouchableOpacity>
+          <Button title="확인" variant="neutral" onPress={verifyCode} textStyle={styles.smallBtnText} />
         </View>
       )}
       {phoneVerified && <Text style={styles.verifiedText}>✓ 휴대폰 인증 완료</Text>}
@@ -196,25 +194,23 @@ export default function FindAccountScreen() {
                 onChangeText={setName}
               />
               {renderPhoneVerify()}
-              <TouchableOpacity
-                style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
+              <Button
+                title="이메일 확인하기"
                 onPress={onFindEmail}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator color={colors.white} />
-                ) : (
-                  <Text style={styles.submitText}>이메일 확인하기</Text>
-                )}
-              </TouchableOpacity>
+                loading={submitting}
+                style={styles.submitBtn}
+              />
               {foundEmail && (
                 <View style={styles.resultBox}>
                   <Text style={styles.resultLabel}>결과</Text>
                   <Text style={styles.resultEmail}>{foundEmail}</Text>
                   <Text style={styles.resultSub}>해당 이메일로 가입되어 있습니다</Text>
-                  <TouchableOpacity style={styles.linkBtn} onPress={() => navigation.navigate('Login')}>
-                    <Text style={styles.linkBtnText}>로그인하러 가기</Text>
-                  </TouchableOpacity>
+                  <Button
+                    title="로그인하러 가기"
+                    variant="secondary"
+                    size="md"
+                    onPress={() => navigation.navigate('Login')}
+                  />
                 </View>
               )}
             </>
@@ -248,17 +244,12 @@ export default function FindAccountScreen() {
                 value={newPasswordConfirm}
                 onChangeText={setNewPasswordConfirm}
               />
-              <TouchableOpacity
-                style={[styles.submitBtn, submitting && { opacity: 0.6 }]}
+              <Button
+                title="비밀번호 변경"
                 onPress={onResetPassword}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <ActivityIndicator color={colors.white} />
-                ) : (
-                  <Text style={styles.submitText}>비밀번호 변경</Text>
-                )}
-              </TouchableOpacity>
+                loading={submitting}
+                style={styles.submitBtn}
+              />
             </>
           )}
         </ScrollView>
@@ -298,26 +289,9 @@ const styles = StyleSheet.create({
   inputDisabled: { opacity: 0.6 },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   rowInput: { flex: 1, marginBottom: 0, marginRight: spacing.sm },
-  smallBtn: {
-    backgroundColor: colors.text,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  smallBtnDone: { backgroundColor: colors.success },
-  smallBtnText: { color: colors.white, fontSize: font.sub, fontWeight: '700' },
+  smallBtnText: { fontSize: font.sub },
   verifiedText: { color: colors.success, fontSize: font.sub, marginBottom: spacing.md },
-  submitBtn: {
-    backgroundColor: colors.primary,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.sm,
-  },
-  submitText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  submitBtn: { marginTop: spacing.sm },
   resultBox: {
     marginTop: spacing.xl,
     backgroundColor: colors.inputBg,
@@ -327,12 +301,4 @@ const styles = StyleSheet.create({
   resultLabel: { fontSize: font.caption, color: colors.textSub, marginBottom: spacing.xs },
   resultEmail: { fontSize: font.h3, fontWeight: '800', color: colors.text },
   resultSub: { fontSize: font.sub, color: colors.textSub, marginTop: spacing.xs, marginBottom: spacing.md },
-  linkBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-  },
-  linkBtnText: { color: colors.text, fontSize: font.sub, fontWeight: '700' },
 });

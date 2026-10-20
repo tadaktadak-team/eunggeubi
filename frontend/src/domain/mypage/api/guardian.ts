@@ -20,6 +20,10 @@ export function updateGuardian(id: number, body: GuardianRequest) {
   return api.put<Guardian>(`/api/guardians/${id}`, body, { auth: true });
 }
 
+export function resendGuardianVerification(id: number) {
+  return api.post<Guardian>(`/api/guardians/${id}/verification`, undefined, { auth: true });
+}
+
 export function deleteGuardian(id: number) {
   return api.delete<void>(`/api/guardians/${id}`, { auth: true });
 }
