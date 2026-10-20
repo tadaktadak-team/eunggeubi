@@ -71,7 +71,7 @@ public class ConsultationRegenerationService {
 
         String userPrompt = "[참고자료]\n%s\n\n[증상]\n%s\n\n[체크리스트에서 해당한다고 응답한 항목]\n%s".formatted(
                 ragRetrievalService.buildContext(docs), symptomText,
-                checkedItems.isEmpty() ? "해당사항 없음" : String.join("\n", checkedItems));
+                checkedItems.isEmpty() ? AiConsultationPrompts.NO_CHECKED_ITEMS : String.join("\n", checkedItems));
         RawRegeneratedAnswer raw = generateRawAnswer(consultationId, userPrompt);
         if (raw == null) {
             return persistAndBuild(baseMessage, DIAGNOSTIC_LANGUAGE_FALLBACK, List.of(), relatedAidGuide);
@@ -128,7 +128,8 @@ public class ConsultationRegenerationService {
     // (없으면 Optional.empty()) 이 체크만으로 "관련 응급처치가 실제로 존재하는지"까지 확인된다.
     // ponytail: search()가 여기서 한 번, 사용자가 배너를 눌러 FirstAidGuide 화면에 들어갈 때 한 번 더
     // 호출돼서 같은 내용을 두 번 생성한다(캐싱 없음) - 재생성은 체크리스트 제출당 1회뿐이라 감내 가능한
-    // 비용이지만, 호출 빈도가 늘면 캐싱을 고려해야 한다.
+    // 비용이지만, 호출 빈도가 늘면 캐싱을 고려해야 한다. 세부 상황이 있는 주제(동물·벌레 물림 등)는
+    // search()가 가이드를 만들지 않고 이름만 주며, 배너를 누르면 응급처치 화면에서 세부 상황을 고른다.
     private RegenerateResponse.RelatedAidGuide findRelatedAidGuide(String combinedQuery) {
         return firstAidGuideService.search(combinedQuery)
                 .map(guide -> new RegenerateResponse.RelatedAidGuide(guide.situation(), guide.title()))

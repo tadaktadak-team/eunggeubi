@@ -11,6 +11,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -82,7 +83,7 @@ class HealthTopicResolver {
     // 주제 이름 -> 카드 표시 정보(짧은 이름·분류·설명). 목록 파일 순서를 유지한다.
     private Map<String, FirstAidTopic> firstAidTopics = Map.of();
 
-    // 응급처치 검색(후보 고르기·관련성 확인)에만 쓰는 모델. 앱 기본(gpt-4o-mini)으로는 "손가락"에 골절·열상이
+    // 응급처치 검색(후보 고르기·관련성 확인)에만 쓰는 모델. gpt-4o-mini로는 "손가락"에 골절·열상이
     // 목록에 있는데도 "고를 게 없다"(matches=null)고 답하거나, "손"에 치아외상을 넣는 판단 실수가 프롬프트를
     // 고쳐도 남았다(실측). 검색어별로 결과를 캐싱하므로 비싼 모델은 새 검색어에만 호출된다.
     @Value("${kdca.first-aid.search-model:gpt-4.1}")
@@ -321,7 +322,16 @@ class HealthTopicResolver {
     // 없으니 버린다(오타·옛 목록 방어).
     // 검색 후보 카드에 보여줄 정보. 목록에 없는 주제(전체 목록으로 검색한 경우)는 원래 이름만 보여준다.
     FirstAidTopic describe(String topic) {
-        return firstAidTopics.getOrDefault(topic, FirstAidTopic.bare(topic));
+        return findTopic(topic).orElse(FirstAidTopic.bare(topic));
+    }
+
+    // 화면의 "상황별로 찾기" 목록 - first-aid-topics.txt 순서(분류별로 모여 있다) 그대로.
+    List<FirstAidTopic> allTopics() {
+        return List.copyOf(firstAidTopics.values());
+    }
+
+    Optional<FirstAidTopic> findTopic(String topic) {
+        return Optional.ofNullable(firstAidTopics.get(topic));
     }
 
     // first-aid-topics.txt 형식: "[분류]" 줄 아래에 "주제 | 짧은 이름 | 설명". 짧은 이름·설명은 생략할 수 있다.
@@ -348,7 +358,10 @@ class HealthTopicResolver {
                 }
                 String shortName = parts.length > 1 && !parts[1].isBlank() ? parts[1].trim() : topic;
                 String description = parts.length > 2 ? parts[2].trim() : "";
-                result.putIfAbsent(topic, new FirstAidTopic(topic, shortName, category, description));
+                List<String> cases = parts.length > 3
+                        ? Arrays.stream(parts[3].split(",")).map(String::trim).filter(c -> !c.isEmpty()).toList()
+                        : List.of();
+                result.putIfAbsent(topic, new FirstAidTopic(topic, shortName, category, description, cases));
             }
         }
         return result;

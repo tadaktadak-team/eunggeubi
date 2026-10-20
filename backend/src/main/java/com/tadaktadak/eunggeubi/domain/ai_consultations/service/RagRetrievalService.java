@@ -53,6 +53,8 @@ public class RagRetrievalService {
     // keywordScore의 질병명 완전일치 가산점(아래 keywordScore 메서드 참고)과 같은 값 - 이 값 이상이면
     // "질병명이 쿼리와 완전히 같다"는 뜻이라 byExactMatchThenRrf 정렬에서 최우선으로 끌어올린다.
     private static final double EXACT_MATCH_KEYWORD_SCORE = 3.0;
+    // rerankHybrid 결과에서 한 질병이 차지할 수 있는 최대 청크 수(아래 rerankHybrid 참고).
+    private static final int MAX_CHUNKS_PER_DISEASE = 3;
 
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
@@ -170,12 +172,27 @@ public class RagRetrievalService {
                 .thenComparingDouble(d -> keywordScoreById.get(d.getId()))
                 .reversed();
 
-        return candidates.stream()
+        List<Document> ranked = candidates.stream()
                 .filter(d -> (d.getScore() != null && d.getScore() >= SIMILARITY_THRESHOLD)
                         || keywordScoreById.get(d.getId()) > 0.0)
                 .sorted(byExactMatchThenRrf)
-                .limit(topK)
                 .toList();
+
+        // 한 질병이 topK를 독차지하지 않게 질병당 청크 수를 제한한다. 재작성된 검색어는 관련어를 나열해서
+        // ("벌 쏘임 벌침 곤충 알레르기 부종 통증") 그중 "알레르기"·"부종"처럼 질병명과 같은 단어가 완전일치
+        // 우선 규칙을 타면, 그 질병 청크 10여 개가 top 8을 다 채우고 벡터 1~3위였던 정답 문서("동물 및
+        // 곤충에 의한 응급상황")가 13위 밖으로 밀렸다(실측). 순위는 그대로 두고 넘치는 청크만 건너뛴다.
+        Map<Object, Integer> perDisease = new HashMap<>();
+        List<Document> result = new ArrayList<>();
+        for (Document d : ranked) {
+            if (result.size() >= topK) {
+                break;
+            }
+            if (perDisease.merge(d.getMetadata().get("disease"), 1, Integer::sum) <= MAX_CHUNKS_PER_DISEASE) {
+                result.add(d);
+            }
+        }
+        return result;
     }
 
     // 형태소분석기 없이 disease 메타데이터/본문/섹션명과의 substring 일치만으로 계산하는 키워드

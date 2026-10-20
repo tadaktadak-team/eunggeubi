@@ -60,6 +60,27 @@ class HealthInfoDocumentMapperTest {
                 .allSatisfy(section -> assertThat((String) section).startsWith("자주하는 질문 ("));
     }
 
+    @Test
+    void 그림으로_나뉜_같은_이름의_섹션은_하나로_합쳐진다() {
+        // 실제 아나필락시스(6684) "치료" 응답 구조: 1단계 / 그림 URL / 2단계가 같은 섹션명으로 온다.
+        // 예전엔 조각마다 같은 chunkId가 붙어 마지막 조각(2단계)만 Qdrant에 남았다.
+        KdcaHealthInfoResponse response = client.parse("""
+                <response><HEAD><CODE>S001</CODE><MESSAGE>OK</MESSAGE></HEAD>
+                <svc><CNTNTSSJ>아나필락시스</CNTNTSSJ><CNTNTS_SN>6684</CNTNTS_SN><cntntsClList>
+                <cntntsCl><CNTNTS_CL_NM>치료</CNTNTS_CL_NM><CNTNTS_CL_CN>1단계- 에피네프린을 허벅지에 근육주사합니다.</CNTNTS_CL_CN></cntntsCl>
+                <cntntsCl><CNTNTS_CL_NM>치료</CNTNTS_CL_NM><CNTNTS_CL_CN>https://is.kdca.go.kr/image.png</CNTNTS_CL_CN></cntntsCl>
+                <cntntsCl><CNTNTS_CL_NM>치료</CNTNTS_CL_NM><CNTNTS_CL_CN>2단계- 원인을 확인합니다.</CNTNTS_CL_CN></cntntsCl>
+                <cntntsCl><CNTNTS_CL_NM>예방</CNTNTS_CL_NM><CNTNTS_CL_CN>원인을 피합니다.</CNTNTS_CL_CN></cntntsCl>
+                </cntntsClList></svc></response>
+                """);
+
+        List<Document> documents = mapper.toDocuments(response);
+
+        assertThat(documents).extracting(d -> d.getMetadata().get("section")).containsExactly("치료", "예방");
+        assertThat(documents.get(0).getText()).contains("1단계").contains("2단계").doesNotContain("http");
+        assertThat(documents).extracting(Document::getId).doesNotHaveDuplicates();
+    }
+
     private String readFixture(String name) throws IOException {
         Path path = new ClassPathResource("fixtures/" + name).getFile().toPath();
         return Files.readString(path);

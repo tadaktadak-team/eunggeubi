@@ -92,6 +92,23 @@ class RagRetrievalServiceTest {
         assertThat(result.get(0).getId()).isEqualTo("exact");
     }
 
+    // "벌에 쏘였어요" 실측 재현 - 재작성 검색어의 "알레르기"가 질병명 완전일치를 타서 알레르기 청크가
+    // top 8을 다 채우고, 벡터 1위였던 정답 문서가 밀려났다. 질병당 청크 수 제한으로 정답이 들어와야 한다.
+    @Test
+    void 완전일치_질병이_청크가_많아도_topK를_독차지하지_않는다() {
+        List<Document> candidates = new ArrayList<>();
+        candidates.add(doc("bee", "동물 및 곤충에 의한 응급상황", "예방 및 대처", "벌침을 카드로 긁어 제거한다.", 0.55));
+        for (int i = 0; i < 10; i++) {
+            candidates.add(doc("allergy-" + i, "알레르기", "섹션" + i, "알레르기 반응에 대한 설명이다.", 0.47 - i * 0.01));
+        }
+        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(candidates);
+
+        List<Document> result = service.retrieve("벌 쏘임 벌침 곤충 알레르기 부종");
+
+        assertThat(result).extracting(Document::getId).contains("bee");
+        assertThat(result).filteredOn(d -> "알레르기".equals(d.getMetadata().get("disease"))).hasSize(3);
+    }
+
     @Test
     void retrieveGrouped은_해석별로_따로_검색하고_중복을_제거한다() {
         Document shared = doc("shared", "거북목증후군", "정의", "거북목증후군에 대한 설명이다.", 0.60);
