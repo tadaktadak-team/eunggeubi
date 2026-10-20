@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,6 +15,9 @@ import DisclaimerFooter from '../components/DisclaimerFooter';
 import QuickLinkCard from '../components/QuickLinkCard';
 import SymptomChip from '../components/SymptomChip';
 import { AiConsultationStackParamList, QUICK_SYMPTOMS } from '../types';
+import { getAccessToken } from '../../../shared/storage/tokenStorage';
+import { getConsultations } from '../../mypage/api/consultation';
+import { ConsultationSummary } from '../../mypage/types';
 
 type Nav = NativeStackNavigationProp<AiConsultationStackParamList>;
 
@@ -35,6 +38,18 @@ export default function SymptomHomeScreen() {
     viewportHeight > 0 && erTop > 0
       ? Math.max(1, Math.min(3, Math.floor((viewportHeight - erTop - ER_HEADER_HEIGHT - spacing.lg) / ER_ROW_STEP)))
       : 3;
+
+  // 가장 최근 상담 - 채팅에서 나왔다 돌아오면 바로 이어갈 수 있게 화면에 돌아올 때마다 다시 불러온다.
+  // 상담 기록은 로그인해야 저장·조회되므로 비회원은 부르지 않는다(토큰 없이 부르면 401 → 세션 종료 처리로 샌다).
+  const [recent, setRecent] = useState<ConsultationSummary | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      getAccessToken()
+        .then((token) => (token ? getConsultations() : []))
+        .then((list) => setRecent(list[0] ?? null))
+        .catch(() => setRecent(null));
+    }, []),
+  );
 
   const goAsk = (message: string) => {
     const trimmed = message.trim();
@@ -100,6 +115,23 @@ export default function SymptomHomeScreen() {
             />
             <QuickLinkCard label="약물정보" icon={{ lib: 'mci', name: 'pill' }} onPress={() => goToTab('Medicine')} />
           </View>
+
+          {recent && (
+              <>
+                <Text style={styles.sectionTitle}>최근 상담 이어가기</Text>
+                <Pressable
+                    style={styles.recentCard}
+                    onPress={() => navigation.navigate('SymptomChat', { sessionId: recent.sessionId })}
+                >
+                  <View style={styles.recentInfo}>
+                    <Text style={styles.recentQuestion} numberOfLines={1}>{recent.firstQuestion}</Text>
+                    {/* createdAt에 타임존이 없어 Date로 파싱하지 않고 자른다(ConsultationHistoryScreen과 같은 이유) */}
+                    <Text style={styles.recentDate}>{recent.createdAt.slice(0, 10).replace(/-/g, '.')}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={colors.placeholder} />
+                </Pressable>
+              </>
+          )}
 
           <View onLayout={(e) => setErTop(e.nativeEvent.layout.y)}>
           <View style={styles.sectionHeader}>
@@ -205,6 +237,18 @@ const styles = StyleSheet.create({
   chipRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl },
   sectionTitle: { fontSize: font.h3, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
   quickLinkRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.xl },
+  recentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  recentInfo: { flex: 1, gap: spacing.xs },
+  recentQuestion: { fontSize: font.body, fontWeight: '700', color: colors.text },
+  recentDate: { fontSize: font.caption, color: colors.textSub },
   erCard: {
     flexDirection: 'row',
     alignItems: 'center',

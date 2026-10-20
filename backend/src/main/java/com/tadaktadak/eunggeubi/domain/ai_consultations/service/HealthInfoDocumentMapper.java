@@ -4,6 +4,7 @@ import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.KdcaHealthInfoRespon
 import com.tadaktadak.eunggeubi.domain.ai_consultations.dto.Svc;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +39,11 @@ public class HealthInfoDocumentMapper {
             return documents;
         }
 
+        // KDCA는 섹션 중간에 그림이 끼면 같은 섹션명으로 조각을 나눠 보낸다(예: 아나필락시스 "치료" =
+        // 1단계 응급처치 / 그림 URL / 2단계). 조각마다 따로 저장하면 chunkId(섹션명 기준)가 겹쳐 마지막
+        // 조각만 남는다 - 실측으로 483개 중 326개 질병에서 본문 약 20%가 이렇게 사라졌다. 그래서 같은
+        // 이름의 조각을 원래 순서대로 이어 붙인 뒤 쪼갠다.
+        Map<String, StringBuilder> contentBySection = new LinkedHashMap<>();
         for (Svc.Section section : svc.getSections()) {
             String content = section.getContent();
             if (content == null || content.isBlank() || content.trim().startsWith("http")) {
@@ -46,19 +52,26 @@ public class HealthInfoDocumentMapper {
             if (EXCLUDED_SECTIONS.contains(section.getName())) {
                 continue;
             }
+            StringBuilder merged = contentBySection.computeIfAbsent(section.getName(), k -> new StringBuilder());
+            if (!merged.isEmpty()) {
+                merged.append("\n\n");
+            }
+            merged.append(content.trim());
+        }
 
-            List<String> pieces = TextChunker.split(content.trim(), MAX_CHUNK_CHARS);
+        for (Map.Entry<String, StringBuilder> section : contentBySection.entrySet()) {
+            List<String> pieces = TextChunker.split(section.getValue().toString(), MAX_CHUNK_CHARS);
             for (int i = 0; i < pieces.size(); i++) {
                 String sectionName = pieces.size() > 1
-                        ? "%s (%d/%d)".formatted(section.getName(), i + 1, pieces.size())
-                        : section.getName();
+                        ? "%s (%d/%d)".formatted(section.getKey(), i + 1, pieces.size())
+                        : section.getKey();
                 Map<String, Object> metadata = Map.of(
                         "source", SOURCE,
                         "disease", svc.getDiseaseName(),
                         "section", sectionName,
                         "cntntsSn", svc.getCntntsSn()
                 );
-                String id = chunkId(svc.getCntntsSn(), section.getName(), i);
+                String id = chunkId(svc.getCntntsSn(), section.getKey(), i);
                 documents.add(new Document(id, pieces.get(i), metadata));
             }
         }

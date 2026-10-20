@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { showAlert } from '../../../shared/dialog';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import AiAvatar from '../components/AiAvatar';
 import AnswerCard from '../components/AnswerCard';
@@ -35,8 +34,8 @@ export default function SymptomChatScreen() {
   const { params } = useRoute<ChatRoute>();
   const insets = useSafeAreaInsets();
   const {
-    messages, loading, guestLimitReached, limitSheetVisible, setLimitSheetVisible,
-    sendText, toggleChecklistItem, submitChecklist, submitChecklistNone,
+    messages, loading, answering, guestLimitReached, limitSheetVisible, setLimitSheetVisible,
+    sendText, resume, toggleChecklistItem, submitChecklist, submitChecklistNone,
   } = useSymptomChat();
 
   const [inputText, setInputText] = useState('');
@@ -58,6 +57,11 @@ export default function SymptomChatScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params?.initialMessage]);
 
+  // 홈의 "최근 상담 이어가기"로 들어오면 지난 대화를 불러온다.
+  useEffect(() => {
+    if (params?.sessionId) resume(params.sessionId);
+  }, [params?.sessionId, resume]);
+
   const onSend = () => {
     // 응답 오는 중에 연타하면 sessionRef 갱신 순서가 응답 도착 순서에 의존하게 된다 - 로딩 중엔 막는다.
     if (!inputText.trim() || loading) return;
@@ -67,9 +71,6 @@ export default function SymptomChatScreen() {
     setInputText('');
     send(text);
   };
-
-  const showDisclaimer = () =>
-    showAlert('안내', '*참고용이며, 의료 전문가의 상담을 대체하지 않습니다.');
 
   return (
       <KeyboardAvoidingView
@@ -85,11 +86,7 @@ export default function SymptomChatScreen() {
             <AiAvatar />
             <View style={styles.headerText}>
               <Text style={styles.headerTitle}>AI 증상 상담</Text>
-              <Text style={styles.headerSubtitle}>참고 정보만 제공해요 · 진단 아님</Text>
             </View>
-            <Pressable style={styles.side} onPress={showDisclaimer} hitSlop={8}>
-              <Ionicons name="alert-circle-outline" size={22} color={colors.textSub} />
-            </Pressable>
           </View>
         </View>
 
@@ -130,7 +127,7 @@ export default function SymptomChatScreen() {
             );
           })}
 
-          {loading && (
+          {loading && !answering && (
               <View style={styles.typingRow}>
                 <AiAvatar />
                 <Text style={styles.typingText}>입력 중...</Text>
@@ -186,7 +183,6 @@ const styles = StyleSheet.create({
   side: { width: 32, alignItems: 'center', justifyContent: 'center' },
   headerText: { flex: 1 },
   headerTitle: { fontSize: font.h3, fontWeight: '700', color: colors.text },
-  headerSubtitle: { fontSize: font.caption, color: colors.textSub, marginTop: 2 },
   list: { flex: 1 },
   listContent: { padding: spacing.lg, gap: spacing.lg },
   typingRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -204,7 +200,7 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     backgroundColor: colors.inputBg,
-    borderRadius: radius.pill,
+    borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
     fontSize: font.body,
