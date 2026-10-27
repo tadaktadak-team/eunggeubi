@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -38,21 +38,23 @@ export default function WithdrawScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const info = await getMyInfo();
-      setSocialOnly(info.socialOnly);
-    } catch (e: any) {
-      showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // 진입할 때 한 번만 불러온다. 응답 전에 화면을 나가면 결과를 버린다
   useEffect(() => {
-    load();
-  }, [load]);
+    let cancelled = false;
+    getMyInfo()
+      .then((info) => {
+        if (!cancelled) setSocialOnly(info.socialOnly);
+      })
+      .catch((e: any) => {
+        if (!cancelled) showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const runWithdraw = async () => {
     try {
