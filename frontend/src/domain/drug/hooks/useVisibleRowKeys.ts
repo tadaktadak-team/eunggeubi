@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { ViewToken } from 'react-native';
+import type { ListViewToken as ViewToken } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 
 // FlatList는 화면 위아래로 여러 화면 분량의 행을 미리 그려 둔다(예: 낱알 검색은 windowSize=7이라
