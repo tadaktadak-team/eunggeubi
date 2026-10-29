@@ -1,7 +1,7 @@
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,9 +10,9 @@ import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import {
   FirstAidGuideDto,
   FirstAidTopicDto,
-  getFirstAidGuide,
   getFirstAidTopics,
   searchFirstAidGuide,
+  streamFirstAidGuide,
 } from '../api/firstAid';
 import { AiConsultationStackParamList } from '../types';
 
@@ -47,6 +47,10 @@ export default function FirstAidGuideScreen() {
   const [searchText, setSearchText] = useState('');
   const [guide, setGuide] = useState<FirstAidGuideDto | null>(null);
   const [loading, setLoading] = useState(false);
+  // 단계가 스트리밍으로 채워지는 중 - 첫 단계가 오면 로딩 표시 대신 카드를 띄우고 아래에 작은 스피너를 둔다.
+  const [generating, setGenerating] = useState(false);
+  // 가장 최근 조회 번호. 스트림이 도는 중에 다른 상황으로 넘어가면 이전 스트림의 단계가 덮어쓰지 않게 한다.
+  const requestRef = useRef(0);
   const [candidates, setCandidates] = useState<FirstAidTopicDto[]>([]);
   // 후보 목록을 보고 있는지 - 후보를 골라 응급처치로 들어가도 candidates는 남겨둬서 목록으로 되돌아올 수 있게 한다.
   const [showList, setShowList] = useState(false);
@@ -73,13 +77,22 @@ export default function FirstAidGuideScreen() {
   // AI 상담에서 바로 들어온 경우는 돌아갈 처음 화면이 없으니 뺀다.
   const canGoBackHome = !!(guide || caseMenu) && !params?.situation;
   const goBackHome = () => {
+    requestRef.current++;
     setGuide(null);
     setCaseMenu(null);
   };
 
   // 헤더 뒤로가기도 세부 상황이나 후보에서 골라 들어온 상태면 화면을 나가지 않고 그 목록으로 돌아간다.
+  // 검색 후보 목록을 보고 있으면 화면을 나가지 않고 처음 화면(자주 찾는 상황)으로 돌아간다.
+  // 후보에서 골라 들어갔던 세부 상황 목록(caseMenu)·가이드도 같이 비운다 - 남아 있으면 처음 화면 대신 그게 보인다.
+  const closeList = () => {
+    setShowList(false);
+    setCandidates([]);
+    goBackHome();
+  };
   const onPressBack = () => {
-    if (viewingCase) setGuide(null);
+    if (showList) closeList();
+    else if (viewingCase) setGuide(null);
     else if (canGoBackToList) setShowList(true);
     else if (canGoBackHome) goBackHome();
     else navigation.goBack();
@@ -87,9 +100,18 @@ export default function FirstAidGuideScreen() {
 
   // 성공 여부를 돌려준다. silent면 실패 안내를 호출부가 직접 띄운다. caseName은 세부 상황을 고른 경우에만 준다.
   const loadGuide = useCallback(async (target: string, { silent = false, caseName }: { silent?: boolean; caseName?: string } = {}) => {
+    const req = ++requestRef.current;
+    const isCurrent = () => requestRef.current === req;
     setLoading(true);
     try {
-      const result = await getFirstAidGuide(target, caseName);
+      const result = await streamFirstAidGuide(target, caseName, (partial) => {
+        if (!isCurrent()) return;
+        if (!caseName) setCaseMenu(null);
+        setGuide(partial);
+        setLoading(false);
+        setGenerating(true);
+      });
+      if (!isCurrent()) return true;
       if (result.cases?.length) {
         // 세부 상황이 있는 주제 - 단계 대신 고를 목록을 보여준다.
         setCaseMenu({ situation: target, title: result.title, cases: result.cases });
@@ -102,13 +124,17 @@ export default function FirstAidGuideScreen() {
       return true;
     } catch (e) {
       console.warn(e);
+      if (!isCurrent()) return true;
       // 이전 상황의 스텝이 남아있으면 지금 고른 상황과 내용이 안 맞게 보인다 - 비워서
       // "이 상황은 못 불러왔다"를 명확히 한다.
       setGuide(null);
       if (!silent) showAlert('오류', '응급처치 정보를 불러오지 못했어요.');
       return false;
     } finally {
-      setLoading(false);
+      if (isCurrent()) {
+        setLoading(false);
+        setGenerating(false);
+      }
     }
   }, []);
 
@@ -148,6 +174,7 @@ export default function FirstAidGuideScreen() {
         await loadGuide(matched[0].topic);
       } else if (matched.length > 1) {
         // 여러 개면 가이드 자리에 후보 목록을 띄워 사용자가 고르게 한다.
+        requestRef.current++;
         setCandidates(matched);
         setShowList(true);
         setGuide(null);
@@ -186,7 +213,9 @@ export default function FirstAidGuideScreen() {
                 onSubmitEditing={onSearchSubmit}
                 returnKeyType="search"
             />
-            <Ionicons name="search" size={18} color={colors.placeholder} />
+            <Pressable onPress={onSearchSubmit} hitSlop={8} accessibilityLabel="검색">
+              <Feather name="search" size={18} color={colors.placeholder} />
+            </Pressable>
           </View>
 
           {loading ? (
@@ -197,6 +226,11 @@ export default function FirstAidGuideScreen() {
                 <Text style={styles.loadingText}>맞춤 응급처치 가이드를 만들고 있어요...</Text>
               </View>
           ) : showList ? (
+              <>
+              {/* 검색 결과(후보 목록)에서 처음 화면으로 돌아가는 아이콘 버튼 - 가이드 화면의 것과 같은 모양. */}
+              <Pressable style={styles.backToListBtn} onPress={closeList} hitSlop={8} accessibilityLabel="처음 화면으로">
+                <Ionicons name="chevron-back" size={16} color={colors.textSub} />
+              </Pressable>
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>어떤 상황인가요?</Text>
                 {candidates.map((c) => (
@@ -209,6 +243,7 @@ export default function FirstAidGuideScreen() {
                     </Pressable>
                 ))}
               </View>
+              </>
           ) : (
               <>
                 {viewingCase ? (
@@ -252,6 +287,7 @@ export default function FirstAidGuideScreen() {
                             <Text style={styles.stepText}>{step}</Text>
                           </View>
                       ))}
+                      {generating && <ActivityIndicator color={colors.primary} style={styles.stepSpinner} />}
                     </View>
                 )}
                 {!guide && !caseMenu && (
@@ -338,14 +374,15 @@ const styles = StyleSheet.create({
   side: { width: 32, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: font.h3, fontWeight: '700', color: colors.text },
   scrollContent: { padding: spacing.lg, gap: spacing.lg },
+  // 약물정보 화면 검색창(DrugHomeScreen searchContainer)과 같은 높이·모서리·아이콘으로 맞춤.
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     backgroundColor: colors.inputBg,
-    borderRadius: radius.md,
+    borderRadius: 10,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
+    height: 48,
   },
   searchInput: { flex: 1, fontSize: font.body, color: colors.text },
   loadingBox: { alignItems: 'center', gap: spacing.sm, marginVertical: spacing.xl },
@@ -362,6 +399,7 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.md },
   stepMarker: { fontSize: font.sub, color: colors.text },
   stepText: { flex: 1, fontSize: font.sub, color: colors.text },
+  stepSpinner: { alignSelf: 'flex-start' },
   backToListBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 2 },
   backToListText: { fontSize: font.sub, color: colors.textSub },
   sourceFooter: { textAlign: 'center', color: colors.placeholder, fontSize: font.caption },

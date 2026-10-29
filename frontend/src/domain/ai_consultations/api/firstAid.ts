@@ -12,10 +12,26 @@ export interface FirstAidGuideDto {
   cases: string[];
 }
 
-// 상황(화상/코피/골절/기도막힘 등)에 해당하는 응급처치 단계를 조회한다.
-export function getFirstAidGuide(situation: string, caseName?: string) {
+// 상황(화상/코피/골절/기도막힘 등)에 해당하는 응급처치 단계를 스트리밍으로 받는다. 처음 만드는 가이드면 완성된 step이 늘 때마다
+// onPartial로 지금까지의 가이드를 넘기고(ordered는 아직 false), 최종 가이드를 돌려준다.
+export async function streamFirstAidGuide(
+  situation: string,
+  caseName: string | undefined,
+  onPartial: (guide: FirstAidGuideDto) => void,
+) {
   const query = caseName ? `?case=${encodeURIComponent(caseName)}` : '';
-  return api.get<FirstAidGuideDto>(`/api/first-aid/guides/${encodeURIComponent(situation)}${query}`);
+  let result: FirstAidGuideDto | undefined;
+  await api.postStream(
+    `/api/first-aid/guides/${encodeURIComponent(situation)}/stream${query}`,
+    {},
+    (event, data) => {
+      if (event === 'partial') onPartial(data as FirstAidGuideDto);
+      else if (event === 'done') result = data as FirstAidGuideDto;
+      else if (event === 'error') throw new Error((data as { message: string }).message);
+    },
+  );
+  if (!result) throw new Error('응급처치 정보를 받는 중 연결이 끊겼어요. 다시 시도해주세요.');
+  return result;
 }
 
 // 검색 후보 카드 한 장. topic은 getFirstAidGuide에 넘기는 원래 이름, 나머지는 카드에 보여주는 값이다
