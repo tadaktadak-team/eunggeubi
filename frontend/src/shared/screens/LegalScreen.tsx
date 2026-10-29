@@ -1,6 +1,6 @@
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { useMemo, useRef, useState } from 'react';
-import { LayoutChangeEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LayoutChangeEvent, Pressable, ScrollView, ScrollViewInstance, StyleSheet, Text, View } from 'react-native';
 
 import AppHeader from '../components/AppHeader';
 import { EFFECTIVE_DATE, PRIVACY_POLICY, TERMS_OF_SERVICE } from '../constants/legalDocs';
@@ -22,7 +22,7 @@ export default function LegalScreen() {
   const { params } = useRoute<LegalRoute>();
   const [tab, setTab] = useState<Tab>(params?.tab ?? 'terms');
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const scrolled = useRef(false);
 
   const articles = useMemo(

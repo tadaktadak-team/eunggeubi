@@ -219,12 +219,12 @@ const PillSearchScreen = ({ navigation }: any) => {
         keyExtractor={(item) => item.itemSeq}
         ListHeaderComponent={renderFilters}
         ListEmptyComponent={
-          !loading && searched ? <Text style={styles.emptyText}>조건에 맞는 약을 찾지 못했습니다.</Text> : null
+          !loading && searched ? <Text style={styles.emptyText}>조건에 맞는 약을 찾지 못했습니다.</Text> : undefined
         }
         onEndReached={loadMore}
         onEndReachedThreshold={0.4}
         ListFooterComponent={
-          loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={styles.footerLoading} /> : null
+          loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={styles.footerLoading} /> : undefined
         }
         // 결과가 수천 건까지 나올 수 있어 초기/배치 렌더링 양을 보수적으로 잡고 화면 밖 항목은
         // 뷰 자체를 비워(removeClippedSubviews) 메모리·렉을 줄인다.

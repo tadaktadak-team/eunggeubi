@@ -160,7 +160,7 @@ const DrugSearchScreen: React.FC<{ navigation: any; route: any }> = ({ navigatio
           ListFooterComponent={
             loadingMore ? (
               <ActivityIndicator size="small" color={colors.primary} style={styles.footerLoading} />
-            ) : null
+            ) : undefined
           }
           ListEmptyComponent={
             searched ? (

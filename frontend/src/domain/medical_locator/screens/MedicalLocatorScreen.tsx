@@ -502,7 +502,7 @@ export default function MedicalLocatorScreen() {
               >
                 더보기 ({filteredItems.length - visibleCount}개 더 있음)
               </Text>
-            ) : null
+            ) : undefined
           }
         />
         </>
