@@ -1,8 +1,8 @@
-package com.tadaktadak.eunggeubi.domain.emergency_bed.service;
+package com.tadaktadak.eunggeubi.domain.hospital.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import com.tadaktadak.eunggeubi.domain.emergency_bed.dto.EmergencyBedResponse;
+import com.tadaktadak.eunggeubi.domain.hospital.dto.EmergencyBedResponse;
 import com.tadaktadak.eunggeubi.global.exception.ExternalApiException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

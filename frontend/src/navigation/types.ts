@@ -24,17 +24,4 @@ export type RootStackParamList = {
     skipReason: SkipReason | null;
   };
 
-   HospitalDetail: {
-    ykiho: string;
-    name: string;
-    address: string;
-    phone: string;
-    distance: number | null;
-    latitude: number | null;
-    longitude: number | null;
-    availableBeds?: number | null;
-    congestion?: number | null;
-    hasEmergency?: boolean;
-    category?: string;
-  };
 };

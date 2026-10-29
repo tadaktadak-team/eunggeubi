@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { BackHandler, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ import {
 } from '../utils/hospitalHours';
 import { CHECKLIST_ITEMS } from '../utils/visitChecklist';
 import { openDirections } from '../utils/openDirections';
+import { formatDistance } from '../utils/formatDistance';
 
 export interface SheetItem {
   id: string;
@@ -57,20 +58,31 @@ export default function FacilitySheet({ item, accentColor, onClose }: FacilitySh
   }));
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [detail, setDetail] = useState<HospitalDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
 
-  const isHospital = item.category !== '약국' && item.ykiho != null;
-  // 약국은 보여줄 상세 정보가 없어서 미리보기 높이로만 열린다 (위로 펼쳐지지 않음)
-  const snapPoints = item.category === '약국' ? [previewSnap] : [previewSnap, '100%'];
+  const isHospital = item.category === '병원' && item.ykiho != null;
+  const detailLoading = isHospital && detail == null && !detailError;
+  // 약국/응급실은 보여줄 상세 정보가 없어서 미리보기 높이로만 열린다 (위로 펼쳐지지 않음)
+  const isFixed = item.category !== '병원';
+  const snapPoints = isFixed ? [previewSnap] : [previewSnap, '100%'];
+  // 끝까지 펼쳐지면 끌어서 내려가거나 닫히지 않고, 뒤로가기(<) 버튼으로만 닫는다
+  const [expanded, setExpanded] = useState(false);
+
+  // 안드로이드 뒤로가기 버튼은 시트를 닫는다
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      sheetRef.current?.close();
+      return true;
+    });
+    return () => sub.remove();
+  }, []);
 
   // 병원일 때만 진료과목/진료시간/체크리스트를 불러온다
   useEffect(() => {
     if (!isHospital || !item.ykiho) return;
 
     let cancelled = false;
-    setDetailLoading(true);
     getHospitalDetail(item.ykiho)
       .then((data) => {
         if (!cancelled) setDetail(data);
@@ -78,9 +90,6 @@ export default function FacilitySheet({ item, accentColor, onClose }: FacilitySh
       .catch((e) => {
         console.error('병원 상세정보 조회 실패:', e);
         if (!cancelled) setDetailError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setDetailLoading(false);
       });
 
     AsyncStorage.getItem(`checklist_${item.ykiho}`)
@@ -165,10 +174,19 @@ export default function FacilitySheet({ item, accentColor, onClose }: FacilitySh
           <Text style={styles.summaryText}>{hoursText}</Text>
         </View>
       )}
+      {item.availableBeds != null && (
+        <View style={styles.summaryRow}>
+          <Ionicons name="pulse-outline" size={18} color="#2E7D32" />
+          <Text style={[styles.summaryText, styles.bedText]}>
+            응급실 잔여 {item.availableBeds}병상
+            {item.congestion != null ? ` · 혼잡도 ${item.congestion}%` : ''}
+          </Text>
+        </View>
+      )}
       {item.distance != null && (
         <View style={styles.summaryRow}>
           <Ionicons name="walk-outline" size={18} color="#999" />
-          <Text style={styles.summaryText}>{item.distance}km</Text>
+          <Text style={styles.summaryText}>{formatDistance(item.distance)}</Text>
         </View>
       )}
     </View>
@@ -179,7 +197,10 @@ export default function FacilitySheet({ item, accentColor, onClose }: FacilitySh
       ref={sheetRef}
       snapPoints={snapPoints}
       enableDynamicSizing={false}
-      enableOverDrag={item.category !== '약국'}
+      enableOverDrag={!isFixed}
+      enableContentPanningGesture={!expanded}
+      enableHandlePanningGesture={!expanded}
+      onChange={(index) => setExpanded(index === 1)}
       index={0}
       animatedIndex={animatedIndex}
       topInset={insets.top}
@@ -195,10 +216,7 @@ export default function FacilitySheet({ item, accentColor, onClose }: FacilitySh
       </Animated.View>
 
       {/* 미리보기와 상세가 하나로 이어진 내용: 시트가 올라온 만큼 아래가 드러남 */}
-      <BottomSheetScrollView
-        scrollEnabled={item.category !== '약국'}
-        contentContainerStyle={styles.content}
-      >
+      <BottomSheetScrollView scrollEnabled={!isFixed} contentContainerStyle={styles.content}>
         <View onLayout={(e) => setPreviewHeight(e.nativeEvent.layout.height)}>
           <View style={styles.previewHeader}>
             <View style={styles.previewTitleWrap}>
@@ -239,24 +257,6 @@ export default function FacilitySheet({ item, accentColor, onClose }: FacilitySh
 
         {activeTab === 'info' || !isHospital ? (
           <>
-            {item.availableBeds != null && (
-              <View style={styles.bedSection}>
-                <View style={styles.bedLeft}>
-                  <Ionicons name="pulse-outline" size={20} color="#2E7D32" />
-                  <View>
-                    <Text style={styles.bedTitle}>응급실 잔여 병상</Text>
-                    {item.congestion != null && (
-                      <Text style={styles.congestion}>혼잡도 {item.congestion}%</Text>
-                    )}
-                  </View>
-                </View>
-                <Text style={styles.bedCount}>
-                  {item.availableBeds}
-                  <Text style={styles.bedUnit}>병상</Text>
-                </Text>
-              </View>
-            )}
-
             {isHospital && (
               <>
                 {detailLoading && <Text style={styles.message}>상세정보를 불러오고 있어요...</Text>}
@@ -491,44 +491,9 @@ const styles = StyleSheet.create({
   },
 
   // ---- 상세 내용 ----
-  bedSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: 20,
-    marginVertical: 12,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#E8F5E9',
-  },
-
-  bedLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-
-  bedTitle: {
-    fontSize: 15,
+  bedText: {
     color: '#2E7D32',
     fontWeight: '700',
-  },
-
-  congestion: {
-    fontSize: 12,
-    color: '#2E7D32',
-    marginTop: 2,
-  },
-
-  bedCount: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#2E7D32',
-  },
-
-  bedUnit: {
-    fontSize: 14,
-    fontWeight: '600',
   },
 
   section: {

@@ -21,7 +21,6 @@ import { useState } from 'react';
 import LoginRequiredSheet from '../domain/auth/screens/../components/LoginRequiredSheet';
 import MyPageNavigator from '../domain/mypage/screens/MyPageNavigator';
 import MedicalLocatorScreen from '../domain/medical_locator/screens/MedicalLocatorScreen';
-import HospitalDetailScreen from '../domain/medical_locator/screens/HospitalDetailScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -64,7 +63,6 @@ export default function RootNavigator() {
                             <Stack.Screen name="Tabs" component={TabsNavigator} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
               <Stack.Screen name="Legal" component={LegalScreen} />
-              <Stack.Screen name="HospitalDetail" component={HospitalDetailScreen} />
             </>
           ) : (
             <>
@@ -72,7 +70,6 @@ export default function RootNavigator() {
               <Stack.Screen name="EditProfile" component={EditProfileScreen} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
               <Stack.Screen name="Legal" component={LegalScreen} />
-              <Stack.Screen name="HospitalDetail" component={HospitalDetailScreen} />
             </>
           )}
         </Stack.Navigator>
