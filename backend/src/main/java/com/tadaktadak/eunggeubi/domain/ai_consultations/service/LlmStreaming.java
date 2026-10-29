@@ -11,8 +11,8 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.converter.BeanOutputConverter;
 
 // 구조화 출력(JSON)을 스트리밍으로 받으면서, 아직 다 안 온 JSON에서 화면에 먼저 보여줄 글을 뽑는다.
-// AiConsultationService(1차 답변)와 ConsultationRegenerationService(재생성)가 같이 쓴다.
-final class LlmStreaming {
+// AiConsultationService(1차 답변)와 ConsultationRegenerationService(재생성), FirstAidGuideService(응급처치)가 같이 쓴다.
+public final class LlmStreaming {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     // 문자열 값 안에서 다음 문장이 시작된 지점(문장부호 + 공백/줄바꿈). 공백까지 와야 끊어서 "38.5도"의
@@ -20,13 +20,15 @@ final class LlmStreaming {
     private static final Pattern SENTENCE_END = Pattern.compile("[.!?。](?=\\s)|\\n");
     // 끝이 덜 온 이스케이프(백슬래시 하나, 또는 유니코드 이스케이프의 앞부분) - 디코딩 전에 떼어낸다.
     private static final Pattern TRAILING_PARTIAL_ESCAPE = Pattern.compile("\\\\(u[0-9a-fA-F]{0,3})?$");
+    // 배열 안의 닫힌 문자열 원소 하나(앞 쉼표·공백 포함).
+    private static final Pattern ARRAY_ITEM = Pattern.compile("\\s*,?\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");
 
     private LlmStreaming() {
     }
 
     // entity()와 같은 형식 지시(BeanOutputConverter)를 붙여 스트리밍으로 받고, 토큰이 올 때마다 지금까지
     // 받은 원문 전체를 onBuffer로 넘긴다. 다 받으면 같은 변환기로 type을 만든다.
-    static <T> T stream(ChatClient chatClient, String system, String user, Class<T> type,
+    public static <T> T stream(ChatClient chatClient, String system, String user, Class<T> type,
                         Consumer<CharSequence> onBuffer) {
         BeanOutputConverter<T> converter = new BeanOutputConverter<>(type);
         StringBuilder buffer = new StringBuilder();
@@ -52,6 +54,27 @@ final class LlmStreaming {
             String value = decode(m.group(1));
             if (value == null) {
                 break; // 이스케이프가 깨진 값 - 뒤는 최종 응답에 맡긴다
+            }
+            if (!value.isBlank()) {
+                values.add(value);
+            }
+        }
+        return values;
+    }
+
+    // "field": ["...", "...", "... 처럼 문자열 배열에서 닫힌 원소들(=완성된 원소). 배열이 아직 안 열렸으면 빈 목록.
+    public static List<String> closedArrayItems(CharSequence partialJson, String field) {
+        Matcher open = Pattern.compile("\"" + field + "\"\\s*:\\s*\\[").matcher(partialJson);
+        if (!open.find()) {
+            return List.of();
+        }
+        List<String> values = new ArrayList<>();
+        // lookingAt으로 바로 앞 원소에 이어지는 것만 잡는다 - "]"를 만나면 거기서 멈춘다.
+        Matcher item = ARRAY_ITEM.matcher(partialJson);
+        for (int pos = open.end(); item.region(pos, partialJson.length()).lookingAt(); pos = item.end()) {
+            String value = decode(item.group(1));
+            if (value == null) {
+                break;
             }
             if (!value.isBlank()) {
                 values.add(value);

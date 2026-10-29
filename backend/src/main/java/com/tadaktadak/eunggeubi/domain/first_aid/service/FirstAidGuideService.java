@@ -1,5 +1,6 @@
 package com.tadaktadak.eunggeubi.domain.first_aid.service;
 
+import com.tadaktadak.eunggeubi.domain.ai_consultations.service.LlmStreaming;
 import com.tadaktadak.eunggeubi.domain.ai_consultations.service.RagRetrievalService;
 import com.tadaktadak.eunggeubi.domain.first_aid.dto.FirstAidGuideResponse;
 import com.tadaktadak.eunggeubi.domain.first_aid.dto.FirstAidSearchResponse;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -89,6 +91,14 @@ public class FirstAidGuideService {
     // 번호까지 붙어 한 순서처럼 보였다(실측). 목록에 없는 값은 거부한다 - 요청 값이 그대로 프롬프트와 캐시
     // 키에 들어가기 때문이다.
     public FirstAidGuideResponse getBySituation(String situation, String caseName) {
+        return getBySituation(situation, caseName, null);
+    }
+
+    // onPartial이 있으면 처음 만드는 가이드를 스트리밍으로 생성하면서, 완성된 step이 늘 때마다 지금까지의
+    // 가이드를 넘긴다(ordered는 아직 모르니 false). 재시도하면 빈 steps로 한 번 지운다. 캐시에 있으면 안 부른다.
+    // 반환값은 스트리밍이 아닐 때와 같은 최종 응답이다 - 번호(ordered)·제목은 이걸로 확정된다.
+    public FirstAidGuideResponse getBySituation(String situation, String caseName,
+                                                Consumer<FirstAidGuideResponse> onPartial) {
         String resolvedTopic = healthTopicResolver.resolve(situation)
                 .orElseThrow(() -> new IllegalArgumentException("해당 상황의 응급처치 정보를 찾을 수 없습니다."));
 
@@ -102,11 +112,17 @@ public class FirstAidGuideService {
             throw new IllegalArgumentException("해당 상황의 응급처치 정보를 찾을 수 없습니다.");
         }
 
-        Guide guide = guideFor(resolvedTopic, caseName)
+        // 생성 중 제목: 목록에 없는 주제는 최종 제목이 LLM이 지은 것이라 끝날 때 바뀔 수 있다.
+        String partialTitle = caseName != null
+                ? caseName + " 응급처치"
+                : titleFor(resolvedTopic, resolvedTopic + " 응급처치");
+        Consumer<List<String>> onSteps = onPartial == null ? null
+                : steps -> onPartial.accept(new FirstAidGuideResponse(situation, partialTitle, steps, false, List.of()));
+        Guide guide = guideFor(resolvedTopic, caseName, onSteps)
                 .orElseThrow(() -> new IllegalArgumentException("해당 상황의 응급처치 정보를 찾을 수 없습니다."));
         // situation은 호출자가 준 원래 표현(예: 프론트 칩 라벨 "기도막힘")을 그대로 돌려준다 - 내부적으로만
         // resolvedTopic(코퍼스 문서명, 예: "심폐소생술(이물질에 의한 기도폐쇄의 처치)")으로 검색한다.
-        String title = caseName != null ? caseName + " 응급처치" : titleFor(resolvedTopic, guide.raw());
+        String title = caseName != null ? caseName + " 응급처치" : titleFor(resolvedTopic, guide.raw().title());
         return FirstAidGuideResponse.of(situation, title, guide.raw(), guide.ordered());
     }
 
@@ -130,17 +146,17 @@ public class FirstAidGuideService {
                     resolvedTopic.get(), info.get().label() + " 응급처치", info.get().cases()));
         }
 
-        return guideFor(resolvedTopic.get(), null)
+        return guideFor(resolvedTopic.get(), null, null)
                 .map(guide -> FirstAidGuideResponse.of(
-                        resolvedTopic.get(), titleFor(resolvedTopic.get(), guide.raw()), guide.raw(), guide.ordered()));
+                        resolvedTopic.get(), titleFor(resolvedTopic.get(), guide.raw().title()), guide.raw(), guide.ordered()));
     }
 
     // 화면 제목은 검색 후보 카드와 같은 이름으로 맞춘다("베인 상처 (열상) 응급처치") - 카드를 누르고 들어온
-    // 사람이 같은 이름을 보게 한다. 응급처치 검색 목록에 없는 주제는 LLM이 지은 제목을 그대로 쓴다.
-    private String titleFor(String topic, RawFirstAidGuide raw) {
+    // 사람이 같은 이름을 보게 한다. 응급처치 검색 목록에 없는 주제는 fallback(LLM이 지은 제목)을 그대로 쓴다.
+    private String titleFor(String topic, String fallback) {
         return healthTopicResolver.findTopic(topic)
                 .map(info -> info.label() + " 응급처치")
-                .orElse(raw.title());
+                .orElse(fallback);
     }
 
     // 응급처치 검색창 전용. 가이드는 만들지 않고 후보 이름만 돌려준다 - 사용자가 고른 것만
@@ -163,7 +179,8 @@ public class FirstAidGuideService {
     // 조치 없음)는 캐싱하지 않는다 - 실패 원인(seed.csv 갱신, 재인덱싱)이 나중에 해소될 수 있어서
     // 매번 다시 시도하는 편이 안전하다.
     // caseName이 있으면 같은 참고자료로 그 세부 상황의 처치만 만들고, 캐시도 세부 상황별로 따로 둔다.
-    private Optional<Guide> guideFor(String topic, String caseName) {
+    // onSteps는 새로 생성할 때만 불린다(generateWithRetry 참고).
+    private Optional<Guide> guideFor(String topic, String caseName, Consumer<List<String>> onSteps) {
         String situation = caseName == null ? topic : "%s - %s".formatted(topic, caseName);
         Guide cached = guideCache.get(situation);
         if (cached != null) {
@@ -175,7 +192,7 @@ public class FirstAidGuideService {
             return Optional.empty();
         }
 
-        return generateWithRetry(situation, docs).map(raw -> {
+        return generateWithRetry(situation, docs, onSteps).map(raw -> {
             Guide guide = new Guide(raw, classifyOrdered(situation, raw.steps()));
             guideCache.put(situation, guide);
             return guide;
@@ -214,18 +231,26 @@ public class FirstAidGuideService {
     // 한 번은 빈 배열이 나오는 경우가 실측으로 확인됐다(LLM 샘플링 편차). 그래서 여기서 최종적으로
     // Optional이 채워져 돌아오면 steps가 비어있지 않음을 호출부(getBySituation/search)가 보장받는다 -
     // MAX_ATTEMPTS를 다 써도 계속 비어있으면 그때는 정말 현장 조치가 없는 것으로 보고 empty를 반환한다.
-    private Optional<RawFirstAidGuide> generateWithRetry(String topic, List<Document> docs) {
+    private Optional<RawFirstAidGuide> generateWithRetry(String topic, List<Document> docs,
+                                                         Consumer<List<String>> onSteps) {
         String userPrompt = "[상황]\n%s\n\n[참고자료]\n%s"
                 .formatted(topic, ragRetrievalService.buildContext(prioritizeHazardRemoval(docs)));
 
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             RawFirstAidGuide raw;
             try {
-                raw = chatClient.prompt()
-                        .system(FirstAidPrompts.FIRST_AID_PROMPT)
-                        .user(userPrompt)
-                        .call()
-                        .entity(RawFirstAidGuide.class);
+                if (onSteps == null) {
+                    raw = chatClient.prompt()
+                            .system(FirstAidPrompts.FIRST_AID_PROMPT)
+                            .user(userPrompt)
+                            .call()
+                            .entity(RawFirstAidGuide.class);
+                } else {
+                    if (attempt > 1) {
+                        onSteps.accept(List.of()); // 실패한 시도에서 보낸 step은 지운다
+                    }
+                    raw = streamGuide(userPrompt, onSteps);
+                }
             } catch (Exception e) {
                 log.warn("응급처치 가이드 LLM 호출이 실패했습니다 (시도 {}/{}). topic=\"{}\"", attempt, MAX_ATTEMPTS, topic, e);
                 continue;
@@ -244,6 +269,19 @@ public class FirstAidGuideService {
             return Optional.of(raw);
         }
         return Optional.empty();
+    }
+
+    // 받는 중에 닫힌 steps 원소(=완성된 step)가 늘 때마다 지금까지의 steps를 넘긴다.
+    private RawFirstAidGuide streamGuide(String userPrompt, Consumer<List<String>> onSteps) {
+        int[] sent = {0};
+        return LlmStreaming.stream(chatClient, FirstAidPrompts.FIRST_AID_PROMPT, userPrompt, RawFirstAidGuide.class,
+                buffer -> {
+                    List<String> steps = LlmStreaming.closedArrayItems(buffer, "steps");
+                    if (steps.size() > sent[0]) {
+                        sent[0] = steps.size();
+                        onSteps.accept(steps);
+                    }
+                });
     }
 
     // RawFirstAidGuide는 sourceIndexes를 안 쓰므로(title/steps만), 순서를 바꿔도 인용 번호가 깨질 일이

@@ -17,6 +17,18 @@ class LlmStreamingTest {
     }
 
     @Test
+    void 배열에서_닫힌_원소만_뽑는다() {
+        String partial = "{\"title\":\"화상 응급처치\",\"steps\":[\"전원을 차단합니다.\", \"찬물로 \\\"식힙니다\\\".\",\"병원에";
+
+        assertThat(LlmStreaming.closedArrayItems("{\"title\":\"화상", "steps")).isEmpty();
+        assertThat(LlmStreaming.closedArrayItems(partial, "steps"))
+                .containsExactly("전원을 차단합니다.", "찬물로 \"식힙니다\".");
+        // 배열이 닫힌 뒤의 문자열은 원소가 아니다.
+        assertThat(LlmStreaming.closedArrayItems(partial + " 갑니다.\"],\"note\":\"x\"}", "steps"))
+                .containsExactly("전원을 차단합니다.", "찬물로 \"식힙니다\".", "병원에 갑니다.");
+    }
+
+    @Test
     void 안_닫힌_값에서는_끝난_문장까지만_뽑는다() {
         String partial = "{\"message\":\"체온이 38.5도 이상이면 해열제를 드세요. 물을 충분히";
 
