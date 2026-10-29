@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { showAlert } from '../../../shared/dialog';
@@ -70,22 +70,13 @@ export default function ConsultationDetailScreen() {
   const [messages, setMessages] = useState<ConsultationMessage[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const detail = await getConsultationDetail(sessionId);
-      setMessages(detail.messages);
-    } catch (e: any) {
-      showAlert('오류', e?.message ?? '상담 내역을 불러오지 못했어요.');
-    } finally {
-      setLoading(false);
-    }
-  }, [sessionId]);
-
-  // 지난 기록은 바뀌지 않으므로 진입할 때 한 번만 부른다.
+  // 지난 기록은 바뀌지 않으므로 진입할 때 한 번만 부른다. loading 은 true 로 시작한다.
   useEffect(() => {
-    load();
-  }, [load]);
+    getConsultationDetail(sessionId)
+      .then((detail) => setMessages(detail.messages))
+      .catch((e: any) => showAlert('오류', e?.message ?? '상담 내역을 불러오지 못했어요.'))
+      .finally(() => setLoading(false));
+  }, [sessionId]);
 
   const firstDate = messages.length > 0 ? formatDate(messages[0].createdAt) : '';
 
