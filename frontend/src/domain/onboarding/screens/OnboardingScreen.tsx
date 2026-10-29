@@ -1,6 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ViewInstance } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -117,7 +118,7 @@ export default function OnboardingScreen({ onDone }: Props) {
   const spot = spots[current.key];
 
   // measureInWindow는 레이아웃이 끝난 뒤에야 값이 나온다. onLayout에서 불러 담아둔다.
-  const measure = useCallback((key: string, node: View | null, circle = false) => {
+  const measure = useCallback((key: string, node: ViewInstance | null, circle = false) => {
     node?.measureInWindow((x, y, w, h) => {
       if (!w || !h) return;
       // 원형이면 요소 한가운데에 고정 지름의 원을 올린다
@@ -158,11 +159,11 @@ export default function OnboardingScreen({ onDone }: Props) {
     return () => loop.stop();
   }, [pulse]);
 
-  const symptomRef = useRef<View>(null);
-  const erRef = useRef<View>(null);
-  const drugRef = useRef<View>(null);
-  const sosRef = useRef<View>(null);
-  const myRef = useRef<View>(null);
+  const symptomRef = useRef<ViewInstance>(null);
+  const erRef = useRef<ViewInstance>(null);
+  const drugRef = useRef<ViewInstance>(null);
+  const sosRef = useRef<ViewInstance>(null);
+  const myRef = useRef<ViewInstance>(null);
 
   // 증상칸 데모 타이핑. 1단계에서만 돈다.
   const [demo, setDemo] = useState(0);

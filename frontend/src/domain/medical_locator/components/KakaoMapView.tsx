@@ -18,6 +18,10 @@ export interface MapFitPoint {
   longitude: number;
 }
 
+interface WebViewHandle {
+  injectJavaScript: (script: string) => void;
+}
+
 interface KakaoMapViewProps {
   centerLatitude: number;
   centerLongitude: number;
@@ -296,7 +300,8 @@ export default function KakaoMapView({
   fitKey,
   onMarkerPress,
 }: KakaoMapViewProps) {
-  const webviewRef = useRef<WebView>(null);
+  // react-native-webview 14 의 타입 정의가 React 19.3 타입과 맞지 않아, 쓰는 메서드만 직접 정의한다
+  const webviewRef = useRef<WebViewHandle>(null);
 
   // 위치가 같으면 같은 HTML 이어야 WebView 가 다시 로드되지 않는다
   const html = useMemo(
@@ -327,6 +332,7 @@ export default function KakaoMapView({
 
   return (
     <WebView
+      // @ts-expect-error react-native-webview 14 의 ref 타입이 React 19.3 타입과 맞지 않음 (런타임에는 정상)
       ref={webviewRef}
       style={styles.webview}
       originWhitelist={['*']}

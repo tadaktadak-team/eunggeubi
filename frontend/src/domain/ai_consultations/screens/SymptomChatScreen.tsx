@@ -7,6 +7,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  ScrollViewInstance,
   StyleSheet,
   Text,
   TextInput,
@@ -39,7 +40,7 @@ export default function SymptomChatScreen() {
   } = useSymptomChat();
 
   const [inputText, setInputText] = useState('');
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const sentInitialRef = useRef(false);
 
   // 한도 초과로 거절되면 질문을 입력창에 되돌린다 - 그 사이 새로 친 게 있으면 그걸 덮지 않는다.
