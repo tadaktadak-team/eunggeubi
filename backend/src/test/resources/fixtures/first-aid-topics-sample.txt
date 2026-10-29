@@ -1,0 +1,6 @@
+# seed-sample.csv 중 응급처치 검색 목록에 넣을 주제 (HealthTopicResolverTest)
+[호흡]
+딸꾹질 | 딸꾹질 멈추기 | 딸꾹질이 멈추지 않을 때
+
+# seed에 없는 이름은 무시된다
+없는주제 | 없음 | 없음

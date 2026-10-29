@@ -7,15 +7,16 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { searchPills, PillSearchResponse } from '../api/pill';
 import { addRecentSearch } from '../storage/recentSearches';
 import DrugImage from '../components/DrugImage';
+import { useVisibleRowKeys, VISIBLE_ROW_CONFIG } from '../hooks/useVisibleRowKeys';
 
 const NUM_OF_ROWS = 20;
 
@@ -63,6 +64,8 @@ const PillSearchScreen = ({ navigation }: any) => {
   // 보이고 직접 스크롤해야 하는 문제가 있었다. 검색이 끝나면 필터 영역 높이만큼 자동으로 스크롤해
   // 결과(또는 "결과 없음" 안내)가 바로 보이게 한다.
   const listRef = useRef<FlatList<PillSearchResponse>>(null);
+  // 지금 화면에 보이는 행만 약 이미지를 요청한다(미리 그려 둔 화면 밖 행은 아이콘만 표시).
+  const { visibleKeys, onViewableItemsChanged } = useVisibleRowKeys();
   const headerHeightRef = useRef(0);
 
   const handleReset = () => {
@@ -73,7 +76,7 @@ const PillSearchScreen = ({ navigation }: any) => {
 
   const handleSearch = async () => {
     if (!printText.trim() && !selectedShape && !selectedColor) {
-      Alert.alert('조건 필요', '모양, 색상, 식별문자 중 하나는 입력해주세요.');
+      showAlert('조건 필요', '모양, 색상, 식별문자 중 하나는 입력해주세요.');
       return;
     }
     requestIdRef.current += 1;
@@ -95,7 +98,7 @@ const PillSearchScreen = ({ navigation }: any) => {
       shouldScrollRef.current = true;
     } catch (error) {
       console.error('낱알 특징 검색 오류:', error);
-      Alert.alert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
+      showAlert('검색 실패', '검색 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
     } finally {
       if (requestId === requestIdRef.current) setLoading(false);
     }
@@ -118,7 +121,7 @@ const PillSearchScreen = ({ navigation }: any) => {
       setPageNo(nextPage);
     } catch (error) {
       console.error('낱알 특징 검색 추가 로딩 오류:', error);
-      Alert.alert('불러오기 실패', '추가 결과를 불러오지 못했습니다. 다시 스크롤해 재시도해 주세요.');
+      showAlert('불러오기 실패', '추가 결과를 불러오지 못했습니다. 다시 스크롤해 재시도해 주세요.');
     } finally {
       fetchingMoreRef.current = false;
       setLoadingMore(false);
@@ -232,7 +235,10 @@ const PillSearchScreen = ({ navigation }: any) => {
         maxToRenderPerBatch={12}
         windowSize={7}
         removeClippedSubviews
-        renderItem={({ item }) => (
+        extraData={visibleKeys}
+        viewabilityConfig={VISIBLE_ROW_CONFIG}
+        onViewableItemsChanged={onViewableItemsChanged}
+        renderItem={({ item, index }) => (
           <TouchableOpacity
             style={styles.resultCard}
             onPress={() => {
@@ -245,7 +251,14 @@ const PillSearchScreen = ({ navigation }: any) => {
               navigation.navigate('DrugDetail', { itemSeq: item.itemSeq });
             }}
           >
-            <DrugImage uri={item.itemImage} name={item.itemName} size={56} style={styles.resultImage} />
+            <DrugImage
+              uri={item.itemImage}
+              name={item.itemName}
+              size={56}
+              style={styles.resultImage}
+              active={visibleKeys.has(item.itemSeq)}
+              order={index}
+            />
             <View style={styles.resultInfo}>
               <Text style={styles.resultName} numberOfLines={1}>
                 {item.itemName}

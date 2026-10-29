@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -73,6 +74,14 @@ public class AiConsultationService {
     // Data가 호출마다 개별 트랜잭션으로 처리하므로 그대로 안전하다. 대신 LLM 실패 시 이미 저장된
     // userMessage가 롤백되지 않고 남을 수 있다(응답 없는 사용자 메시지) - 감내 가능한 트레이드오프.
     public ConsultationResponse consult(ConsultationRequest request, Long userId, String clientIp) {
+        return consult(request, userId, clientIp, null);
+    }
+
+    // onPartial이 있으면 답변을 스트리밍으로 생성하면서, 완성된 문장이 늘어날 때마다 지금까지의 문장 전체를
+    // 넘긴다(출처 번호 없이 글만). 반환값은 스트리밍이 아닐 때와 똑같은 최종 응답이다 - 119 강제 안내·진단
+    // 가드·계통 보강은 다 만든 뒤에만 적용되니, 화면은 마지막에 이 응답으로 통째로 바꿔야 한다.
+    public ConsultationResponse consult(ConsultationRequest request, Long userId, String clientIp,
+                                        Consumer<List<ConsultationResponse.AnswerSegment>> onPartial) {
         // 게스트는 이미 쓰던 guestCode가 있으면 그대로 쓰고(재발급하면 이전 메시지와 소유권이 끊어짐),
         // 없으면 새로 발급한다. 메시지가 하나도 없는 코드(지어낸 값, 가입으로 계정에 이전돼 비워진 값)도
         // 새 발급으로 취급한다 - 안 그러면 아무 값이나 보내서 횟수 제한을 초기화할 수 있다.
@@ -130,7 +139,8 @@ public class AiConsultationService {
         GenerationResult result = docs.isEmpty()
                 ? GenerationResult.noResult()
                 : ensureMultiInterpretationCoverage(
-                        generate(request.query(), docs, buildConversationHistory(priorTurns), healthProfileSummary),
+                        generate(request.query(), docs, buildConversationHistory(priorTurns), healthProfileSummary,
+                                onPartial),
                         docGroups, docs);
 
         AiConsultation aiMessage = aiConsultationRepository.save(AiConsultation.builder()
@@ -281,7 +291,8 @@ public class AiConsultationService {
     }
 
     private GenerationResult generate(
-            String query, List<Document> docs, String conversationHistory, String healthProfileSummary) {
+            String query, List<Document> docs, String conversationHistory, String healthProfileSummary,
+            Consumer<List<ConsultationResponse.AnswerSegment>> onPartial) {
         StringBuilder userPrompt = new StringBuilder();
         if (!conversationHistory.isBlank()) {
             userPrompt.append("[이전 대화]\n").append(conversationHistory).append("\n\n");
@@ -292,7 +303,7 @@ public class AiConsultationService {
         userPrompt.append("[참고자료]\n").append(ragRetrievalService.buildContext(docs))
                 .append("\n\n[질문]\n").append(query);
 
-        RawAnswer raw = generateRawAnswer(query, userPrompt.toString());
+        RawAnswer raw = generateRawAnswer(query, userPrompt.toString(), onPartial);
         if (raw == null) {
             return GenerationResult.generationFailed();
         }
@@ -351,15 +362,23 @@ public class AiConsultationService {
     // LLM 호출 자체가 실패(타임아웃/429/네트워크 오류)하거나 스키마를 벗어난 JSON(예: segments 누락)을
     // 내놓는 경우가 실제로 있었다 - 둘 다 재시도 대상으로 묶는다(ChecklistService.generateItemsWithRetry
     // 와 같은 구조). 모두 실패하면 null을 돌려주고, 호출부가 GenerationResult.generationFailed()로 처리한다.
-    private RawAnswer generateRawAnswer(String query, String userPrompt) {
+    private RawAnswer generateRawAnswer(String query, String userPrompt,
+                                       Consumer<List<ConsultationResponse.AnswerSegment>> onPartial) {
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             RawAnswer raw;
             try {
-                raw = chatClient.prompt()
-                        .system(AiConsultationPrompts.CONSULT_PROMPT)
-                        .user(userPrompt)
-                        .call()
-                        .entity(RawAnswer.class);
+                if (onPartial == null) {
+                    raw = chatClient.prompt()
+                            .system(AiConsultationPrompts.CONSULT_PROMPT)
+                            .user(userPrompt)
+                            .call()
+                            .entity(RawAnswer.class);
+                } else {
+                    if (attempt > 1) {
+                        onPartial.accept(List.of()); // 실패한 시도에서 보낸 문장은 지운다
+                    }
+                    raw = streamRawAnswer(userPrompt, onPartial);
+                }
             } catch (Exception e) {
                 log.warn("1차 답변 LLM 호출이 실패했습니다 (시도 {}/{}). query=\"{}\"", attempt, MAX_ATTEMPTS, query, e);
                 continue;
@@ -371,6 +390,32 @@ public class AiConsultationService {
                     attempt, MAX_ATTEMPTS, query, raw);
         }
         return null;
+    }
+
+    // 받는 중에는 닫힌 "text" 값(=완성된 문장)이 늘 때마다 onPartial로 넘긴다. 진단형 표현이 섞인 문장이
+    // 나오면 그때부터 안 보낸다 - 최종 응답이 어차피 폴백 문구로 바뀌니, 진단 문장이 화면에 잠깐이라도
+    // 보이지 않게 하는 것.
+    private RawAnswer streamRawAnswer(String userPrompt, Consumer<List<ConsultationResponse.AnswerSegment>> onPartial) {
+        int[] sent = {0};
+        boolean[] blocked = {false};
+        return LlmStreaming.stream(chatClient, AiConsultationPrompts.CONSULT_PROMPT, userPrompt, RawAnswer.class,
+                buffer -> {
+                    if (blocked[0]) {
+                        return;
+                    }
+                    List<String> texts = LlmStreaming.closedStrings(buffer, "text");
+                    if (texts.size() <= sent[0]) {
+                        return;
+                    }
+                    if (texts.stream().anyMatch(DiagnosisLanguageGuard::containsDiagnosticLanguage)) {
+                        blocked[0] = true;
+                        return;
+                    }
+                    sent[0] = texts.size();
+                    onPartial.accept(texts.stream()
+                            .map(text -> new ConsultationResponse.AnswerSegment(text, List.of()))
+                            .toList());
+                });
     }
 
     private void saveReferenceSources(Long consultationId, List<ConsultationResponse.Source> sources) {

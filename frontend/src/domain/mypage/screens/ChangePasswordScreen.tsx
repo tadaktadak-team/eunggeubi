@@ -1,8 +1,9 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { saveTokens } from '../../../shared/storage/tokenStorage';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
@@ -41,7 +42,7 @@ export default function ChangePasswordScreen() {
   const onSave = async () => {
     const error = validate();
     if (error) {
-      Alert.alert('입력 확인', error);
+      showAlert('입력 확인', error);
       return;
     }
     try {
@@ -50,12 +51,12 @@ export default function ChangePasswordScreen() {
       //서버가 기존 토큰을 전부 폐기 -> 새로 받은 토큰으로 교체해야 이 기기의 로그인이 유지
       await saveTokens(tokens.accessToken, tokens.refreshToken);
 
-      Alert.alert('변경 완료', '비밀번호가 변경됐어요.\n다른 기기에서는 로그아웃 처리했어요.', [
+      showAlert('변경 완료', '비밀번호가 변경됐어요.\n다른 기기에서는 로그아웃 처리했어요.', [
         { text: '확인', onPress: () => navigation.goBack() },
       ]);
     } catch (e: any) {
       //현재 비밀번호 불일치 등 서버 메시지를 그대로 노출
-      Alert.alert('변경 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('변경 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSaving(false);
     }

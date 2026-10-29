@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { AnswerChatMessage, AnswerSource } from '../types';
 import AiAvatar from './AiAvatar';
+import { groupSourceLines } from './groupSourceLines';
 
 type Props = {
   message: AnswerChatMessage;
@@ -41,9 +42,9 @@ export default function AnswerCard({ message }: Props) {
               <Ionicons name="document-text-outline" size={12} color={colors.placeholder} />
               <Text style={styles.sourceHeaderText}>출처</Text>
             </View>
-            {sources.map((source) => (
-              <Text key={source.cntntsSn || `${source.disease}-${source.section}`} style={styles.sourceLine}>
-                {source.disease} · {source.section}
+            {groupSourceLines(sources).map((line) => (
+              <Text key={line} style={styles.sourceLine}>
+                {line}
               </Text>
             ))}
           </View>

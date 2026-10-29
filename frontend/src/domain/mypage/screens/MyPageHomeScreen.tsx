@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CompositeNavigationProp, useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { getConsultations } from '../api/consultation';
@@ -11,6 +11,7 @@ import { getHealthProfile } from '../api/health';
 import { getMyInfo } from '../api/user';
 import { ConsultationSummary, Guardian, HealthProfile, MyInfo, MyPageStackParamList } from '../types';
 import { RootStackParamList } from '../../../navigation/types';
+import { showAlert } from '../../../shared/dialog';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { useAuth } from '../../auth/hooks/useAuth';
 
@@ -83,7 +84,7 @@ export default function MyPageHomeScreen() {
       setHealth(profile);
       setConsultations(consultationList);
     } catch (e: any) {
-      Alert.alert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
+      showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
     } finally {
       setLoading(false);
     }
@@ -105,7 +106,7 @@ export default function MyPageHomeScreen() {
   const menus = MENUS.filter((m) => !(m.key === 'password' && myInfo?.socialOnly));
 
   const onLogout = () =>
-    Alert.alert('로그아웃', '로그아웃 하시겠어요?', [
+    showAlert('로그아웃', '로그아웃 하시겠어요?', [
       { text: '취소', style: 'cancel' },
       { text: '로그아웃', style: 'destructive', onPress: () => signOut() },
     ]);

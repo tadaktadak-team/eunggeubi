@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+} from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
+import { showAlert } from '../../../shared/dialog';
 import AppHeader from '../../../shared/components/AppHeader';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { checkInteractions, InteractionResponse } from '../api/interaction';
@@ -45,7 +53,7 @@ const InteractionCheckScreen = ({ navigation, route }: any) => {
 
   const handleCheck = async () => {
     if (selectedDrugs.length < 2) {
-      Alert.alert('약물 추가 필요', '비교할 약물을 2개 이상 추가해 주세요.');
+      showAlert('약물 추가 필요', '비교할 약물을 2개 이상 추가해 주세요.');
       return;
     }
     try {
@@ -55,7 +63,7 @@ const InteractionCheckScreen = ({ navigation, route }: any) => {
       setHasChecked(true);
     } catch (error) {
       console.error('상호작용 체크 오류:', error);
-      Alert.alert('확인 실패', '상호작용 확인 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
+      showAlert('확인 실패', '상호작용 확인 중 오류가 발생했습니다. 서버 연결 상태를 확인해 주세요.');
     } finally {
       setChecking(false);
     }
