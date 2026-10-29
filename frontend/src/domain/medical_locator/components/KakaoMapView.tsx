@@ -39,6 +39,11 @@ const HTML_TEMPLATE = `
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <style>
     html, body, #map { width: 100%; height: 100%; margin: 0; padding: 0; }
+    /* WebView 기본 글꼴(iOS 는 Times 계열)이 앱 글꼴과 달라 보여서, 앱과 같은 시스템 글꼴을 쓴다 */
+    html, body {
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
     .label {
       color: #fff; padding: 6px 12px; border-radius: 16px;
       font-size: 13px; font-weight: 700; white-space: nowrap;
@@ -62,8 +67,25 @@ const HTML_TEMPLATE = `
     var lastFitKey = null;
     var lastFitSig = null;
     var CENTER = null;
+    var FONT = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", Roboto, "Noto Sans KR", "Malgun Gothic", sans-serif';
 
-    function svgIcon(category, color, size) {
+    // 같은 자리로 볼 거리(약 10m). 이 안에 있는 핀들은 서로 벌려서 그린다
+    function spotKey(d) {
+      return d.latitude.toFixed(4) + ',' + d.longitude.toFixed(4);
+    }
+
+    // 같은 자리 핀 n개를 원 위에 고르게 놓을 때 i번째 핀의 픽셀 이동량
+    function spreadOffset(i, n) {
+      if (n <= 1) return { dx: 0, dy: 0 };
+      // 이웃한 핀 사이가 핀 지름(36px)보다 넓도록 개수에 맞춰 원 크기를 키운다
+      var r = Math.max(20, Math.ceil(19 / Math.sin(Math.PI / n)));
+      var angle = -Math.PI / 2 + (2 * Math.PI * i) / n;
+      return { dx: Math.round(r * Math.cos(angle)), dy: Math.round(r * Math.sin(angle)) };
+    }
+
+    function svgIcon(category, color, size, dx, dy) {
+      dx = dx || 0;
+      dy = dy || 0;
       var inner;
       if (category === '병원') {
         inner = '<rect x="17" y="9" width="6" height="22" rx="1.5" fill="#fff"/>' +
@@ -86,7 +108,8 @@ const HTML_TEMPLATE = `
       return new kakao.maps.MarkerImage(
         'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
         new kakao.maps.Size(size, size),
-        { offset: new kakao.maps.Point(size / 2, size / 2) }
+        // offset 은 '이미지의 어느 점을 좌표에 맞출지'라서, 빼면 그만큼 핀이 옆으로 이동한다
+        { offset: new kakao.maps.Point(size / 2 - dx, size / 2 - dy) }
       );
     }
 
@@ -129,7 +152,8 @@ const HTML_TEMPLATE = `
             background: 'rgba(187,210,240,0.92)',
             borderRadius: '50%',
             color: '#1a3d73',
-            fontWeight: 'bold',
+            fontFamily: FONT,
+            fontWeight: '700',
             fontSize: '15px',
             textAlign: 'center',
             lineHeight: size + 'px'
@@ -148,10 +172,11 @@ const HTML_TEMPLATE = `
     });
 
     function setSelected(id) {
+      if (id === selectedId && (!id || entries[id])) return;
       // 이전 선택 해제: 일반 크기로 되돌리고 클러스터에 다시 넣는다
       if (selectedId && entries[selectedId]) {
         var prev = entries[selectedId];
-        prev.marker.setImage(svgIcon(prev.data.category, prev.data.color, 36));
+        prev.marker.setImage(svgIcon(prev.data.category, prev.data.color, 36, prev.dx, prev.dy));
         prev.marker.setZIndex(1);
         clusterer.addMarker(prev.marker);
       }
@@ -162,7 +187,7 @@ const HTML_TEMPLATE = `
         var cur = entries[id];
         // 선택된 핀은 묶이지 않고 크게 보이며 이름표가 붙는다
         clusterer.removeMarker(cur.marker);
-        cur.marker.setImage(svgIcon(cur.data.category, cur.data.color, 46));
+        cur.marker.setImage(svgIcon(cur.data.category, cur.data.color, 46, cur.dx, cur.dy));
         cur.marker.setZIndex(10);
         cur.marker.setMap(map);
 
@@ -170,6 +195,8 @@ const HTML_TEMPLATE = `
         label.className = 'label';
         label.style.background = cur.data.color;
         label.innerText = cur.data.name;
+        // 이름표도 벌려진 핀 위치를 따라간다
+        label.style.transform = 'translate(' + cur.dx + 'px,' + cur.dy + 'px)';
         labelOverlay = new kakao.maps.CustomOverlay({
           position: cur.marker.getPosition(), content: label, yAnchor: 1.7, zIndex: 11
         });
@@ -201,10 +228,29 @@ const HTML_TEMPLATE = `
           zIndex: 1
         });
         kakao.maps.event.addListener(marker, 'click', function () { post({ type: 'MARKER_PRESS', id: d.id }); });
-        entries[d.id] = { marker: marker, data: d };
+        entries[d.id] = { marker: marker, data: d, dx: 0, dy: 0 };
         added.push(marker);
       });
       if (added.length) clusterer.addMarkers(added);
+
+      // 같은 자리 핀끼리 묶어서 원 모양으로 벌린다. 위치가 바뀐 핀만 이미지를 다시 만든다
+      var groups = {};
+      list.forEach(function (d) {
+        var k = spotKey(d);
+        (groups[k] = groups[k] || []).push(d.id);
+      });
+      Object.keys(groups).forEach(function (k) {
+        var ids = groups[k];
+        ids.forEach(function (id, i) {
+          var e = entries[id];
+          var o = spreadOffset(i, ids.length);
+          if (e.dx === o.dx && e.dy === o.dy) return;
+          e.dx = o.dx;
+          e.dy = o.dy;
+          var size = id === selectedId ? 46 : 36;
+          e.marker.setImage(svgIcon(e.data.category, e.data.color, size, e.dx, e.dy));
+        });
+      });
     }
 
     function fit(points, key) {
