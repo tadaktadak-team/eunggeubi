@@ -86,10 +86,6 @@ export default function MedicalLocatorScreen() {
     loadInitialData();
   }, []);
 
-  useEffect(() => {
-    setVisibleCount(5);
-  }, [filter, searchText]);
-
   // 위치 확보까지만 담당. 실패하면 화면 전체를 에러로 보여줘야 하는 전제조건이라 그대로 try/catch.
   async function loadInitialData() {
     let permissionDenied = false;
@@ -386,7 +382,10 @@ export default function MedicalLocatorScreen() {
             placeholder="의료기관 이름 찾기"
             placeholderTextColor={colors.placeholder}
             value={searchText}
-            onChangeText={setSearchText}
+            onChangeText={(text) => {
+              setSearchText(text);
+              setVisibleCount(5);
+            }}
             returnKeyType="search"
           />
           <Feather name="search" size={18} color={colors.placeholder} />
@@ -415,6 +414,7 @@ export default function MedicalLocatorScreen() {
               onPress={() => {
                 setFilter(item.key);
                 setSelectedId(null);
+                setVisibleCount(5);
               }}
             >
               {item.label}
