@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -47,21 +47,27 @@ export default function AccountEditScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // 화면에 들어올 때 내 정보를 한 번 불러온다. loading 은 true 로 시작한다.
-  useEffect(() => {
-    getMyInfo()
-      .then((info) => {
-        setEmail(info.email);
-        setName(info.name);
-        setPhone(toDigits(info.phone));
-        setOriginalPhone(toDigits(info.phone));
-        setBirth(toDigits(info.birthDate));
-        setGender(info.gender);
-        setAddress(info.address ?? '');
-      })
-      .catch((e: any) => showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.'))
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const info = await getMyInfo();
+      setEmail(info.email);
+      setName(info.name);
+      setPhone(toDigits(info.phone));
+      setOriginalPhone(toDigits(info.phone));
+      setBirth(toDigits(info.birthDate));
+      setGender(info.gender);
+      setAddress(info.address ?? '');
+    } catch (e: any) {
+      showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const phoneChanged = phone !== originalPhone;
   const phoneVerified = phoneChanged && verifiedPhone === phone;

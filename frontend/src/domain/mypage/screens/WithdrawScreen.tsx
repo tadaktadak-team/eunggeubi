@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -38,13 +38,21 @@ export default function WithdrawScreen() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
-  // 화면에 들어올 때 소셜 전용 계정인지 한 번 확인한다. loading 은 true 로 시작한다.
-  useEffect(() => {
-    getMyInfo()
-      .then((info) => setSocialOnly(info.socialOnly))
-      .catch((e: any) => showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.'))
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const info = await getMyInfo();
+      setSocialOnly(info.socialOnly);
+    } catch (e: any) {
+      showAlert('오류', e?.message ?? '내 정보를 불러오지 못했어요.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const runWithdraw = async () => {
     try {
