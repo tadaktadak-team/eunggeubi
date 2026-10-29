@@ -91,15 +91,14 @@ export interface ChecklistItem {
 export const QUICK_SYMPTOMS = ['두통', '복통', '발열', '어지럼'] as const;
 export type QuickSymptom = (typeof QUICK_SYMPTOMS)[number];
 
-// 응급처치 안내 화면의 "빠른 선택" 칩 - 백엔드는 이 4개로 제한하지 않고 health_info 컬렉션에 있는
-// 어떤 상황이든 검색/조회할 수 있어서(FirstAidGuideService), situation은 고정 유니온이 아니라
-// 일반 문자열이다. 이 목록은 화면에 기본으로 보여줄 추천 칩일 뿐이다.
-export const FIRST_AID_SITUATIONS = ['화상', '코피', '골절', '기도막힘'] as const;
+// 백엔드는 health_info 컬렉션에 있는 어떤 상황이든 검색/조회할 수 있어서(FirstAidGuideService),
+// situation은 고정 유니온이 아니라 일반 문자열이다.
 export type FirstAidSituation = string;
 
 // AI상담 탭 내부 네비게이션
 export type AiConsultationStackParamList = {
   SymptomHome: undefined;
-  SymptomChat: { initialMessage?: string } | undefined;
+  // sessionId가 있으면 그 상담의 지난 대화를 불러와 이어서 묻는다(홈의 "최근 상담 이어가기").
+  SymptomChat: { initialMessage?: string; sessionId?: string } | undefined;
   FirstAidGuide: { situation?: FirstAidSituation } | undefined;
 };

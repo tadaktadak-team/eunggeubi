@@ -9,6 +9,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
@@ -53,9 +56,12 @@ public class RagRetrievalService {
     // keywordScore의 질병명 완전일치 가산점(아래 keywordScore 메서드 참고)과 같은 값 - 이 값 이상이면
     // "질병명이 쿼리와 완전히 같다"는 뜻이라 byExactMatchThenRrf 정렬에서 최우선으로 끌어올린다.
     private static final double EXACT_MATCH_KEYWORD_SCORE = 3.0;
+    // rerankHybrid 결과에서 한 질병이 차지할 수 있는 최대 청크 수(아래 rerankHybrid 참고).
+    private static final int MAX_CHUNKS_PER_DISEASE = 3;
 
     private final VectorStore vectorStore;
     private final ChatClient chatClient;
+    private final Executor ragSearchExecutor; // AsyncConfig - 빈 이름과 필드 이름으로 매칭된다
 
     // 사용자의 일상어 표현을 검색용 의학 용어로 바꾼다(예: "발이 부어요" -> "부종 다리 발목 붓기") -
     // 실제로 이렇게 안 바꾸면 관련 문서가 top-K 밖으로 밀려서 검색이 아예 안 되는 경우가 있었다.
@@ -110,11 +116,17 @@ public class RagRetrievalService {
         // 절대 점수가 더 높게 나옴), 합친 뒤 점수로 한 번 더 자르면 점수가 낮은 해석이 통째로
         // 밀려날 수 있다 - 그래서 해석마다 TOP_K를 공평하게 나눠 갖고, 그 안에서만 점수순으로 뽑는다.
         int perInterpretation = Math.max(1, TOP_K / interpretations.length);
+        // 해석별 검색(임베딩 API + Qdrant 왕복)은 서로 독립이라 동시에 보낸다 - 순서대로 하면 해석 수만큼
+        // 지연이 쌓인다. 중복 제거는 다 모은 뒤 원래 해석 순서대로 해서, 앞 해석이 먼저 가져가는 규칙은 같다.
+        List<CompletableFuture<List<Document>>> searches = Arrays.stream(interpretations)
+                .map(interpretation -> CompletableFuture.supplyAsync(
+                        () -> search(interpretation.trim(), perInterpretation), ragSearchExecutor))
+                .toList();
         Set<String> seenIds = new HashSet<>();
         List<List<Document>> groups = new ArrayList<>();
-        for (String interpretation : interpretations) {
+        for (CompletableFuture<List<Document>> search : searches) {
             List<Document> group = new ArrayList<>();
-            for (Document doc : search(interpretation.trim(), perInterpretation)) {
+            for (Document doc : join(search)) {
                 if (seenIds.add(doc.getId())) {
                     group.add(doc);
                 }
@@ -122,6 +134,15 @@ public class RagRetrievalService {
             groups.add(group);
         }
         return groups;
+    }
+
+    // 검색 실패를 순차 실행 때와 같은 예외로 그대로 던진다(CompletionException으로 감싸지 않게).
+    private static List<Document> join(CompletableFuture<List<Document>> search) {
+        try {
+            return search.join();
+        } catch (CompletionException e) {
+            throw e.getCause() instanceof RuntimeException cause ? cause : e;
+        }
     }
 
     private List<Document> search(String query, int topK) {
@@ -170,12 +191,27 @@ public class RagRetrievalService {
                 .thenComparingDouble(d -> keywordScoreById.get(d.getId()))
                 .reversed();
 
-        return candidates.stream()
+        List<Document> ranked = candidates.stream()
                 .filter(d -> (d.getScore() != null && d.getScore() >= SIMILARITY_THRESHOLD)
                         || keywordScoreById.get(d.getId()) > 0.0)
                 .sorted(byExactMatchThenRrf)
-                .limit(topK)
                 .toList();
+
+        // 한 질병이 topK를 독차지하지 않게 질병당 청크 수를 제한한다. 재작성된 검색어는 관련어를 나열해서
+        // ("벌 쏘임 벌침 곤충 알레르기 부종 통증") 그중 "알레르기"·"부종"처럼 질병명과 같은 단어가 완전일치
+        // 우선 규칙을 타면, 그 질병 청크 10여 개가 top 8을 다 채우고 벡터 1~3위였던 정답 문서("동물 및
+        // 곤충에 의한 응급상황")가 13위 밖으로 밀렸다(실측). 순위는 그대로 두고 넘치는 청크만 건너뛴다.
+        Map<Object, Integer> perDisease = new HashMap<>();
+        List<Document> result = new ArrayList<>();
+        for (Document d : ranked) {
+            if (result.size() >= topK) {
+                break;
+            }
+            if (perDisease.merge(d.getMetadata().get("disease"), 1, Integer::sum) <= MAX_CHUNKS_PER_DISEASE) {
+                result.add(d);
+            }
+        }
+        return result;
     }
 
     // 형태소분석기 없이 disease 메타데이터/본문/섹션명과의 substring 일치만으로 계산하는 키워드

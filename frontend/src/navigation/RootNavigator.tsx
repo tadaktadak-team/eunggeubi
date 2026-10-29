@@ -9,18 +9,21 @@ import LoginScreen from '../domain/auth/screens/LoginScreen';
 import SignupCompleteScreen from '../domain/auth/screens/SignupCompleteScreen';
 import SignupScreen from '../domain/auth/screens/SignupScreen';
 import SplashScreen from '../domain/auth/screens/SplashScreen';
-import EditProfileScreen from '../domain/user/screens/EditProfileScreen';
 import GuardianConsentScreen from '../domain/auth/screens/GuardianConsentScreen';
 import GuardianWaitingScreen from '../domain/auth/screens/GuardianWaitingScreen';
+import SocialConsentScreen from '../domain/auth/screens/SocialConsentScreen';
+import SocialExtraInfoScreen from '../domain/auth/screens/SocialExtraInfoScreen';
 import EmergencyResultScreen from '../domain/emergency/screens/EmergencyResultScreen';
 import DrugNavigator from '../domain/drug/screens/DrugNavigator';
 import LegalScreen from '../shared/screens/LegalScreen';
 import TabBar from '../shared/components/TabBar';
 import { RootStackParamList } from './types';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import LoginRequiredSheet from '../domain/auth/screens/../components/LoginRequiredSheet';
 import MyPageNavigator from '../domain/mypage/screens/MyPageNavigator';
 import MedicalLocatorScreen from '../domain/medical_locator/screens/MedicalLocatorScreen';
+import OnboardingScreen from '../domain/onboarding/screens/OnboardingScreen';
+import { hasSeenOnboarding, markOnboardingSeen } from '../shared/storage/onboardingStorage';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -46,13 +49,43 @@ function TabsNavigator() {
 export default function RootNavigator() {
   const { loading, isLoggedIn } = useAuth();
 
+  // 앱을 처음 연 사람에게만 둘러보기를 보여준다. 로그인 여부와 무관하게 먼저 뜬다 -
+  // 비회원도 AI 상담·병원찾기를 쓸 수 있어서 설명이 먼저 필요하다.
+  // null은 "아직 확인 중"이라 그동안은 스플래시를 띄운다.
+  const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    hasSeenOnboarding()
+      .then((seen) => setNeedsOnboarding(!seen))
+      .catch(() => setNeedsOnboarding(false));
+  }, []);
+
+  const finishOnboarding = () => {
+    setNeedsOnboarding(false);
+    markOnboardingSeen().catch(console.error);
+  };
+
+  if (needsOnboarding === null || loading) {
+    return (
+      <SafeAreaProvider>
+        <SplashScreen />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (needsOnboarding) {
+    return (
+      <SafeAreaProvider>
+        <OnboardingScreen onDone={finishOnboarding} />
+      </SafeAreaProvider>
+    );
+  }
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          {loading ? (
-            <Stack.Screen name="Splash" component={SplashScreen} />
-          ) : !isLoggedIn ? (
+          {!isLoggedIn ? (
             <>
               <Stack.Screen name="Login" component={LoginScreen} />
               <Stack.Screen name="Signup" component={SignupScreen} />
@@ -60,6 +93,8 @@ export default function RootNavigator() {
               <Stack.Screen name="GuardianConsent" component={GuardianConsentScreen} />
               <Stack.Screen name="GuardianWaiting" component={GuardianWaitingScreen} />
               <Stack.Screen name="FindAccount" component={FindAccountScreen} />
+              <Stack.Screen name="SocialConsent" component={SocialConsentScreen} />
+              <Stack.Screen name="SocialExtraInfo" component={SocialExtraInfoScreen} />
                             <Stack.Screen name="Tabs" component={TabsNavigator} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
               <Stack.Screen name="Legal" component={LegalScreen} />
@@ -67,7 +102,6 @@ export default function RootNavigator() {
           ) : (
             <>
               <Stack.Screen name="Tabs" component={TabsNavigator} />
-              <Stack.Screen name="EditProfile" component={EditProfileScreen} />
               <Stack.Screen name="EmergencyResult" component={EmergencyResultScreen} />
               <Stack.Screen name="Legal" component={LegalScreen} />
             </>

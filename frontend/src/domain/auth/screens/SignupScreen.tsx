@@ -3,8 +3,6 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -17,12 +15,27 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
+import { showAlert } from '../../../shared/dialog';
+import Button from '../../../shared/components/Button';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { formatPhone, toDigits } from '../../../shared/utils/phone';
 import { PASSWORD_RULE_TEXT, validatePassword } from '../../../shared/utils/password';
 import * as authApi from '../api/auth';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+// 입력 검증 결과는 모달이 아니라 해당 칸 아래에 띄운다 - 모달은 어느 칸이 틀렸는지 알려주지 못하고,
+// 확인을 눌러 닫아야 화면이 보이며, 틀린 칸이 여러 개면 그 수만큼 반복된다.
+type FieldErrors = {
+  email?: string;
+  password?: string;
+  passwordConfirm?: string;
+  phone?: string;
+  code?: string;
+  name?: string;
+  birth?: string;
+  agree?: string;
+};
 
 export default function SignupScreen() {
   const navigation = useNavigation<Nav>();
@@ -42,47 +55,82 @@ export default function SignupScreen() {
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeSensitive, setAgreeSensitive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [codeNotice, setCodeNotice] = useState('');
+
+  // 사용자가 그 칸을 고치기 시작하면 해당 에러만 지운다 - 다른 칸의 에러는 그대로 둬야
+  // "아직 남은 게 무엇인지"가 계속 보인다.
+  const clearError = (field: keyof FieldErrors) =>
+    setErrors((prev) => (prev[field] === undefined ? prev : { ...prev, [field]: undefined }));
+
+  const setError = (field: keyof FieldErrors, message: string) =>
+    setErrors((prev) => ({ ...prev, [field]: message }));
 
   const sendCode = async () => {
-    if (!phone) return Alert.alert('전화번호', '전화번호를 입력해주세요.');
+    if (!phone.trim()) return setError('phone', '전화번호를 입력해주세요');
+    clearError('phone');
+    setCodeNotice('');
     try {
       await authApi.sendPhoneCode(phone.trim(), 'SIGNUP');
       setCodeSent(true);
-      Alert.alert('인증번호 발송', '인증번호를 발송했어요. 문자를 확인해주세요.');
+      setCodeNotice('인증번호를 보냈어요. 문자를 확인해주세요');
     } catch (e: any) {
-      Alert.alert('발송 실패', e?.message ?? '다시 시도해주세요.');
+      setError('phone', e?.message ?? '발송에 실패했어요. 잠시 후 다시 시도해주세요');
     }
   };
 
   const verifyCode = async () => {
-    if (!code) return Alert.alert('인증번호', '인증번호를 입력해주세요.');
+    if (!code.trim()) return setError('code', '인증번호를 입력해주세요');
+    clearError('code');
     try {
       await authApi.verifyPhoneCode(phone.trim(), 'SIGNUP', code.trim());
       setPhoneVerified(true);
-      Alert.alert('인증 완료', '휴대폰 인증이 완료됐어요.');
+      setCodeNotice('');
+      clearError('phone');
     } catch (e: any) {
-      Alert.alert('인증 실패', e?.message ?? '다시 시도해주세요.');
+      setError('code', e?.message ?? '인증번호가 맞지 않아요');
     }
   };
 
   const toISODate = (d: string) =>
     /^\d{8}$/.test(d) ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}` : null;
 
+  // 첫 번째 오류에서 멈추지 않고 전부 모아서 돌려준다 - 한 번 누르면 남은 문제를 한눈에 보게 한다.
+  const collectErrors = (): FieldErrors => {
+    const found: FieldErrors = {};
+
+    if (!email.trim()) found.email = '이메일을 입력해주세요';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) found.email = '이메일 형식이 올바르지 않아요';
+
+    if (!password) {
+      found.password = '비밀번호를 입력해주세요';
+    } else {
+      const pwCheck = validatePassword(password, { email: email.trim(), phone: phone.trim() });
+      if (!pwCheck.ok) found.password = pwCheck.message;
+    }
+
+    if (!passwordConfirm) found.passwordConfirm = '비밀번호를 한 번 더 입력해주세요';
+    else if (password !== passwordConfirm) found.passwordConfirm = '비밀번호가 일치하지 않아요';
+
+    if (!phone.trim()) found.phone = '전화번호를 입력해주세요';
+    else if (!phoneVerified) found.phone = '휴대폰 인증을 완료해주세요';
+
+    if (!name.trim()) found.name = '이름을 입력해주세요';
+
+    if (!birth) found.birth = '생년월일을 입력해주세요';
+    else if (!toISODate(birth)) found.birth = '8자리를 정확히 입력해주세요 (예: 19900101)';
+
+    if (!agreeTerms || !agreePrivacy || !agreeSensitive) found.agree = '필수 약관에 모두 동의해주세요';
+
+    return found;
+  };
+
   const onSubmit = async () => {
-    if (!email || !password || !name || !birth) {
-      return Alert.alert('입력 확인', '모든 필수 항목을 입력해주세요.');
-    }
-    const pwCheck = validatePassword(password, { email: email.trim(), phone: phone.trim() });
-    if (!pwCheck.ok) return Alert.alert('비밀번호 확인', pwCheck.message);
-    if (password !== passwordConfirm) {
-      return Alert.alert('비밀번호 확인', '비밀번호가 일치하지 않습니다.');
-    }
-    if (!phoneVerified) return Alert.alert('휴대폰 인증', '휴대폰 인증을 완료해주세요.');
-    const birthDate = toISODate(birth);
-    if (!birthDate) return Alert.alert('생년월일', '생년월일 8자리를 정확히 입력해주세요. (예: 19900101)');
-    if (!agreeTerms || !agreePrivacy || !agreeSensitive) {
-      return Alert.alert('약관 동의', '필수 약관에 동의해주세요.');
-    }
+    const found = collectErrors();
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    const birthDate = toISODate(birth)!;
 
     setSubmitting(true);
     try {
@@ -112,7 +160,7 @@ export default function SignupScreen() {
 
       // 이미 가입된 이메일이면 → 로그인 / 비밀번호 찾기로 유도
       if (msg.includes('이미 가입')) {
-        Alert.alert('이미 가입된 이메일', '이 이메일로 가입된 계정이 있어요.', [
+        showAlert('이미 가입된 이메일', '이 이메일로 가입된 계정이 있어요.', [
           { text: '로그인하기', onPress: () => navigation.navigate('Login') },
           {
             text: '비밀번호 찾기',
@@ -123,7 +171,7 @@ export default function SignupScreen() {
         return;
       }
 
-      Alert.alert('회원가입 실패', msg);
+      showAlert('회원가입 실패', msg);
     } finally {
       setSubmitting(false);
     }
@@ -148,23 +196,30 @@ export default function SignupScreen() {
       >
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <TextInput
-            style={styles.input}
+            style={[styles.input, errors.email && styles.inputError]}
             placeholder="이메일"
             placeholderTextColor={colors.placeholder}
             autoCapitalize="none"
             keyboardType="email-address"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(v) => {
+              setEmail(v);
+              clearError('email');
+            }}
           />
+          {errors.email && <Text style={styles.error}>{errors.email}</Text>}
 
-          <View style={styles.inputWrap}>
+          <View style={[styles.inputWrap, errors.password && styles.inputError]}>
             <TextInput
               style={styles.inputFlex}
               placeholder="비밀번호"
               placeholderTextColor={colors.placeholder}
               secureTextEntry={!showPassword}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={(v) => {
+                setPassword(v);
+                clearError('password');
+              }}
             />
             <TouchableOpacity onPress={() => setShowPassword((v) => !v)}>
               <Ionicons
@@ -174,72 +229,111 @@ export default function SignupScreen() {
               />
             </TouchableOpacity>
           </View>
-          <Text style={styles.hint}>{PASSWORD_RULE_TEXT}</Text>
+          {errors.password ? (
+            <Text style={styles.error}>{errors.password}</Text>
+          ) : (
+            <Text style={styles.hint}>{PASSWORD_RULE_TEXT}</Text>
+          )}
 
           <TextInput
-            style={styles.input}
+            style={[styles.input, errors.passwordConfirm && styles.inputError]}
             placeholder="비밀번호 확인"
             placeholderTextColor={colors.placeholder}
             secureTextEntry={!showPassword}
             value={passwordConfirm}
-            onChangeText={setPasswordConfirm}
+            onChangeText={(v) => {
+              setPasswordConfirm(v);
+              clearError('passwordConfirm');
+            }}
           />
+          {errors.passwordConfirm && <Text style={styles.error}>{errors.passwordConfirm}</Text>}
 
           <View style={styles.row}>
             <TextInput
-              style={[styles.input, styles.rowInput, phoneVerified && styles.inputDisabled]}
+              style={[
+                styles.input,
+                styles.rowInput,
+                phoneVerified && styles.inputDisabled,
+                errors.phone && styles.inputError,
+              ]}
               placeholder="010-0000-0000"
               placeholderTextColor={colors.placeholder}
               keyboardType="number-pad"
               value={formatPhone(phone)}
-              onChangeText={(v) => setPhone(toDigits(v))}
+              onChangeText={(v) => {
+                setPhone(toDigits(v));
+                clearError('phone');
+              }}
               editable={!phoneVerified}
             />
-            <TouchableOpacity
-              style={[styles.smallBtn, phoneVerified && styles.smallBtnDone]}
+            <Button
+              title={phoneVerified ? '완료' : '인증'}
+              variant={phoneVerified ? 'success' : 'neutral'}
               onPress={sendCode}
-              disabled={phoneVerified}
-            >
-              <Text style={styles.smallBtnText}>{phoneVerified ? '완료' : '인증'}</Text>
-            </TouchableOpacity>
+              done={phoneVerified}
+              textStyle={styles.smallBtnText}
+            />
           </View>
+          {errors.phone && <Text style={styles.error}>{errors.phone}</Text>}
+          {!errors.phone && !!codeNotice && <Text style={styles.notice}>{codeNotice}</Text>}
 
           {codeSent && !phoneVerified && (
-            <View style={styles.row}>
-              <TextInput
-                style={[styles.input, styles.rowInput]}
-                placeholder="인증번호 6자리"
-                placeholderTextColor={colors.placeholder}
-                keyboardType="number-pad"
-                value={code}
-                onChangeText={setCode}
-                maxLength={6}
-              />
-              <TouchableOpacity style={styles.smallBtn} onPress={verifyCode}>
-                <Text style={styles.smallBtnText}>확인</Text>
-              </TouchableOpacity>
-            </View>
+            <>
+              <View style={styles.row}>
+                <TextInput
+                  style={[styles.input, styles.rowInput, errors.code && styles.inputError]}
+                  placeholder="인증번호 6자리"
+                  placeholderTextColor={colors.placeholder}
+                  keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  value={code}
+                  onChangeText={(v) => {
+                    setCode(v);
+                    clearError('code');
+                  }}
+                  maxLength={6}
+                />
+                <Button
+                  title="확인"
+                  variant="neutral"
+                  onPress={verifyCode}
+                  textStyle={styles.smallBtnText}
+                />
+              </View>
+              {errors.code && <Text style={styles.error}>{errors.code}</Text>}
+            </>
           )}
           {phoneVerified && <Text style={styles.verifiedText}>✓ 휴대폰 인증 완료</Text>}
 
           <TextInput
-            style={styles.input}
+            style={[styles.input, errors.name && styles.inputError]}
             placeholder="이름"
             placeholderTextColor={colors.placeholder}
             value={name}
-            onChangeText={setName}
+            onChangeText={(v) => {
+              setName(v);
+              clearError('name');
+            }}
           />
+          {errors.name && <Text style={styles.error}>{errors.name}</Text>}
 
           <TextInput
-            style={styles.input}
+            style={[styles.input, errors.birth && styles.inputError]}
             placeholder="생년월일 (예: 19900101)"
             placeholderTextColor={colors.placeholder}
             keyboardType="number-pad"
             maxLength={8}
             value={birth}
-            onChangeText={setBirth}
+            onChangeText={(v) => {
+              setBirth(v);
+              clearError('birth');
+            }}
           />
-          <Text style={styles.hint}>만 14세 미만이면 다음 단계에서 보호자 동의가 필요해요</Text>
+          {errors.birth ? (
+            <Text style={styles.error}>{errors.birth}</Text>
+          ) : (
+            <Text style={styles.hint}>만 14세 미만이면 다음 단계에서 보호자 동의가 필요해요</Text>
+          )}
 
           <TextInput
             style={styles.input}
@@ -249,7 +343,7 @@ export default function SignupScreen() {
             onChangeText={setAddress}
           />
 
-          <TouchableOpacity style={styles.check} onPress={() => setAgreeTerms((v) => !v)}>
+          <TouchableOpacity style={styles.check} onPress={() => { setAgreeTerms((v) => !v); clearError('agree'); }}>
             <Ionicons
               name={agreeTerms ? 'checkbox' : 'square-outline'}
               size={22}
@@ -260,7 +354,7 @@ export default function SignupScreen() {
               <Text style={styles.checkLink}>보기</Text>
             </TouchableOpacity>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.check} onPress={() => setAgreePrivacy((v) => !v)}>
+          <TouchableOpacity style={styles.check} onPress={() => { setAgreePrivacy((v) => !v); clearError('agree'); }}>
             <Ionicons
               name={agreePrivacy ? 'checkbox' : 'square-outline'}
               size={22}
@@ -271,7 +365,7 @@ export default function SignupScreen() {
               <Text style={styles.checkLink}>보기</Text>
             </TouchableOpacity>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.check} onPress={() => setAgreeSensitive((v) => !v)}>
+          <TouchableOpacity style={styles.check} onPress={() => { setAgreeSensitive((v) => !v); clearError('agree'); }}>
             <Ionicons
               name={agreeSensitive ? 'checkbox' : 'square-outline'}
               size={22}
@@ -285,18 +379,9 @@ export default function SignupScreen() {
               <Text style={styles.checkLink}>보기</Text>
             </TouchableOpacity>
           </TouchableOpacity>
+          {errors.agree && <Text style={styles.error}>{errors.agree}</Text>}
 
-          <TouchableOpacity
-            style={[styles.nextBtn, submitting && { opacity: 0.6 }]}
-            onPress={onSubmit}
-            disabled={submitting}
-          >
-            {submitting ? (
-              <ActivityIndicator color={colors.white} />
-            ) : (
-              <Text style={styles.nextBtnText}>다음</Text>
-            )}
-          </TouchableOpacity>
+          <Button title="다음" onPress={onSubmit} loading={submitting} style={styles.nextBtn} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -339,28 +424,15 @@ const styles = StyleSheet.create({
   inputDisabled: { opacity: 0.6 },
   row: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
   rowInput: { flex: 1, marginBottom: 0, marginRight: spacing.sm },
-  smallBtn: {
-    backgroundColor: colors.text,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  smallBtnDone: { backgroundColor: colors.success },
-  smallBtnText: { color: colors.white, fontSize: font.sub, fontWeight: '700' },
+  smallBtnText: { fontSize: font.sub },
   verifiedText: { color: colors.success, fontSize: font.sub, marginBottom: spacing.md },
   hint: { color: colors.textSub, fontSize: font.caption, marginBottom: spacing.md, marginTop: -spacing.xs },
+  // 에러는 해당 칸 바로 아래에 붙는다. hint와 자리가 같아서 둘 중 하나만 보인다.
+  error: { color: colors.danger, fontSize: font.caption, marginBottom: spacing.md, marginTop: -spacing.xs },
+  notice: { color: colors.textSub, fontSize: font.caption, marginBottom: spacing.md, marginTop: -spacing.xs },
+  inputError: { borderWidth: 1, borderColor: colors.danger },
   check: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm },
   checkText: { flex: 1, marginLeft: spacing.sm, fontSize: font.sub, color: colors.text },
   checkLink: { fontSize: font.caption, color: colors.placeholder, textDecorationLine: 'underline' },
-  nextBtn: {
-    backgroundColor: colors.primary,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.lg,
-  },
-  nextBtnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  nextBtn: { marginTop: spacing.lg },
 });

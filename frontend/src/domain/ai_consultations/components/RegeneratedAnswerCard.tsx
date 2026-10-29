@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, font, radius, spacing } from '../../../shared/theme/theme';
 import { FirstAidSituation, RegeneratedAnswerChatMessage, RegeneratedSource } from '../types';
 import AiAvatar from './AiAvatar';
+import { groupSourceLines } from './groupSourceLines';
 
 type Props = {
   message: RegeneratedAnswerChatMessage;
@@ -47,9 +48,13 @@ export default function RegeneratedAnswerCard({ message, onPressAidGuide }: Prop
               <Ionicons name="document-text-outline" size={12} color={colors.placeholder} />
               <Text style={styles.sourceHeaderText}>출처</Text>
             </View>
-            {sources.map((source) => (
-              <Text key={source.referenceSourceId} style={styles.sourceLine}>
-                {source.title}
+            {groupSourceLines(sources.map(({ title }) => {
+              // title은 '두통 - 연관 증상' 형태로 온다.
+              const [disease, ...rest] = title.split(' - ');
+              return { disease, section: rest.join(' - ') };
+            })).map((line) => (
+              <Text key={line} style={styles.sourceLine}>
+                {line}
               </Text>
             ))}
           </View>

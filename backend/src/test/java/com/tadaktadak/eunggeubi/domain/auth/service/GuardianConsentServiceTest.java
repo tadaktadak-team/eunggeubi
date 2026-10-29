@@ -11,7 +11,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianRequest;
+import com.tadaktadak.eunggeubi.domain.auth.dto.GuardianConsentRequest;
 import com.tadaktadak.eunggeubi.domain.user.entity.Guardian;
 import com.tadaktadak.eunggeubi.domain.user.entity.Relationship;
 import com.tadaktadak.eunggeubi.domain.user.entity.User;
@@ -54,8 +54,8 @@ class GuardianConsentServiceTest {
         when(guardianRepository.save(any(Guardian.class))).thenAnswer(inv -> inv.getArgument(0));
     }
 
-    private GuardianRequest request() {
-        return new GuardianRequest("consent-token", "보호자", GUARDIAN_PHONE, Relationship.PARENT);
+    private GuardianConsentRequest request() {
+        return new GuardianConsentRequest("consent-token", "보호자", GUARDIAN_PHONE, Relationship.PARENT);
     }
 
     // ---- 가입 경로 ----

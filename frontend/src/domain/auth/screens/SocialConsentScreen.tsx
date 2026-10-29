@@ -1,18 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RootStackParamList } from '../../../navigation/types';
-import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { showAlert } from '../../../shared/dialog';
+import Button from '../../../shared/components/Button';
+import { colors, font, spacing } from '../../../shared/theme/theme';
 import { completeSocialSignup } from '../api/social';
 import { useAuth } from '../hooks/useAuth';
 
@@ -38,7 +33,7 @@ export default function SocialConsentScreen() {
 
   const onSubmit = async () => {
     if (!allChecked) {
-      Alert.alert('약관 동의', '필수 약관에 모두 동의해주세요.');
+      showAlert('약관 동의', '필수 약관에 모두 동의해주세요.');
       return;
     }
     setSubmitting(true);
@@ -51,7 +46,7 @@ export default function SocialConsentScreen() {
       await signInWithTokens(res);
       // 성공하면 AuthProvider가 로그인 상태로 바꿔 자동으로 홈으로 전환됨
     } catch (e: any) {
-      Alert.alert('가입 실패', e?.message ?? '다시 시도해주세요.');
+      showAlert('가입 실패', e?.message ?? '다시 시도해주세요.');
     } finally {
       setSubmitting(false);
     }
@@ -101,17 +96,13 @@ export default function SocialConsentScreen() {
           <Text style={styles.rowText}>[필수] 민감정보 처리 동의</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.btn, (!allChecked || submitting) && { opacity: 0.5 }]}
+        <Button
+          title="동의하고 시작하기"
           onPress={onSubmit}
-          disabled={!allChecked || submitting}
-        >
-          {submitting ? (
-            <ActivityIndicator color={colors.white} />
-          ) : (
-            <Text style={styles.btnText}>동의하고 시작하기</Text>
-          )}
-        </TouchableOpacity>
+          disabled={!allChecked}
+          loading={submitting}
+          style={styles.btn}
+        />
       </View>
     </SafeAreaView>
   );
@@ -127,13 +118,5 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.sm },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
   rowText: { marginLeft: spacing.sm, fontSize: font.sub, color: colors.text },
-  btn: {
-    marginTop: spacing.xxl,
-    backgroundColor: colors.primary,
-    height: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnText: { color: colors.white, fontSize: font.body, fontWeight: '700' },
+  btn: { marginTop: spacing.xxl },
 });
