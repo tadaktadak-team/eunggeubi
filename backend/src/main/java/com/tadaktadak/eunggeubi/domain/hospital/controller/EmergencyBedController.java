@@ -1,7 +1,7 @@
-package com.tadaktadak.eunggeubi.domain.emergency_bed.Controller;
+package com.tadaktadak.eunggeubi.domain.hospital.controller;
 
-import com.tadaktadak.eunggeubi.domain.emergency_bed.dto.EmergencyBedResponse;
-import com.tadaktadak.eunggeubi.domain.emergency_bed.service.EmergencyBedService;
+import com.tadaktadak.eunggeubi.domain.hospital.dto.EmergencyBedResponse;
+import com.tadaktadak.eunggeubi.domain.hospital.service.EmergencyBedService;
 import com.tadaktadak.eunggeubi.global.validation.KoreaLatitude;
 import com.tadaktadak.eunggeubi.global.validation.KoreaLongitude;
 import jakarta.validation.constraints.Pattern;
