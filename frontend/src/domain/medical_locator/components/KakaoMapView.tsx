@@ -44,11 +44,6 @@ const HTML_TEMPLATE = `
       font-size: 13px; font-weight: 700; white-space: nowrap;
       box-shadow: 0 1px 4px rgba(0,0,0,0.3); pointer-events: none;
     }
-    .cluster {
-      display: flex; align-items: center; justify-content: center;
-      border-radius: 50%; background: rgba(187,210,240,0.92);
-      color: #1a3d73; font-weight: 700; font-size: 15px;
-    }
   </style>
 </head>
 <body>
@@ -126,11 +121,20 @@ const HTML_TEMPLATE = `
         averageCenter: true,
         minLevel: 4,
         calculator: [5, 10],
-        styles: [
-          { width: '44px', height: '44px', className: 'cluster' },
-          { width: '54px', height: '54px', className: 'cluster' },
-          { width: '64px', height: '64px', className: 'cluster' }
-        ]
+        // 카카오 클러스터러는 모양을 className 이 아니라 직접 스타일 값으로 받아야 확실히 적용된다
+        styles: [44, 54, 64].map(function (size) {
+          return {
+            width: size + 'px',
+            height: size + 'px',
+            background: 'rgba(187,210,240,0.92)',
+            borderRadius: '50%',
+            color: '#1a3d73',
+            fontWeight: 'bold',
+            fontSize: '15px',
+            textAlign: 'center',
+            lineHeight: size + 'px'
+          };
+        })
       });
 
       // 사용자가 직접 움직이거나 확대/축소하면 그 뒤로는 자동 맞춤을 하지 않는다
