@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 
@@ -313,7 +313,7 @@ export default function KakaoMapView({
     [centerLatitude, centerLongitude],
   );
 
-  const sendState = () => {
+  const sendState = useCallback(() => {
     const state = JSON.stringify({
       markers,
       selectedId: selectedId ?? null,
@@ -323,12 +323,12 @@ export default function KakaoMapView({
     webviewRef.current?.injectJavaScript(
       `window.setMapState && window.setMapState(${state}); true;`,
     );
-  };
+  }, [markers, selectedId, fitPoints, fitKey]);
 
   // markers / selectedId / fitPoints / fitKey 가 실제로 바뀔 때만 전달한다
   useEffect(() => {
     sendState();
-  }, [markers, selectedId, fitPoints, fitKey]);
+  }, [sendState]);
 
   return (
     <WebView

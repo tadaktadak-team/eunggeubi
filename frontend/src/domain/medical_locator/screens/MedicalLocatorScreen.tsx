@@ -82,8 +82,10 @@ export default function MedicalLocatorScreen() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // 진입할 때 한 번만 위치를 잡는다. 다시 시도는 버튼(loadInitialData)으로 한다
   useEffect(() => {
     loadInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 위치 확보까지만 담당. 실패하면 화면 전체를 에러로 보여줘야 하는 전제조건이라 그대로 try/catch.

@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, Image } from 'react-native';
 
-import { colors, font, radius, spacing } from '../../../shared/theme/theme';
+import { colors, font, spacing } from '../../../shared/theme/theme';
 
 export default function SplashScreen() {
   return (
