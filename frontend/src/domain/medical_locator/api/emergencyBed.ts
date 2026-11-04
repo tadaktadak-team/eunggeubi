@@ -12,10 +12,5 @@ export async function getEmergencyBeds(
     longitude: String(longitude),
   });
 
-  console.log(
-    "응급실 API 요청:",
-    `/api/emergency-beds?${params.toString()}`
-  );
-
   return api.get<EmergencyBed[]>(`/api/emergency-beds?${params.toString()}`);
 }

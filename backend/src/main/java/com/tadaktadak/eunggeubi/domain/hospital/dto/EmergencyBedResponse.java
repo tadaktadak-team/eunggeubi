@@ -1,4 +1,4 @@
-package com.tadaktadak.eunggeubi.domain.emergency_bed.dto;
+package com.tadaktadak.eunggeubi.domain.hospital.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

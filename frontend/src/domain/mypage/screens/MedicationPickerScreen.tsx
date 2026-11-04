@@ -120,7 +120,7 @@ export default function MedicationPickerScreen() {
               <Pressable style={styles.manualBtn} onPress={() => pick({ name: searchedKeyword, itemSeq: null })}>
                 <Text style={styles.manualText}>찾는 약이 없나요? ‘{searchedKeyword}’ 그대로 직접 추가</Text>
               </Pressable>
-            ) : null
+            ) : undefined
           }
         />
       )}
