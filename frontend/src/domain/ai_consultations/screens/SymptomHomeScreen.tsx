@@ -107,7 +107,7 @@ export default function SymptomHomeScreen() {
 
           <Text style={styles.sectionTitle}>바로가기</Text>
           <View style={styles.quickLinkRow}>
-            <QuickLinkCard label="병원찾기" icon={{ lib: 'ion', name: 'location-outline' }} onPress={() => goToTab('Hospital')} />
+            <QuickLinkCard label="의료기관 찾기" icon={{ lib: 'ion', name: 'location-outline' }} onPress={() => goToTab('Hospital')} />
             <QuickLinkCard
                 label="응급처치 안내"
                 icon={{ lib: 'ion', name: 'alert-circle-outline' }}

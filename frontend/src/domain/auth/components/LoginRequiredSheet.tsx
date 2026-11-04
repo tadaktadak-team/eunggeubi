@@ -14,7 +14,7 @@ interface Props {
   onClose: () => void;
 }
 
-// 로그인해야 쓸 수 있는 기능. 상담·병원 찾기·약물 정보는 로그인 없이도 되므로 문구로만 안내한다
+// 로그인해야 쓸 수 있는 기능. 상담·의료기관 찾기·약물 정보는 로그인 없이도 되므로 문구로만 안내한다
 const BENEFITS = ['긴급 상황에 보호자에게 위치 알림', 'AI 상담 이력 저장', '건강 프로필 관리'];
 
 export default function LoginRequiredSheet({ visible, onClose }: Props) {
@@ -34,7 +34,7 @@ export default function LoginRequiredSheet({ visible, onClose }: Props) {
           <View style={styles.handle} />
 
           <Text style={styles.title}>로그인하면 이런 기능이 더해져요</Text>
-          <Text style={styles.subtitle}>상담·병원 찾기·약물 정보는 로그인 없이도 쓸 수 있어요.</Text>
+          <Text style={styles.subtitle}>상담·의료기관 찾기·약물 정보는 로그인 없이도 쓸 수 있어요.</Text>
 
           <View style={styles.list}>
             {BENEFITS.map((b) => (

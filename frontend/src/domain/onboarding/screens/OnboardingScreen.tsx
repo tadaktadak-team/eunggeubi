@@ -86,7 +86,7 @@ const STEPS: Step[] = [
 
 const CHIPS = ['두통', '복통', '발열', '어지럼'];
 const SHORTCUTS: { label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { label: '병원찾기', icon: 'location-outline' },
+  { label: '의료기관 찾기', icon: 'location-outline' },
   { label: '응급처치 안내', icon: 'alert-circle-outline' },
   { label: '약물정보', icon: 'medkit-outline' },
 ];
@@ -285,7 +285,7 @@ export default function OnboardingScreen({ onDone }: Props) {
             </View>
             <View style={styles.tab}>
               <Ionicons name="location-outline" size={22} color={colors.placeholder} />
-              <Text style={styles.tabLabel}>병원찾기</Text>
+              <Text style={styles.tabLabel}>의료기관</Text>
             </View>
           </View>
 
