@@ -101,7 +101,7 @@ export default function FacilitySheet({ item, accentColor, onClose }: FacilitySh
     return () => {
       cancelled = true;
     };
-  }, [item.id]);
+  }, [isHospital, item.ykiho]);
 
   function toggleChecklistItem(id: string) {
     setCheckedItems((prev) => {

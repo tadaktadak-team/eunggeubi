@@ -301,6 +301,7 @@ export const imageLoadQueue = createImageLoadQueue({
   // 개발 중에만 정지 시작/종료를 Metro 콘솔에 남긴다(팀에서 실패·정지 횟수를 다시 측정할 때 참고용).
   onEvent:
     process.env.NODE_ENV !== 'production'
-      ? (event) => console.log('[imageLoadQueue]', JSON.stringify(event))
+      ? // eslint-disable-next-line no-console -- 개발 빌드에서만 남기는 측정용 로그
+        (event) => console.log('[imageLoadQueue]', JSON.stringify(event))
       : undefined,
 });
